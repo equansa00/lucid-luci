@@ -53,6 +53,7 @@ WORKSPACE = Path(os.getenv("BEAST_WORKSPACE", str(Path.home() / "beast" / "works
 DOCS_DIR = WORKSPACE / "docs"
 REPO_DIR = WORKSPACE / "repo"
 RUNS_DIR = WORKSPACE / "runs"
+PERSONA_PATH = os.getenv("BEAST_PERSONA_PATH", str(WORKSPACE / "persona_agent.txt"))
 
 # RAG bounds
 CHUNK_SIZE = int(os.getenv("BEAST_CHUNK_SIZE", "900"))
@@ -211,6 +212,16 @@ def is_allowed_tool_path(arg: str) -> bool:
 # -----------------------------
 # Ollama client
 # -----------------------------
+
+def load_persona() -> str:
+    try:
+        p = Path(PERSONA_PATH)
+        if p.is_file():
+            return p.read_text(encoding="utf-8", errors="ignore").strip()
+    except Exception:
+        pass
+    return ""
+
 def ollama_chat(messages: List[Dict[str, str]], temperature: float = 0.2) -> str:
     payload = {
         "model": MODEL,
@@ -1043,7 +1054,12 @@ def main() -> None:
 
     if args.cmd == "ask":
         q = " ".join(args.q)
-        ans = ollama_chat([{"role": "user", "content": q}], temperature=args.temp)
+        persona = load_persona()
+        messages = []
+        if persona:
+            messages.append({"role": "system", "content": persona})
+        messages.append({"role": "user", "content": q})
+        ans = ollama_chat(messages, temperature=args.temp)
         print(ans)
         return
 
@@ -1065,7 +1081,12 @@ QUESTION:
 {q}
 
 ANSWER:"""
-        ans = ollama_chat([{"role": "user", "content": prompt}], temperature=0.2)
+        persona = load_persona()
+        messages = []
+        if persona:
+            messages.append({"role": "system", "content": persona})
+        messages.append({"role": "user", "content": prompt})
+        ans = ollama_chat(messages, temperature=0.2)
         print(ans)
         return
 
