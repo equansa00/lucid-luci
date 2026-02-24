@@ -61,6 +61,13 @@ MEMORIES_DIR = WORKSPACE / "memories"
 MEMORY_EXTRACT_MODEL = os.getenv("BEAST_MEMORY_EXTRACT_MODEL", "llama3.1:8b")
 BEAST_AUTO_MEMORY = os.getenv("BEAST_AUTO_MEMORY", "0") == "1"
 
+# Web system
+WEB_MAX_BYTES = int(os.getenv("BEAST_WEB_MAX_BYTES", str(512 * 1024)))
+WEB_TIMEOUT_SEC = int(os.getenv("BEAST_WEB_TIMEOUT_SEC", "10"))
+WEB_SUMMARY_MODEL = os.getenv("BEAST_WEB_SUMMARY_MODEL", "llama3.1:8b")
+WEB_MONITORS_PATH = WORKSPACE / "monitors.json"
+WEB_USER_AGENT = "Mozilla/5.0 (compatible; BEAST-Agent/1.0)"
+
 # RAG bounds
 CHUNK_SIZE = int(os.getenv("BEAST_CHUNK_SIZE", "900"))
 CHUNK_OVERLAP = int(os.getenv("BEAST_CHUNK_OVERLAP", "150"))
@@ -1397,6 +1404,155 @@ def init_memory() -> None:
 
 
 # -----------------------------
+# Web System
+# -----------------------------
+
+def web_fetch(url: str) -> Tuple[str, str]:
+    """Fetch a URL, return (title, clean_text[:8000]).
+    Raises ValueError with a clean message on any failure."""
+    if not (url.startswith("http://") or url.startswith("https://")):
+        raise ValueError(f"URL must start with http:// or https://")
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        raise ValueError("beautifulsoup4 not installed")
+    try:
+        resp = requests.get(
+            url,
+            headers={"User-Agent": WEB_USER_AGENT},
+            timeout=WEB_TIMEOUT_SEC,
+            stream=True,
+        )
+        resp.raise_for_status()
+        raw = b""
+        for chunk in resp.iter_content(chunk_size=8192):
+            raw += chunk
+            if len(raw) >= WEB_MAX_BYTES:
+                break
+        html = raw.decode("utf-8", errors="ignore")
+    except requests.RequestException as e:
+        raise ValueError(f"fetch failed: {e}")
+    soup = BeautifulSoup(html, "lxml")
+    for tag in soup(["script", "style", "noscript", "nav", "footer", "iframe"]):
+        tag.decompose()
+    title = (soup.title.string or "").strip() if soup.title else ""
+    text = "\n".join(l for l in soup.get_text(separator="\n", strip=True).splitlines() if l.strip())
+    return title, text[:8000]
+
+
+def web_search_ddg(query: str, max_results: int = 5) -> List[Dict[str, str]]:
+    """Search DuckDuckGo HTML, return list of {title, url, snippet}. Never raises."""
+    try:
+        import urllib.parse
+        from bs4 import BeautifulSoup
+        q = urllib.parse.quote_plus(query)
+        resp = requests.get(
+            f"https://html.duckduckgo.com/html/?q={q}",
+            headers={"User-Agent": WEB_USER_AGENT},
+            timeout=WEB_TIMEOUT_SEC,
+        )
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "lxml")
+        results: List[Dict[str, str]] = []
+        for result in soup.select(".result")[:max_results]:
+            title_el = result.select_one(".result__title")
+            snippet_el = result.select_one(".result__snippet")
+            link_el = result.select_one(".result__title a")
+            title = title_el.get_text(strip=True) if title_el else ""
+            snippet = snippet_el.get_text(strip=True) if snippet_el else ""
+            url = ""
+            if link_el and link_el.get("href"):
+                href = str(link_el["href"])
+                if "uddg=" in href:
+                    params = urllib.parse.parse_qs(urllib.parse.urlparse(href).query)
+                    url = urllib.parse.unquote(params.get("uddg", [""])[0])
+                elif href.startswith("http"):
+                    url = href
+                else:
+                    url = f"https://duckduckgo.com{href}"
+            if title or url:
+                results.append({"title": title, "url": url, "snippet": snippet})
+        return results
+    except Exception:
+        return []
+
+
+def web_summarize(content: str, query: str = "") -> str:
+    """Summarize content in 3-5 bullets using WEB_SUMMARY_MODEL."""
+    if query:
+        system = f"Summarize in 3-5 bullet points, focusing on: {query}"
+    else:
+        system = "Summarize in 3-5 concise bullet points."
+    try:
+        payload = {
+            "model": WEB_SUMMARY_MODEL,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": content[:4000]},
+            ],
+            "stream": False,
+            "options": {"temperature": 0.2},
+        }
+        r = requests.post(OLLAMA_CHAT_URL, json=payload, timeout=30)
+        r.raise_for_status()
+        return (r.json().get("message") or {}).get("content", "").strip()
+    except Exception as e:
+        return f"(summarization failed: {e})"
+
+
+def web_monitor_load() -> Dict[str, Any]:
+    """Load monitors.json, return {} if missing or invalid."""
+    if not WEB_MONITORS_PATH.exists():
+        return {}
+    try:
+        return json.loads(WEB_MONITORS_PATH.read_text(encoding="utf-8", errors="ignore"))
+    except Exception:
+        return {}
+
+
+def web_monitor_save(monitors: Dict[str, Any]) -> None:
+    """Save monitors dict to monitors.json atomically."""
+    safe_write_text(WEB_MONITORS_PATH, json.dumps(monitors, indent=2))
+
+
+def web_monitor_check(url: str, monitors: Dict[str, Any]) -> Tuple[bool, str]:
+    """Check if a monitored URL changed. Updates hash in monitors in-place.
+    Returns (changed, message). Never raises."""
+    try:
+        _, text = web_fetch(url)
+        current_hash = sha256_text(text)
+        entry = monitors.get(url, {})
+        stored_hash = entry.get("hash", "")
+        monitors[url] = {
+            "hash": current_hash,
+            "last_checked": time.time(),
+            "title": entry.get("title", ""),
+        }
+        if stored_hash and current_hash != stored_hash:
+            return True, f"🌐 {url} changed since last check"
+        return False, "unchanged"
+    except Exception as e:
+        return False, f"monitor check failed for {url}: {e}"
+
+
+def run_web_monitors() -> List[str]:
+    """Check all monitors, return list of change alert strings."""
+    monitors = web_monitor_load()
+    if not monitors:
+        return []
+    alerts: List[str] = []
+    any_changed = False
+    for url in list(monitors.keys()):
+        changed, msg = web_monitor_check(url, monitors)
+        if changed:
+            alerts.append(msg)
+            any_changed = True
+    if any_changed:
+        web_monitor_save(monitors)
+    return alerts
+
+
+# -----------------------------
 # Telegram Bot
 # -----------------------------
 ALLOWED_USER_ID = 8757958279
@@ -1471,6 +1627,9 @@ def run_telegram_bot() -> None:
             "/memoryfull — complete memory dump\n"
             "/remember <text> — save something to memory\n"
             "/forget <text> — remove matching memory entry\n"
+            "/web <query or url> — search or fetch a page\n"
+            "/monitor <url> — watch a URL for changes\n"
+            "/yes — confirm pending fetch\n"
             "plain text — sent directly to Ollama, response returned"
         )
 
@@ -1613,6 +1772,116 @@ def run_telegram_bot() -> None:
         save_memory_entry(cat, entry)
         await send_long(update, f"✅ Memory updated — saved to {cat}")
 
+    # Pending URL fetches awaiting /yes confirmation: {user_id: url}
+    pending_fetches: Dict[int, str] = {}
+
+    async def cmd_web(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not allowed(update):
+            return
+        if not context.args:
+            await update.message.reply_text(
+                "Usage:\n"
+                "  /web <url> — fetch and summarize a page\n"
+                "  /web <query> — search DuckDuckGo"
+            )
+            return
+        arg = " ".join(context.args).strip()
+        if arg.startswith("http://") or arg.startswith("https://"):
+            await update.message.reply_text("🌐 Fetching...")
+            try:
+                title, text = web_fetch(arg)
+                summary = web_summarize(text)
+                msg = f"🌐 {title}\n\n{summary}\n\nURL: {arg}"
+            except ValueError as e:
+                msg = f"❌ {e}"
+        else:
+            await update.message.reply_text(f"🔍 Searching: {arg}...")
+            results = web_search_ddg(arg)
+            if not results:
+                await update.message.reply_text("❌ No results found.")
+                return
+            lines = [f"{i}. {r['title']}\n   {r['url']}\n   {r['snippet']}"
+                     for i, r in enumerate(results, 1)]
+            combined = " ".join(r["snippet"] for r in results)
+            summary = web_summarize(combined, query=arg)
+            msg = "\n\n".join(lines) + f"\n\n📝 Summary:\n{summary}"
+        await send_long(update, msg)
+
+    async def cmd_yes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not allowed(update):
+            return
+        uid = update.effective_user.id
+        url = pending_fetches.pop(uid, None)
+        if not url:
+            await update.message.reply_text("❌ No pending fetch. Send a URL first.")
+            return
+        await update.message.reply_text(f"🌐 Fetching {url}...")
+        try:
+            title, text = web_fetch(url)
+            summary = web_summarize(text)
+            msg = f"🌐 {title}\n\n{summary}\n\nURL: {url}"
+        except ValueError as e:
+            msg = f"❌ {e}"
+        await send_long(update, msg)
+
+    async def cmd_monitor(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not allowed(update):
+            return
+        args = list(context.args or [])
+        if not args:
+            await update.message.reply_text(
+                "Usage:\n"
+                "  /monitor <url> — add URL to monitoring\n"
+                "  /monitor list — show all monitors\n"
+                "  /monitor remove <url> — stop monitoring\n"
+                "  /monitor check — check all monitors now"
+            )
+            return
+        monitors = web_monitor_load()
+        if args[0] == "list":
+            if not monitors:
+                await update.message.reply_text("No URLs being monitored.")
+                return
+            lines = ["Monitored URLs:"]
+            for u, data in monitors.items():
+                last = data.get("last_checked")
+                last_str = time.strftime("%Y-%m-%d %H:%M", time.localtime(last)) if last else "never"
+                lines.append(f"  • {u}\n    last checked: {last_str}")
+            await send_long(update, "\n".join(lines))
+            return
+        if args[0] == "remove":
+            if len(args) < 2:
+                await update.message.reply_text("Usage: /monitor remove <url>")
+                return
+            url = args[1]
+            if url in monitors:
+                del monitors[url]
+                web_monitor_save(monitors)
+                await send_long(update, f"✅ Stopped monitoring {url}")
+            else:
+                await update.message.reply_text(f"❌ Not monitoring {url}")
+            return
+        if args[0] == "check":
+            alerts = run_web_monitors()
+            if alerts:
+                await send_long(update, "\n".join(alerts))
+            else:
+                await update.message.reply_text("✅ No changes detected.")
+            return
+        # Otherwise: add URL
+        url = args[0]
+        if not (url.startswith("http://") or url.startswith("https://")):
+            await update.message.reply_text("❌ URL must start with http:// or https://")
+            return
+        await update.message.reply_text(f"🌐 Fetching baseline for {url}...")
+        try:
+            _, text = web_fetch(url)
+            monitors[url] = {"hash": sha256_text(text), "last_checked": time.time(), "title": ""}
+            web_monitor_save(monitors)
+            await send_long(update, f"✅ Monitoring {url} — I'll alert you on changes")
+        except ValueError as e:
+            await update.message.reply_text(f"❌ Could not fetch baseline: {e}")
+
     async def cmd_forget(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not allowed(update):
             return
@@ -1644,9 +1913,47 @@ def run_telegram_bot() -> None:
         text = (update.message.text or "").strip()
         if not text:
             return
+
+        # URL detection
+        url_match = re.search(r'https?://\S+', text)
+        if url_match:
+            url = url_match.group(0).rstrip(".,;:!?)\"'")
+            text_without_url = text.replace(url_match.group(0), "").strip()
+            if not text_without_url:
+                # URL only — ask for confirmation
+                pending_fetches[update.effective_user.id] = url
+                await update.message.reply_text(
+                    f"🌐 Fetching — confirm? Reply /yes to proceed or just ask me something else\n{url}"
+                )
+                return
+            else:
+                # URL + question — fetch and include in context automatically
+                try:
+                    _, page_text = web_fetch(url)
+                    augmented = (
+                        f"Page content from {url}:\n\n{page_text[:3000]}"
+                        f"\n\nUser question: {text_without_url}"
+                    )
+                except ValueError:
+                    augmented = text
+                persona = load_persona_with_memory()
+                messages: List[Dict[str, str]] = []
+                if persona:
+                    messages.append({"role": "system", "content": persona})
+                messages.append({"role": "user", "content": augmented})
+                try:
+                    response = ollama_chat(messages, temperature=0.4)
+                except Exception as e:
+                    response = f"❌ Ollama error: {e}"
+                await send_long(update, response)
+                if BEAST_AUTO_MEMORY:
+                    asyncio.create_task(asyncio.to_thread(auto_extract_memory, text, response))
+                return
+
+        # Normal message
         try:
             persona = load_persona_with_memory()
-            messages: List[Dict[str, str]] = []
+            messages = []
             if persona:
                 messages.append({"role": "system", "content": persona})
             messages.append({"role": "user", "content": text})
@@ -1669,6 +1976,9 @@ def run_telegram_bot() -> None:
     app.add_handler(CommandHandler("memoryfull", cmd_memoryfull))
     app.add_handler(CommandHandler("remember", cmd_remember))
     app.add_handler(CommandHandler("forget", cmd_forget))
+    app.add_handler(CommandHandler("web", cmd_web))
+    app.add_handler(CommandHandler("yes", cmd_yes))
+    app.add_handler(CommandHandler("monitor", cmd_monitor))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print(f"BEAST bot starting (model: {MODEL})", flush=True)
@@ -1871,6 +2181,9 @@ def run_heartbeat() -> None:
     w = _hb_check_telegram_last_success()
     if w:
         warns.append(w)
+
+    # Web monitors
+    warns.extend(run_web_monitors())
 
     # Log — append and trim to 1000 lines
     status = "WARN" if warns else "OK"
