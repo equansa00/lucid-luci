@@ -1146,6 +1146,8 @@ def run_telegram_bot() -> None:
     async def send_long(update: Update, text: str) -> None:
         for chunk in _split_message(text):
             await update.message.reply_text(chunk)
+        RUNS_DIR.mkdir(parents=True, exist_ok=True)
+        safe_write_text(RUNS_DIR / "telegram_last_success.txt", str(time.time()))
 
     async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not allowed(update):
@@ -1167,6 +1169,7 @@ def run_telegram_bot() -> None:
             "/models — list available Ollama models\n"
             "/run <command> — run an allowlisted shell command\n"
             "/patch — how to send a unified diff\n"
+            "/heartbeat — run all health checks now\n"
             "plain text — sent directly to Ollama, response returned"
         )
 
@@ -1222,6 +1225,30 @@ def run_telegram_bot() -> None:
             f"Allowed path prefixes: {prefixes}"
         )
 
+    async def cmd_heartbeat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not allowed(update):
+            return
+        ts = now_ts()
+        warns: List[str] = []
+        for fn in (_hb_check_disk, _hb_check_ram, _hb_check_cpu_load):
+            w = fn()
+            if w:
+                warns.append(w)
+        w = _hb_check_ollama()
+        if w:
+            warns.append(w)
+        warns.extend(_hb_check_beast_service())
+        w = _hb_check_tasks()
+        if w:
+            warns.append(w)
+        warns.extend(_hb_check_repo())
+        # Skip telegram_last_success check — we're about to update it
+        if warns:
+            msg = f"⚠️ HEARTBEAT — {ts}\n\n" + "\n".join(f"• {w}" for w in warns)
+        else:
+            msg = f"✅ HEARTBEAT OK — {ts} — all systems nominal"
+        await send_long(update, msg)
+
     async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not allowed(update):
             return
@@ -1241,6 +1268,7 @@ def run_telegram_bot() -> None:
     app.add_handler(CommandHandler("models", cmd_models))
     app.add_handler(CommandHandler("run", cmd_run))
     app.add_handler(CommandHandler("patch", cmd_patch))
+    app.add_handler(CommandHandler("heartbeat", cmd_heartbeat))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print(f"BEAST bot starting (model: {MODEL})", flush=True)
