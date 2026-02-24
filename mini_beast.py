@@ -59,6 +59,7 @@ PERSONA_PATH = os.getenv("BEAST_PERSONA_PATH", str(WORKSPACE / "persona_agent.tx
 MEMORY_PATH = WORKSPACE / "memory.md"
 MEMORIES_DIR = WORKSPACE / "memories"
 MEMORY_EXTRACT_MODEL = os.getenv("BEAST_MEMORY_EXTRACT_MODEL", "llama3.1:8b")
+BEAST_AUTO_MEMORY = os.getenv("BEAST_AUTO_MEMORY", "0") == "1"
 
 # RAG bounds
 CHUNK_SIZE = int(os.getenv("BEAST_CHUNK_SIZE", "900"))
@@ -219,14 +220,23 @@ def is_allowed_tool_path(arg: str) -> bool:
 # -----------------------------
 
 def load_persona() -> str:
-    """Return persona_agent.txt + memory.md contents for LLM system context."""
-    parts: List[str] = []
+    """Return persona_agent.txt contents only. Does NOT include memory."""
     try:
         p = Path(PERSONA_PATH)
         if p.is_file():
-            parts.append(p.read_text(encoding="utf-8", errors="ignore").strip())
+            return p.read_text(encoding="utf-8", errors="ignore").strip()
     except Exception:
         pass
+    return ""
+
+
+def load_persona_with_memory() -> str:
+    """Return persona_agent.txt + memory.md for ask/cite/Telegram contexts.
+    NOT used by agent_prompt — it receives memory_text separately."""
+    parts: List[str] = []
+    persona = load_persona()
+    if persona:
+        parts.append(persona)
     mem = load_memory()
     if mem.strip():
         parts.append("## WHAT YOU REMEMBER ABOUT EDWARD:\n" + mem.strip())
@@ -1068,7 +1078,7 @@ def main() -> None:
 
     if args.cmd == "ask":
         q = " ".join(args.q)
-        persona = load_persona()
+        persona = load_persona_with_memory()
         messages = []
         if persona:
             messages.append({"role": "system", "content": persona})
@@ -1095,7 +1105,7 @@ QUESTION:
 {q}
 
 ANSWER:"""
-        persona = load_persona()
+        persona = load_persona_with_memory()
         messages = []
         if persona:
             messages.append({"role": "system", "content": persona})
@@ -1201,13 +1211,25 @@ def save_memory_entry(category: str, entry: str) -> None:
 
 
 def auto_extract_memory(user_msg: str, beast_response: str) -> None:
-    """Use a fast model to extract memorable facts. Silent on any failure."""
+    """Use a fast model to extract memorable facts. Silent on any failure.
+    Rate-limited to one write per 30 minutes via runs/memory_last_write.txt."""
+    # Rate limit: skip if a write happened within the last 30 minutes
+    last_write_path = RUNS_DIR / "memory_last_write.txt"
+    try:
+        if last_write_path.exists():
+            last_write = float(last_write_path.read_text(encoding="utf-8", errors="ignore").strip())
+            if (time.time() - last_write) < 1800:
+                return
+    except Exception:
+        pass
+
     system = (
         "Extract any facts worth remembering about the user, their machine, projects, "
         "or preferences from this exchange. "
         'Return JSON: {"category": str, "entry": str} or {"category": null} if nothing. '
         "Categories: machine, preferences, projects, tasks, security. "
-        "Be selective — only save concrete, reusable facts."
+        "Be selective — only save concrete, reusable facts. "
+        "Return ONLY a JSON object, no other text."
     )
     prompt = f"USER: {user_msg[:600]}\nBEAST: {beast_response[:600]}"
     try:
@@ -1223,14 +1245,18 @@ def auto_extract_memory(user_msg: str, beast_response: str) -> None:
         r = requests.post(OLLAMA_CHAT_URL, json=payload, timeout=10)
         r.raise_for_status()
         raw = (r.json().get("message") or {}).get("content", "").strip()
-        m = re.search(r'\{[^{}]+\}', raw)
-        if not m:
+        if not (raw.startswith("{") and raw.endswith("}")):
             return
-        obj = json.loads(m.group(0))
+        try:
+            obj = json.loads(raw)
+        except json.JSONDecodeError:
+            return
         cat = obj.get("category")
         entry = obj.get("entry", "").strip()
         if cat and entry and cat in {"machine", "preferences", "projects", "tasks", "security"}:
             save_memory_entry(cat, entry)
+            RUNS_DIR.mkdir(parents=True, exist_ok=True)
+            safe_write_text(last_write_path, str(time.time()))
     except Exception:
         pass
 
@@ -1283,7 +1309,7 @@ def init_memory() -> None:
 *Initialized: {ts}*
 
 ## Identity
-- Owner: Edward (Telegram ID: 8757958279)
+- Owner: Edward
 - Machine: {os_version}, {hostname}
 - Timezone: EST
 
@@ -1573,11 +1599,13 @@ def run_telegram_bot() -> None:
             r = requests.post(OLLAMA_CHAT_URL, json=payload, timeout=10)
             r.raise_for_status()
             raw = (r.json().get("message") or {}).get("content", "").strip()
-            m_match = re.search(r'\{[^{}]+\}', raw)
-            if m_match:
-                obj = json.loads(m_match.group(0))
-                cat = obj.get("category", "preferences")
-                entry = obj.get("entry", text).strip() or text
+            if raw.startswith("{") and raw.endswith("}"):
+                try:
+                    obj = json.loads(raw)
+                    cat = obj.get("category", "preferences")
+                    entry = obj.get("entry", text).strip() or text
+                except json.JSONDecodeError:
+                    pass
         except Exception:
             pass
         if cat not in {"machine", "preferences", "projects", "tasks", "security"}:
@@ -1598,7 +1626,9 @@ def run_telegram_bot() -> None:
         try:
             content = MEMORY_PATH.read_text(encoding="utf-8", errors="ignore")
             lines = content.splitlines(keepends=True)
-            kept = [l for l in lines if query not in l.lower()]
+            kept = [l for l in lines if not (
+                l.strip().startswith("- [") and query in l.lower()
+            )]
             removed = len(lines) - len(kept)
             if removed:
                 safe_write_text(MEMORY_PATH, "".join(kept))
@@ -1615,7 +1645,7 @@ def run_telegram_bot() -> None:
         if not text:
             return
         try:
-            persona = load_persona()
+            persona = load_persona_with_memory()
             messages: List[Dict[str, str]] = []
             if persona:
                 messages.append({"role": "system", "content": persona})
@@ -1624,8 +1654,8 @@ def run_telegram_bot() -> None:
         except Exception as e:
             response = f"❌ Ollama error: {e}"
         await send_long(update, response)
-        # Non-blocking background memory extraction
-        asyncio.create_task(asyncio.to_thread(auto_extract_memory, text, response))
+        if BEAST_AUTO_MEMORY:
+            asyncio.create_task(asyncio.to_thread(auto_extract_memory, text, response))
 
     app = Application.builder().token(token).build()
     app.add_handler(CommandHandler("start", cmd_start))

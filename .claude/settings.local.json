@@ -7,7 +7,8 @@
       "Bash(tail:*)",
       "Bash(python3.14:*)",
       "Bash(git:*)",
-      "Bash(systemctl:*)"
+      "Bash(systemctl:*)",
+      "Bash(grep Telegram ID\\\\|8757958279:*)"
     ]
   }
 }

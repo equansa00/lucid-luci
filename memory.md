@@ -1,8 +1,8 @@
 # BEAST Memory — Edward's Agent
-*Initialized: 20260224-162809*
+*Initialized: 20260224-164159*
 
 ## Identity
-- Owner: Edward (Telegram ID: 8757958279)
+- Owner: Edward
 - Machine: Fedora Linux 43 (Workstation Edition), fedora
 - Timezone: EST
 
