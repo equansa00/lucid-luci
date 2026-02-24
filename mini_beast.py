@@ -28,6 +28,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import base64
+import datetime
 import hashlib
 import json
 import os
@@ -37,6 +39,7 @@ import shutil
 import subprocess
 import sys
 import time
+from email.mime.text import MIMEText
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -67,6 +70,20 @@ WEB_TIMEOUT_SEC = int(os.getenv("BEAST_WEB_TIMEOUT_SEC", "10"))
 WEB_SUMMARY_MODEL = os.getenv("BEAST_WEB_SUMMARY_MODEL", "llama3.1:8b")
 WEB_MONITORS_PATH = WORKSPACE / "monitors.json"
 WEB_USER_AGENT = "Mozilla/5.0 (compatible; BEAST-Agent/1.0)"
+
+# Email / Calendar
+EMAIL_DRAFT_ONLY = os.getenv("BEAST_EMAIL_DRAFT_ONLY", "1") == "1"
+GMAIL_CREDENTIALS_PATH = WORKSPACE / "gmail_credentials.json"
+GMAIL_TOKEN_PATH = WORKSPACE / "gmail_token.json"
+CALENDAR_ID = os.getenv("BEAST_CALENDAR_ID", "primary")
+REMINDERS_PATH = WORKSPACE / "reminders.json"
+DAILY_BRIEFING_HOUR = int(os.getenv("BEAST_BRIEFING_HOUR", "8"))
+
+# OAuth scopes (Gmail modify + Calendar full)
+GMAIL_SCOPES = [
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/calendar",
+]
 
 # RAG bounds
 CHUNK_SIZE = int(os.getenv("BEAST_CHUNK_SIZE", "900"))
@@ -1553,6 +1570,389 @@ def run_web_monitors() -> List[str]:
 
 
 # -----------------------------
+# Email System
+# -----------------------------
+
+def _google_creds():
+    """Return valid Google OAuth credentials, refreshing if expired."""
+    try:
+        from google.oauth2.credentials import Credentials
+        from google.auth.transport.requests import Request
+    except ImportError as e:
+        raise ValueError(f"Missing Google API libraries: {e}")
+    if not GMAIL_CREDENTIALS_PATH.exists():
+        raise ValueError(
+            f"Gmail credentials not found at {GMAIL_CREDENTIALS_PATH}\n"
+            "Setup:\n"
+            "1. https://console.cloud.google.com → create project\n"
+            "2. Enable Gmail API + Google Calendar API\n"
+            "3. Create OAuth2 credentials (Desktop app type)\n"
+            "4. Download as ~/beast/workspace/gmail_credentials.json\n"
+            "5. Run: python3.14 mini_beast.py --setup-gmail"
+        )
+    if not GMAIL_TOKEN_PATH.exists():
+        raise ValueError("Gmail not authorized. Run: python3.14 mini_beast.py --setup-gmail")
+    creds = Credentials.from_authorized_user_file(str(GMAIL_TOKEN_PATH), GMAIL_SCOPES)
+    if not creds.valid:
+        if creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+            GMAIL_TOKEN_PATH.write_text(creds.to_json())
+        else:
+            raise ValueError("Gmail token invalid. Run: python3.14 mini_beast.py --setup-gmail")
+    return creds
+
+
+def gmail_get_service():
+    """Return authenticated Gmail API service."""
+    try:
+        from googleapiclient.discovery import build
+    except ImportError as e:
+        raise ValueError(f"Missing Google API libraries: {e}")
+    return build("gmail", "v1", credentials=_google_creds())
+
+
+def calendar_get_service():
+    """Return authenticated Calendar API service."""
+    try:
+        from googleapiclient.discovery import build
+    except ImportError as e:
+        raise ValueError(f"Missing Google API libraries: {e}")
+    return build("calendar", "v3", credentials=_google_creds())
+
+
+def _gmail_headers(msg: dict) -> dict:
+    return {h["name"]: h["value"] for h in msg["payload"].get("headers", [])}
+
+
+def _gmail_body(payload: dict) -> str:
+    """Extract plain-text body from a Gmail message payload."""
+    if payload.get("body", {}).get("data"):
+        return base64.urlsafe_b64decode(payload["body"]["data"]).decode("utf-8", errors="ignore")
+    for part in payload.get("parts", []):
+        if part.get("mimeType") == "text/plain" and part.get("body", {}).get("data"):
+            return base64.urlsafe_b64decode(part["body"]["data"]).decode("utf-8", errors="ignore")
+    for part in payload.get("parts", []):
+        text = _gmail_body(part)
+        if text:
+            return text
+    return ""
+
+
+def email_list_unread(max_results: int = 10) -> List[Dict[str, Any]]:
+    """Return metadata for unread emails. Returns [] on any failure."""
+    try:
+        svc = gmail_get_service()
+        resp = svc.users().messages().list(
+            userId="me", q="is:unread", maxResults=max_results
+        ).execute()
+        results = []
+        for m in resp.get("messages", []):
+            msg = svc.users().messages().get(
+                userId="me", id=m["id"], format="metadata",
+                metadataHeaders=["From", "Subject", "Date"],
+            ).execute()
+            h = _gmail_headers(msg)
+            results.append({
+                "id": m["id"],
+                "sender": h.get("From", ""),
+                "subject": h.get("Subject", "(no subject)"),
+                "date": h.get("Date", ""),
+                "snippet": msg.get("snippet", ""),
+            })
+        return results
+    except Exception:
+        return []
+
+
+def email_get_full(message_id: str) -> Dict[str, Any]:
+    """Fetch a full email by ID, return dict with body as plain text."""
+    try:
+        svc = gmail_get_service()
+        msg = svc.users().messages().get(userId="me", id=message_id, format="full").execute()
+        h = _gmail_headers(msg)
+        return {
+            "id": message_id,
+            "sender": h.get("From", ""),
+            "subject": h.get("Subject", "(no subject)"),
+            "date": h.get("Date", ""),
+            "body": _gmail_body(msg["payload"])[:6000],
+        }
+    except Exception as e:
+        return {"id": message_id, "sender": "", "subject": "", "date": "", "body": "", "error": str(e)}
+
+
+def email_search(query: str, max_results: int = 10) -> List[Dict[str, Any]]:
+    """Search Gmail with a query string. Returns [] on failure."""
+    try:
+        svc = gmail_get_service()
+        resp = svc.users().messages().list(
+            userId="me", q=query, maxResults=max_results
+        ).execute()
+        results = []
+        for m in resp.get("messages", []):
+            msg = svc.users().messages().get(
+                userId="me", id=m["id"], format="metadata",
+                metadataHeaders=["From", "Subject", "Date"],
+            ).execute()
+            h = _gmail_headers(msg)
+            results.append({
+                "id": m["id"],
+                "sender": h.get("From", ""),
+                "subject": h.get("Subject", "(no subject)"),
+                "date": h.get("Date", ""),
+                "snippet": msg.get("snippet", ""),
+            })
+        return results
+    except Exception:
+        return []
+
+
+def email_create_draft(to: str, subject: str, body: str) -> str:
+    """Create a Gmail draft, return draft_id."""
+    msg = MIMEText(body)
+    msg["to"] = to
+    msg["subject"] = subject
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
+    svc = gmail_get_service()
+    draft = svc.users().drafts().create(
+        userId="me", body={"message": {"raw": raw}}
+    ).execute()
+    return draft["id"]
+
+
+def email_send_draft(draft_id: str) -> bool:
+    """Send an existing draft by ID. Return True on success."""
+    try:
+        svc = gmail_get_service()
+        svc.users().drafts().send(userId="me", body={"id": draft_id}).execute()
+        return True
+    except Exception:
+        return False
+
+
+def email_summarize(emails: List[Dict[str, Any]]) -> str:
+    """Summarize a list of email dicts using llama3.1:8b."""
+    if not emails:
+        return "No emails."
+    content = "\n\n".join(
+        f"From: {e['sender']}\nSubject: {e['subject']}\nSnippet: {e['snippet']}"
+        for e in emails
+    )
+    try:
+        payload = {
+            "model": "llama3.1:8b",
+            "messages": [
+                {"role": "system", "content": (
+                    "Summarize these emails in bullet points. "
+                    "Include sender, key point, any action needed."
+                )},
+                {"role": "user", "content": content[:4000]},
+            ],
+            "stream": False,
+            "options": {"temperature": 0.2},
+        }
+        r = requests.post(OLLAMA_CHAT_URL, json=payload, timeout=30)
+        r.raise_for_status()
+        return (r.json().get("message") or {}).get("content", "").strip()
+    except Exception as e:
+        return f"(summarization failed: {e})"
+
+
+# -----------------------------
+# Calendar System
+# -----------------------------
+
+def calendar_list_events(days_ahead: int = 7) -> List[Dict[str, Any]]:
+    """Return events from now to now+days_ahead, sorted by start time."""
+    svc = calendar_get_service()
+    now = datetime.datetime.utcnow().isoformat() + "Z"
+    end = (datetime.datetime.utcnow() + datetime.timedelta(days=days_ahead)).isoformat() + "Z"
+    result = svc.events().list(
+        calendarId=CALENDAR_ID, timeMin=now, timeMax=end,
+        singleEvents=True, orderBy="startTime",
+    ).execute()
+    events = []
+    for e in result.get("items", []):
+        events.append({
+            "summary": e.get("summary", "(no title)"),
+            "start": e["start"].get("dateTime", e["start"].get("date", "")),
+            "end": e["end"].get("dateTime", e["end"].get("date", "")),
+            "location": e.get("location", ""),
+            "description": e.get("description", ""),
+            "link": e.get("htmlLink", ""),
+        })
+    return events
+
+
+def calendar_create_event(
+    summary: str, start_dt: str, end_dt: str, description: str = ""
+) -> str:
+    """Create a calendar event with ISO start/end datetimes. Returns event link."""
+    svc = calendar_get_service()
+    event = {
+        "summary": summary,
+        "description": description,
+        "start": {"dateTime": start_dt, "timeZone": "America/New_York"},
+        "end": {"dateTime": end_dt, "timeZone": "America/New_York"},
+    }
+    result = svc.events().insert(calendarId=CALENDAR_ID, body=event).execute()
+    return result.get("htmlLink", "")
+
+
+def calendar_today() -> List[Dict[str, Any]]:
+    """Return calendar events for today only."""
+    now = datetime.datetime.now()
+    start = datetime.datetime(now.year, now.month, now.day).isoformat() + "Z"
+    end = (datetime.datetime(now.year, now.month, now.day) + datetime.timedelta(days=1)).isoformat() + "Z"
+    try:
+        svc = calendar_get_service()
+        result = svc.events().list(
+            calendarId=CALENDAR_ID, timeMin=start, timeMax=end,
+            singleEvents=True, orderBy="startTime",
+        ).execute()
+        events = []
+        for e in result.get("items", []):
+            events.append({
+                "summary": e.get("summary", "(no title)"),
+                "start": e["start"].get("dateTime", e["start"].get("date", "")),
+                "end": e["end"].get("dateTime", e["end"].get("date", "")),
+                "location": e.get("location", ""),
+                "description": e.get("description", ""),
+                "link": e.get("htmlLink", ""),
+            })
+        return events
+    except Exception:
+        return []
+
+
+# -----------------------------
+# Reminder System
+# -----------------------------
+
+def reminders_load() -> List[Dict[str, Any]]:
+    """Load reminders.json, return [] if missing or invalid."""
+    if not REMINDERS_PATH.exists():
+        return []
+    try:
+        return json.loads(REMINDERS_PATH.read_text(encoding="utf-8", errors="ignore"))
+    except Exception:
+        return []
+
+
+def reminders_save(reminders: List[Dict[str, Any]]) -> None:
+    """Save reminders list to reminders.json atomically."""
+    safe_write_text(REMINDERS_PATH, json.dumps(reminders, indent=2))
+
+
+def reminders_add(text: str, trigger_time: float) -> None:
+    """Add a reminder and persist it."""
+    reminders = reminders_load()
+    reminders.append({"text": text, "trigger_time": trigger_time, "created": time.time()})
+    reminders_save(reminders)
+
+
+def reminders_check() -> List[str]:
+    """Return texts of triggered reminders and remove them from storage."""
+    reminders = reminders_load()
+    now = time.time()
+    triggered = [r["text"] for r in reminders if r.get("trigger_time", 0) <= now]
+    remaining = [r for r in reminders if r.get("trigger_time", 0) > now]
+    if triggered:
+        reminders_save(remaining)
+    return triggered
+
+
+# -----------------------------
+# Daily Briefing
+# -----------------------------
+
+def generate_daily_briefing() -> str:
+    """Compose a morning briefing from calendar, email, and system status."""
+    today_str = datetime.date.today().strftime("%A, %B %d %Y")
+
+    # Calendar
+    events = calendar_today()
+    if events:
+        event_lines = "\n".join(
+            f"  • {e['start'][:16].replace('T', ' ')} — {e['summary']}"
+            for e in events
+        )
+    else:
+        event_lines = "  Nothing scheduled"
+
+    # Email
+    emails = email_list_unread(max_results=5)
+    email_count = len(emails)
+    email_sum = email_summarize(emails) if emails else "  No unread email"
+
+    # System (reuse heartbeat checks — defined later, resolved at call time)
+    sys_warns: List[str] = []
+    for fn in (_hb_check_disk, _hb_check_ram, _hb_check_cpu_load):
+        w = fn()
+        if w:
+            sys_warns.append(w)
+    w = _hb_check_ollama()
+    if w:
+        sys_warns.append(w)
+    sys_status = "All nominal" if not sys_warns else "; ".join(sys_warns)
+
+    return (
+        f"☀️ Good morning Edward — {today_str}\n\n"
+        f"📅 Today:\n{event_lines}\n\n"
+        f"📧 Unread emails ({email_count}):\n{email_sum}\n\n"
+        f"🖥️ System: {sys_status}"
+    )
+
+
+def send_daily_briefing() -> None:
+    """Generate briefing and send to Telegram."""
+    try:
+        from dotenv import load_dotenv
+        from telegram import Bot
+    except ImportError as e:
+        die(f"Missing dependency: {e}")
+    load_dotenv()
+    token = os.getenv("BOT_TOKEN")
+    if not token:
+        die("BOT_TOKEN not set")
+    briefing = generate_daily_briefing()
+    print(briefing)
+
+    async def _send() -> None:
+        bot = Bot(token=token)
+        async with bot:
+            for chunk in _split_message(briefing):
+                await bot.send_message(chat_id=ALLOWED_USER_ID, text=chunk)
+
+    asyncio.run(_send())
+
+
+def setup_gmail() -> None:
+    """Interactive OAuth flow to authorize Gmail + Calendar access."""
+    try:
+        from google_auth_oauthlib.flow import InstalledAppFlow
+    except ImportError as e:
+        die(f"Missing Google API libraries: {e}")
+    if not GMAIL_CREDENTIALS_PATH.exists():
+        die(
+            f"Credentials file not found: {GMAIL_CREDENTIALS_PATH}\n\n"
+            "To set up Gmail access:\n"
+            "1. Go to https://console.cloud.google.com\n"
+            "2. Create a project, enable Gmail API + Google Calendar API\n"
+            "3. Create OAuth2 credentials (Desktop app type)\n"
+            "4. Download credentials JSON as:\n"
+            f"   {GMAIL_CREDENTIALS_PATH}\n"
+            "5. Re-run: python3.14 mini_beast.py --setup-gmail"
+        )
+    flow = InstalledAppFlow.from_client_secrets_file(str(GMAIL_CREDENTIALS_PATH), GMAIL_SCOPES)
+    creds = flow.run_local_server(port=0)
+    GMAIL_TOKEN_PATH.write_text(creds.to_json())
+    print(f"✅ Gmail authorized — token saved to {GMAIL_TOKEN_PATH}")
+    print("   Gmail + Calendar access active.")
+    print("   Test with: /email and /calendar in Telegram")
+
+
+# -----------------------------
 # Telegram Bot
 # -----------------------------
 ALLOWED_USER_ID = 8757958279
@@ -1628,8 +2028,11 @@ def run_telegram_bot() -> None:
             "/remember <text> — save something to memory\n"
             "/forget <text> — remove matching memory entry\n"
             "/web <query or url> — search or fetch a page\n"
-            "/monitor <url> — watch a URL for changes\n"
+            "/monitor <url|list|remove|check> — watch URLs for changes\n"
             "/yes — confirm pending fetch\n"
+            "/email — read, search, draft and send emails\n"
+            "/calendar — view and create calendar events\n"
+            "/remind <time> <msg> — set a Telegram reminder\n"
             "plain text — sent directly to Ollama, response returned"
         )
 
@@ -1907,6 +2310,223 @@ def run_telegram_bot() -> None:
         except Exception as e:
             await update.message.reply_text(f"❌ Error: {e}")
 
+    async def cmd_email(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not allowed(update):
+            return
+        args = list(context.args or [])
+        try:
+            if not args:
+                await update.message.reply_text("📧 Fetching unread emails...")
+                emails = email_list_unread(max_results=10)
+                if not emails:
+                    await update.message.reply_text("📭 No unread emails.")
+                    return
+                summary = email_summarize(emails)
+                lines = [f"📧 {len(emails)} unread:\n"]
+                for e in emails[:5]:
+                    lines.append(f"[{e['id'][:8]}] {e['subject']}")
+                    lines.append(f"  From: {e['sender'][:50]}\n")
+                lines.append(f"📝 Summary:\n{summary}")
+                await send_long(update, "\n".join(lines))
+                return
+
+            if args[0] == "read":
+                if len(args) < 2:
+                    await update.message.reply_text("Usage: /email read <message_id>")
+                    return
+                msg = email_get_full(args[1])
+                if "error" in msg and msg["error"]:
+                    await send_long(update, f"❌ {msg['error']}")
+                    return
+                await send_long(update, (
+                    f"📧 {msg['subject']}\n"
+                    f"From: {msg['sender']}\nDate: {msg['date']}\n\n{msg['body']}"
+                ))
+                return
+
+            if args[0] == "search":
+                query = " ".join(args[1:])
+                if not query:
+                    await update.message.reply_text("Usage: /email search <query>")
+                    return
+                emails = email_search(query)
+                if not emails:
+                    await update.message.reply_text(f"📭 No results for: {query}")
+                    return
+                lines = [f"🔍 {len(emails)} results for '{query}':\n"]
+                for e in emails:
+                    lines.append(f"[{e['id'][:8]}] {e['subject']}")
+                    lines.append(f"  From: {e['sender'][:50]}")
+                    lines.append(f"  {e['snippet'][:80]}\n")
+                await send_long(update, "\n".join(lines))
+                return
+
+            if args[0] == "draft":
+                raw = " ".join(args[1:])
+                to_m = re.search(r'to:(\S+)', raw)
+                subj_m = re.search(r'subject:(.+?)(?=\s+\w+:|$)', raw)
+                if not to_m:
+                    await update.message.reply_text(
+                        "Usage: /email draft to:<addr> subject:<subject> <body>"
+                    )
+                    return
+                to_addr = to_m.group(1)
+                subject = subj_m.group(1).strip() if subj_m else "(no subject)"
+                body = re.sub(r'to:\S+', '', re.sub(r'subject:[^\n]+', '', raw)).strip()
+                draft_id = email_create_draft(to_addr, subject, body)
+                await send_long(update, (
+                    f"📧 Draft ready:\nTo: {to_addr}\nSubject: {subject}\n"
+                    f"Body: {body[:200]}\n\n"
+                    f"Reply /email send {draft_id} to send"
+                ))
+                return
+
+            if args[0] == "send":
+                if len(args) < 2:
+                    await update.message.reply_text("Usage: /email send <draft_id>")
+                    return
+                if EMAIL_DRAFT_ONLY:
+                    await update.message.reply_text(
+                        "❌ Draft-only mode active.\n"
+                        "Set BEAST_EMAIL_DRAFT_ONLY=0 in .env to enable sending."
+                    )
+                    return
+                ok = email_send_draft(args[1])
+                await send_long(update, "✅ Email sent." if ok else "❌ Send failed.")
+                return
+
+            if args[0] == "reply":
+                if len(args) < 3:
+                    await update.message.reply_text("Usage: /email reply <message_id> <text>")
+                    return
+                orig = email_get_full(args[1])
+                reply_body = " ".join(args[2:])
+                draft_id = email_create_draft(
+                    orig.get("sender", ""), f"Re: {orig.get('subject', '')}", reply_body
+                )
+                await send_long(update, (
+                    f"📧 Reply draft created.\nTo: {orig.get('sender', '')}\n\n"
+                    f"Reply /email send {draft_id} to send"
+                ))
+                return
+
+            await update.message.reply_text(
+                "Subcommands: /email, /email read <id>, /email search <q>, "
+                "/email draft to:<addr> subject:<s> <body>, /email send <id>, /email reply <id> <text>"
+            )
+        except ValueError as e:
+            await send_long(update, f"❌ {e}")
+        except Exception as e:
+            await send_long(update, f"❌ Error: {e}")
+
+    async def cmd_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not allowed(update):
+            return
+        args = list(context.args or [])
+        try:
+            if not args or args[0] == "week":
+                events = calendar_list_events(days_ahead=7)
+                if not events:
+                    await update.message.reply_text("📅 No events in the next 7 days.")
+                    return
+                lines = ["📅 Next 7 days:"]
+                for e in events:
+                    start = e["start"][:16].replace("T", " ")
+                    lines.append(f"  • {start} — {e['summary']}")
+                    if e["location"]:
+                        lines.append(f"    📍 {e['location']}")
+                await send_long(update, "\n".join(lines))
+                return
+
+            if args[0] == "today":
+                events = calendar_today()
+                if not events:
+                    await update.message.reply_text("📅 Nothing scheduled today.")
+                    return
+                lines = ["📅 Today:"]
+                for e in events:
+                    start = e["start"][:16].replace("T", " ")
+                    lines.append(f"  • {start} — {e['summary']}")
+                    if e["location"]:
+                        lines.append(f"    📍 {e['location']}")
+                await send_long(update, "\n".join(lines))
+                return
+
+            if args[0] == "add":
+                # /calendar add <title> <YYYY-MM-DD> <HH:MM>
+                if len(args) < 3:
+                    await update.message.reply_text(
+                        "Usage: /calendar add <title> <YYYY-MM-DD> <HH:MM>\n"
+                        "Example: /calendar add Meeting 2026-02-25 14:00"
+                    )
+                    return
+                title = args[1]
+                date_str = args[2]
+                time_str = args[3] if len(args) > 3 else "09:00"
+                start_dt = f"{date_str}T{time_str}:00"
+                dt = datetime.datetime.fromisoformat(start_dt)
+                end_dt = (dt + datetime.timedelta(hours=1)).isoformat()
+                link = calendar_create_event(title, start_dt, end_dt)
+                await send_long(update, f"✅ Event created: {title}\n{date_str} {time_str}\n{link}")
+                return
+
+            await update.message.reply_text("Usage: /calendar [today|week|add <title> <date> <time>]")
+        except ValueError as e:
+            await send_long(update, f"❌ {e}")
+        except Exception as e:
+            await send_long(update, f"❌ Error: {e}")
+
+    async def cmd_remind(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not allowed(update):
+            return
+        if not context.args or len(context.args) < 2:
+            await update.message.reply_text(
+                "Usage: /remind <time> <message>\n"
+                "Examples:\n"
+                "  /remind in 30 minutes call John\n"
+                "  /remind at 6pm check email\n"
+                "  /remind tomorrow 9am standup"
+            )
+            return
+        full = " ".join(context.args)
+        now_unix = time.time()
+        now_human = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now_unix))
+        system = (
+            f"Current time: {now_human} EST (unix: {int(now_unix)}). "
+            "Parse the reminder text and extract the trigger unix timestamp and the reminder message. "
+            'Return ONLY JSON: {"trigger_unix": <int>, "message": "<str>"}. No other text.'
+        )
+        try:
+            payload = {
+                "model": "llama3.1:8b",
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": full},
+                ],
+                "stream": False,
+                "options": {"temperature": 0.0},
+            }
+            r = requests.post(OLLAMA_CHAT_URL, json=payload, timeout=10)
+            r.raise_for_status()
+            raw = (r.json().get("message") or {}).get("content", "").strip()
+            if not (raw.startswith("{") and raw.endswith("}")):
+                raise ValueError("Could not parse time — try: /remind in 30 minutes <message>")
+            obj = json.loads(raw)
+            trigger_unix = float(obj.get("trigger_unix", 0))
+            reminder_text = str(obj.get("message", full)).strip() or full
+            if trigger_unix <= now_unix:
+                await update.message.reply_text("❌ That time is in the past. Try again.")
+                return
+            reminders_add(reminder_text, trigger_unix)
+            human_time = time.strftime("%Y-%m-%d %H:%M", time.localtime(trigger_unix))
+            await send_long(update, f"⏰ Reminder set for {human_time}:\n{reminder_text}")
+        except json.JSONDecodeError:
+            await update.message.reply_text("❌ Couldn't parse the time. Try: /remind in 30 minutes <message>")
+        except ValueError as e:
+            await update.message.reply_text(f"❌ {e}")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Error: {e}")
+
     async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not allowed(update):
             return
@@ -1979,6 +2599,9 @@ def run_telegram_bot() -> None:
     app.add_handler(CommandHandler("web", cmd_web))
     app.add_handler(CommandHandler("yes", cmd_yes))
     app.add_handler(CommandHandler("monitor", cmd_monitor))
+    app.add_handler(CommandHandler("email", cmd_email))
+    app.add_handler(CommandHandler("calendar", cmd_calendar))
+    app.add_handler(CommandHandler("remind", cmd_remind))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print(f"BEAST bot starting (model: {MODEL})", flush=True)
@@ -2185,6 +2808,11 @@ def run_heartbeat() -> None:
     # Web monitors
     warns.extend(run_web_monitors())
 
+    # Reminders
+    triggered = reminders_check()
+    for r in triggered:
+        warns.append(f"⏰ Reminder: {r}")
+
     # Log — append and trim to 1000 lines
     status = "WARN" if warns else "OK"
     summary = warns[0] if warns else "all systems nominal"
@@ -2243,5 +2871,9 @@ if __name__ == "__main__":
         run_heartbeat()
     elif len(sys.argv) > 1 and sys.argv[1] == "--init-memory":
         init_memory()
+    elif len(sys.argv) > 1 and sys.argv[1] == "--briefing":
+        send_daily_briefing()
+    elif len(sys.argv) > 1 and sys.argv[1] == "--setup-gmail":
+        setup_gmail()
     else:
         main()
