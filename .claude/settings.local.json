@@ -6,7 +6,8 @@
       "Bash(python3:*)",
       "Bash(tail:*)",
       "Bash(python3.14:*)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(systemctl:*)"
     ]
   }
 }
