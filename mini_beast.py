@@ -27,11 +27,13 @@ Fixes applied vs prior version:
 from __future__ import annotations
 
 import argparse
+import asyncio
 import hashlib
 import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -1245,8 +1247,258 @@ def run_telegram_bot() -> None:
     app.run_polling(drop_pending_updates=True)
 
 
+# -----------------------------
+# Heartbeat
+# -----------------------------
+def _hb_check_disk() -> Optional[str]:
+    usage = shutil.disk_usage("/")
+    pct_free = (usage.free / usage.total) * 100
+    if pct_free < 15.0:
+        return f"disk: {pct_free:.1f}% free on / (threshold: 15%)"
+    return None
+
+
+def _hb_check_ram() -> Optional[str]:
+    try:
+        meminfo = Path("/proc/meminfo").read_text(encoding="utf-8", errors="ignore")
+        info: Dict[str, int] = {}
+        for line in meminfo.splitlines():
+            if ":" in line:
+                k, v = line.split(":", 1)
+                parts = v.split()
+                if parts:
+                    try:
+                        info[k.strip()] = int(parts[0])
+                    except ValueError:
+                        pass
+        total = info.get("MemTotal", 0)
+        available = info.get("MemAvailable", 0)
+        if total > 0:
+            pct_avail = (available / total) * 100
+            if pct_avail < 10.0:
+                return f"RAM: {pct_avail:.1f}% available (threshold: 10%)"
+    except Exception as e:
+        return f"RAM check error: {e}"
+    return None
+
+
+def _hb_check_cpu_load() -> Optional[str]:
+    try:
+        load1, _, _ = os.getloadavg()
+        ncpus = os.cpu_count() or 1
+        if load1 > ncpus:
+            return f"CPU load: {load1:.2f} > {ncpus} cores"
+    except Exception as e:
+        return f"CPU load check error: {e}"
+    return None
+
+
+def _hb_check_ollama() -> Optional[str]:
+    base = OLLAMA_CHAT_URL.split("/api/")[0]
+    try:
+        r = requests.get(f"{base}/api/tags", timeout=2)
+        if r.status_code != 200:
+            return f"Ollama: HTTP {r.status_code}"
+    except Exception as e:
+        return f"Ollama: unreachable ({type(e).__name__})"
+    return None
+
+
+def _hb_check_beast_service() -> List[str]:
+    warns: List[str] = []
+    try:
+        res = subprocess.run(
+            ["systemctl", "--user", "is-active", "minibeast"],
+            capture_output=True, text=True, timeout=10,
+        )
+        state = res.stdout.strip()
+        if state != "active":
+            warns.append(f"minibeast service: {state or 'unknown'}")
+    except Exception as e:
+        warns.append(f"minibeast service check failed: {e}")
+        return warns
+
+    try:
+        res2 = subprocess.run(
+            ["systemctl", "--user", "show", "minibeast", "--property=NRestarts"],
+            capture_output=True, text=True, timeout=10,
+        )
+        val = res2.stdout.strip()
+        if "=" in val:
+            nrestarts = int(val.split("=", 1)[1])
+            if nrestarts > 3:
+                warns.append(f"minibeast: {nrestarts} restarts (threshold: 3)")
+    except Exception:
+        pass
+
+    try:
+        res3 = subprocess.run(
+            ["journalctl", "--user", "-u", "minibeast", "-n", "50", "--no-pager"],
+            capture_output=True, text=True, timeout=15,
+        )
+        error_lines = [
+            ln for ln in res3.stdout.splitlines()
+            if "ERROR" in ln or "Traceback" in ln
+        ]
+        if error_lines:
+            warns.append(
+                f"minibeast logs: {len(error_lines)} error(s) — {error_lines[0][:120]}"
+            )
+    except Exception:
+        pass
+
+    return warns
+
+
+def _hb_check_tasks() -> Optional[str]:
+    tasks_path = WORKSPACE / "tasks.md"
+    if not tasks_path.exists():
+        return None
+    try:
+        content = tasks_path.read_text(encoding="utf-8", errors="ignore")
+        pending = [ln.strip() for ln in content.splitlines() if ln.strip().startswith("- [ ]")]
+        if pending:
+            preview = "; ".join(p[6:].strip() for p in pending[:3])
+            suffix = f" (+ {len(pending) - 3} more)" if len(pending) > 3 else ""
+            return f"tasks: {len(pending)} unchecked — {preview}{suffix}"
+    except Exception as e:
+        return f"tasks check error: {e}"
+    return None
+
+
+def _hb_check_repo() -> List[str]:
+    warns: List[str] = []
+    try:
+        res = subprocess.run(
+            ["git", "-C", str(WORKSPACE), "status", "--porcelain"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if res.stdout.strip():
+            warns.append("repo: uncommitted changes present")
+    except Exception as e:
+        warns.append(f"repo status check failed: {e}")
+
+    try:
+        res2 = subprocess.run(
+            ["git", "-C", str(WORKSPACE), "rev-list", "@{u}..HEAD", "--count"],
+            capture_output=True, text=True, timeout=10,
+        )
+        ahead = int(res2.stdout.strip())
+        if ahead > 0:
+            warns.append(f"repo: {ahead} unpushed commit(s)")
+    except Exception:
+        pass
+
+    return warns
+
+
+def _hb_check_telegram_last_success() -> Optional[str]:
+    p = RUNS_DIR / "telegram_last_success.txt"
+    if not p.exists():
+        return "Telegram: no last success record found"
+    try:
+        ts = float(p.read_text(encoding="utf-8", errors="ignore").strip())
+        age_h = (time.time() - ts) / 3600
+        if age_h > 12:
+            return f"Telegram: last success {age_h:.1f}h ago (threshold: 12h)"
+    except Exception as e:
+        return f"Telegram last success check error: {e}"
+    return None
+
+
+def run_heartbeat() -> None:
+    try:
+        from dotenv import load_dotenv
+        from telegram import Bot
+    except ImportError as e:
+        die(f"Missing dependency: {e}. Run: python3.14 -m pip install python-telegram-bot python-dotenv")
+
+    load_dotenv()
+    token = os.getenv("BOT_TOKEN")
+
+    RUNS_DIR.mkdir(parents=True, exist_ok=True)
+    log_path = RUNS_DIR / "heartbeat.log"
+    ok_path = RUNS_DIR / "heartbeat_last_ok.txt"
+    ts = now_ts()
+
+    warns: List[str] = []
+
+    for fn in (_hb_check_disk, _hb_check_ram, _hb_check_cpu_load):
+        w = fn()
+        if w:
+            warns.append(w)
+
+    w = _hb_check_ollama()
+    if w:
+        warns.append(w)
+
+    warns.extend(_hb_check_beast_service())
+
+    w = _hb_check_tasks()
+    if w:
+        warns.append(w)
+
+    warns.extend(_hb_check_repo())
+
+    w = _hb_check_telegram_last_success()
+    if w:
+        warns.append(w)
+
+    # Log — append and trim to 1000 lines
+    status = "WARN" if warns else "OK"
+    summary = warns[0] if warns else "all systems nominal"
+    log_line = f"[{ts}] {status} — {summary}\n"
+    existing = ""
+    if log_path.exists():
+        try:
+            existing = log_path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            pass
+    all_lines = (existing + log_line).splitlines(keepends=True)
+    if len(all_lines) > 1000:
+        all_lines = all_lines[-1000:]
+    safe_write_text(log_path, "".join(all_lines))
+
+    # Print result
+    print(f"BEAST HEARTBEAT [{ts}] — {status}")
+    if warns:
+        for w in warns:
+            print(f"  ⚠  {w}")
+    else:
+        print("  All checks passed.")
+
+    # Telegram notification
+    if not token:
+        print("[heartbeat] No BOT_TOKEN — skipping Telegram.", file=sys.stderr)
+        return
+
+    async def _send(text: str) -> None:
+        bot = Bot(token=token)
+        async with bot:
+            for chunk in _split_message(text):
+                await bot.send_message(chat_id=ALLOWED_USER_ID, text=chunk)
+
+    if warns:
+        msg = f"⚠️ BEAST HEARTBEAT — {ts}\n\n" + "\n".join(f"• {w}" for w in warns)
+        asyncio.run(_send(msg))
+    else:
+        send_ok = True
+        if ok_path.exists():
+            try:
+                last_ok = float(ok_path.read_text(encoding="utf-8", errors="ignore").strip())
+                if (time.time() - last_ok) < 6 * 3600:
+                    send_ok = False
+            except Exception:
+                pass
+        if send_ok:
+            asyncio.run(_send(f"✅ HEARTBEAT OK — {ts} — all systems nominal"))
+            safe_write_text(ok_path, str(time.time()))
+
+
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--telegram":
         run_telegram_bot()
+    elif len(sys.argv) > 1 and sys.argv[1] == "--heartbeat":
+        run_heartbeat()
     else:
         main()
