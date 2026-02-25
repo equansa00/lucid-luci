@@ -89,6 +89,13 @@ DAILY_BRIEFING_HOUR = int(os.getenv("BEAST_BRIEFING_HOUR", "8"))
 REMINDER_MAX_DAYS = int(os.getenv("BEAST_REMINDER_MAX_DAYS", "30"))
 EMAIL_SUMMARY_MODEL = os.getenv("BEAST_EMAIL_SUMMARY_MODEL", "llama3.1:8b")
 
+# Voice
+PIPER_BIN = WORKSPACE / "piper" / "piper"
+PIPER_MODEL = WORKSPACE / "piper" / "en_US-lessac-medium.onnx"
+PIPER_ENABLED = os.getenv("BEAST_PIPER_ENABLED", "1") == "1"
+WHISPER_MODEL = os.getenv("BEAST_WHISPER_MODEL", "base.en")
+VOICE_ENABLED = os.getenv("BEAST_VOICE_ENABLED", "1") == "1"
+
 # OAuth scopes
 GOOGLE_SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
@@ -1368,6 +1375,7 @@ def init_memory() -> None:
 - Ollama models:
 {models_str}
 - Key paths: workspace=~/beast/workspace, docs=~/beast/workspace/docs
+- Voice: Piper TTS + Whisper STT enabled
 
 ## Preferences & Communication Style
 - Concise responses — Edward is often on phone
@@ -2097,6 +2105,123 @@ def format_model_tag(model: str, category: str) -> str:
 
 
 # -----------------------------
+# Voice System
+# -----------------------------
+
+_piper_warned = False
+
+
+def _clean_for_tts(text: str) -> str:
+    """Strip markdown/code/URLs and truncate for TTS input."""
+    # Remove fenced code blocks
+    text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+    # Remove inline code
+    text = re.sub(r'`[^`]+`', '', text)
+    # Remove bold/italic
+    text = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', text)
+    # Remove URLs
+    text = re.sub(r'https?://\S+', '', text)
+    # Collapse whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text[:500]
+
+
+def tts_speak(text: str) -> None:
+    """Speak text via Piper TTS + aplay. Never raises."""
+    global _piper_warned
+    if not VOICE_ENABLED or not PIPER_ENABLED:
+        return
+    if not PIPER_BIN.exists() or not PIPER_MODEL.exists():
+        if not _piper_warned:
+            print(f"[voice] Piper not found at {PIPER_BIN} — TTS disabled", file=sys.stderr)
+            _piper_warned = True
+        return
+    clean = _clean_for_tts(text)
+    if not clean:
+        return
+    try:
+        piper_result = subprocess.run(
+            [str(PIPER_BIN), "--model", str(PIPER_MODEL), "--output_raw"],
+            input=clean.encode("utf-8"),
+            capture_output=True,
+            timeout=30,
+            check=False,
+        )
+        if piper_result.returncode != 0:
+            return
+        subprocess.run(
+            ["aplay", "-r", "22050", "-f", "S16_LE", "-c", "1"],
+            input=piper_result.stdout,
+            capture_output=True,
+            timeout=30,
+            check=False,
+        )
+    except Exception:
+        pass
+
+
+def tts_to_file(text: str, output_path: Path) -> bool:
+    """Render text to a WAV file via Piper. Returns True on success."""
+    global _piper_warned
+    if not VOICE_ENABLED or not PIPER_ENABLED:
+        return False
+    if not PIPER_BIN.exists() or not PIPER_MODEL.exists():
+        if not _piper_warned:
+            print(f"[voice] Piper not found at {PIPER_BIN} — TTS disabled", file=sys.stderr)
+            _piper_warned = True
+        return False
+    clean = _clean_for_tts(text)
+    if not clean:
+        return False
+    try:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        result = subprocess.run(
+            [str(PIPER_BIN), "--model", str(PIPER_MODEL), "--output_file", str(output_path)],
+            input=clean.encode("utf-8"),
+            capture_output=True,
+            timeout=30,
+            check=False,
+        )
+        return result.returncode == 0 and output_path.exists() and output_path.stat().st_size > 0
+    except Exception:
+        return False
+
+
+_whisper_model = None
+
+
+def stt_transcribe(audio_path: Path) -> str:
+    """Transcribe audio file via Whisper. Returns '' on any failure."""
+    global _whisper_model
+    if not VOICE_ENABLED:
+        return ""
+    try:
+        import whisper  # type: ignore
+        if _whisper_model is None:
+            _whisper_model = whisper.load_model(WHISPER_MODEL)
+        result = _whisper_model.transcribe(str(audio_path))
+        return (result.get("text") or "").strip()
+    except Exception:
+        return ""
+
+
+def stt_record(duration_sec: int = 5) -> Path:
+    """Record audio from mic and save to WAV. Returns path."""
+    if not VOICE_ENABLED:
+        raise ValueError("Voice disabled (BEAST_VOICE_ENABLED=0)")
+    import sounddevice as sd  # type: ignore
+    import soundfile as sf    # type: ignore
+    RUNS_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = RUNS_DIR / "recorded_audio.wav"
+    print("🎤 Recording...", flush=True)
+    audio = sd.rec(duration_sec * 16000, samplerate=16000, channels=1)
+    sd.wait()
+    sf.write(str(out_path), audio, 16000)
+    print("✅ Done", flush=True)
+    return out_path
+
+
+# -----------------------------
 # Telegram Bot
 # -----------------------------
 ALLOWED_USER_ID = 8757958279
@@ -2177,6 +2302,7 @@ def run_telegram_bot() -> None:
             "/email — read, search, draft and send emails\n"
             "/calendar — view and create calendar events\n"
             "/remind <time> <msg> — set a Telegram reminder\n"
+            "Voice: send a voice message to talk to BEAST\n"
             "plain text — sent directly to Ollama, response returned\n"
             f"Models auto-routed: chat→{ROUTER_DEFAULT_MODEL}, code→{ROUTER_CODE_MODEL}, "
             f"reasoning→{ROUTER_REASON_MODEL}, deep→{ROUTER_DEEP_MODEL}"
@@ -2839,6 +2965,77 @@ def run_telegram_bot() -> None:
     app.add_handler(CommandHandler("remind", cmd_remind))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
+    async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not allowed(update):
+            return
+        ts = int(time.time())
+        RUNS_DIR.mkdir(parents=True, exist_ok=True)
+        ogg_path = RUNS_DIR / f"voice_{ts}.ogg"
+        wav_path = RUNS_DIR / f"voice_{ts}.wav"
+
+        # Download voice file
+        voice_msg = update.message.voice
+        tg_file = await context.bot.get_file(voice_msg.file_id)
+        await tg_file.download_to_drive(ogg_path)
+
+        await update.message.reply_text("🎤 Transcribing...")
+
+        # Convert ogg → wav if ffmpeg available
+        transcribe_path = ogg_path
+        if shutil.which("ffmpeg"):
+            conv = subprocess.run(
+                ["ffmpeg", "-y", "-i", str(ogg_path),
+                 "-ar", "16000", "-ac", "1", str(wav_path)],
+                capture_output=True,
+                timeout=30,
+            )
+            if conv.returncode == 0 and wav_path.exists():
+                transcribe_path = wav_path
+
+        text = await asyncio.to_thread(stt_transcribe, transcribe_path)
+        if not text:
+            await update.message.reply_text("❌ Could not transcribe audio")
+            ogg_path.unlink(missing_ok=True)
+            wav_path.unlink(missing_ok=True)
+            return
+
+        await update.message.reply_text(f"📝 You said: {text}")
+
+        # Route and respond
+        routed_model, category = route_model(text)
+        persona = load_persona_with_memory()
+        vmsgs: List[Dict[str, str]] = []
+        if persona:
+            vmsgs.append({"role": "system", "content": persona})
+        vmsgs.append({"role": "user", "content": text})
+        try:
+            response = await asyncio.to_thread(
+                ollama_chat, vmsgs, 0.4, routed_model
+            )
+        except Exception as e:
+            response = f"❌ Ollama error: {e}"
+
+        tag = format_model_tag(routed_model, category)
+        display_response = response + f"\n\n{tag}" if tag else response
+        await send_long(update, display_response)
+
+        # Voice reply — send WAV back (without tag)
+        reply_wav = RUNS_DIR / f"reply_{ts}.wav"
+        ok = await asyncio.to_thread(tts_to_file, response, reply_wav)
+        if ok:
+            with open(reply_wav, "rb") as f:
+                await update.message.reply_voice(voice=f)
+            reply_wav.unlink(missing_ok=True)
+
+        # Cleanup
+        ogg_path.unlink(missing_ok=True)
+        wav_path.unlink(missing_ok=True)
+
+        if BEAST_AUTO_MEMORY:
+            asyncio.create_task(asyncio.to_thread(auto_extract_memory, text, response))
+
+    app.add_handler(MessageHandler(filters.VOICE, handle_voice))
+
     print(f"BEAST bot starting (model: {MODEL})", flush=True)
     app.run_polling(drop_pending_updates=True)
 
@@ -3198,5 +3395,38 @@ CLI FLAGS SUMMARY
             mdl, cat = route_model(inp)
             short = (inp[:39] + "…") if len(inp) > 40 else inp
             print(f"{short:<42} {cat:<12} {mdl}")
+    elif len(sys.argv) > 1 and sys.argv[1] == "--speak":
+        tts_speak(" ".join(sys.argv[2:]))
+    elif len(sys.argv) > 1 and sys.argv[1] == "--listen":
+        _path = stt_record(5)
+        _text = stt_transcribe(_path)
+        if not _text:
+            print("❌ Could not transcribe")
+            sys.exit(1)
+        print(f"You said: {_text}")
+        _routed, _cat = route_model(_text)
+        _persona = load_persona_with_memory()
+        _msgs: List[Dict[str, str]] = []
+        if _persona:
+            _msgs.append({"role": "system", "content": _persona})
+        _msgs.append({"role": "user", "content": _text})
+        _resp = ollama_chat(_msgs, temperature=0.4, model=_routed)
+        print(_resp)
+        tts_speak(_resp)
+    elif len(sys.argv) > 1 and sys.argv[1] == "--voice-test":
+        print(f"Piper binary:  {'✅' if PIPER_BIN.exists() else '❌'} {PIPER_BIN}")
+        print(f"Piper model:   {'✅' if PIPER_MODEL.exists() else '❌'} {PIPER_MODEL}")
+        print(f"aplay:         {'✅' if shutil.which('aplay') else '❌'}")
+        print(f"ffmpeg:        {'✅' if shutil.which('ffmpeg') else '❌'}")
+        print("Testing TTS...")
+        tts_speak("BEAST voice system online. Testing audio output.")
+        print("✅ TTS: spoken (check speakers)")
+        print("Testing STT model load...")
+        try:
+            import whisper as _whisper  # type: ignore
+            _whisper.load_model(WHISPER_MODEL)
+            print(f"✅ STT: whisper {WHISPER_MODEL} loaded")
+        except Exception as _e:
+            print(f"❌ STT: {_e}")
     else:
         main()
