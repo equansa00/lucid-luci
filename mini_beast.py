@@ -54,6 +54,14 @@ import requests
 OLLAMA_CHAT_URL = os.getenv("OLLAMA_CHAT_URL", "http://127.0.0.1:11434/api/chat")
 MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:70b")
 
+# Model router
+ROUTER_DEFAULT_MODEL = os.getenv("BEAST_ROUTER_DEFAULT", "llama3.1:8b")
+ROUTER_CODE_MODEL = os.getenv("BEAST_ROUTER_CODE", "qwen2.5-coder:7b")
+ROUTER_REASON_MODEL = os.getenv("BEAST_ROUTER_REASON", "deepseek-r1:8b")
+ROUTER_DEEP_MODEL = os.getenv("BEAST_ROUTER_DEEP", "beast70b:latest")
+ROUTER_AGENT_MODEL = os.getenv("BEAST_ROUTER_AGENT", "llama3.1:70b")
+ROUTER_ANNOUNCE = os.getenv("BEAST_ROUTER_ANNOUNCE", "nondefault")
+
 WORKSPACE = Path(os.getenv("BEAST_WORKSPACE", str(Path.home() / "beast" / "workspace"))).resolve()
 DOCS_DIR = WORKSPACE / "docs"
 REPO_DIR = WORKSPACE / "repo"
@@ -271,9 +279,13 @@ def load_persona_with_memory() -> str:
         parts.append("## WHAT YOU REMEMBER ABOUT EDWARD:\n" + mem.strip())
     return "\n\n".join(parts)
 
-def ollama_chat(messages: List[Dict[str, str]], temperature: float = 0.2) -> str:
+def ollama_chat(
+    messages: List[Dict[str, str]],
+    temperature: float = 0.2,
+    model: Optional[str] = None,
+) -> str:
     payload = {
-        "model": MODEL,
+        "model": model if model is not None else MODEL,
         "messages": messages,
         "stream": False,
         "options": {"temperature": temperature},
@@ -875,7 +887,7 @@ def agent_loop(
         prompt = agent_prompt(task, sources_text, feedback, last_error, repo_files_text, memory_text)
         safe_write_text(run_dir / f"iter{it}_prompt.txt", prompt)
 
-        raw = ollama_chat([{"role": "user", "content": prompt}], temperature=0.2)
+        raw = ollama_chat([{"role": "user", "content": prompt}], temperature=0.2, model=ROUTER_AGENT_MODEL)
         safe_write_text(run_dir / f"iter{it}_raw.txt", raw)
 
         # Strict JSON parse with one retry on schema error
@@ -895,7 +907,8 @@ def agent_loop(
                         repo_files_text,
                     )
                     raw = ollama_chat(
-                        [{"role": "user", "content": retry_prompt}], temperature=0.2
+                        [{"role": "user", "content": retry_prompt}], temperature=0.2,
+                        model=ROUTER_AGENT_MODEL,
                     )
                     safe_write_text(run_dir / f"iter{it}_retry_raw.txt", raw)
 
@@ -1107,12 +1120,17 @@ def main() -> None:
 
     if args.cmd == "ask":
         q = " ".join(args.q)
+        routed_model, category = route_model(q)
         persona = load_persona_with_memory()
         messages = []
         if persona:
             messages.append({"role": "system", "content": persona})
         messages.append({"role": "user", "content": q})
-        ans = ollama_chat(messages, temperature=args.temp)
+        ans = ollama_chat(messages, temperature=args.temp, model=routed_model)
+        if ROUTER_ANNOUNCE != "never":
+            tag = format_model_tag(routed_model, category)
+            if tag:
+                print(tag)
         print(ans)
         return
 
@@ -2012,6 +2030,67 @@ def setup_gmail() -> None:
 
 
 # -----------------------------
+# Model Router
+# -----------------------------
+
+CODE_KEYWORDS = {
+    "def ", "class ", "import ", "function", "bug", "error", "traceback",
+    "exception", "debug", "refactor", "syntax", "compile", "script",
+    "code", "python", "bash", "javascript", "typescript", "html", "css",
+    "sql", "regex", "algorithm", "implement", "unittest", "pytest",
+    "fix this", "what's wrong", "why doesn't", "how do i write",
+}
+
+REASON_KEYWORDS = {
+    "why", "explain", "how does", "analyze", "compare", "pros and cons",
+    "difference between", "should i", "is it better", "trade-off",
+    "step by step", "walk me through", "reason", "logic", "prove",
+    "calculate", "math", "formula", "solve", "think through",
+}
+
+DEEP_KEYWORDS = {
+    "design", "architecture", "system", "plan", "strategy", "review",
+    "critique", "evaluate", "assess", "comprehensive", "detailed",
+    "full", "complete", "everything about", "in depth", "thorough",
+}
+
+
+def route_model(text: str) -> Tuple[str, str]:
+    """Classify text and return (model_name, category).
+
+    Category: "code", "reasoning", "deep", "chat".
+    Pure pattern matching — no LLM, completes in <1ms.
+    Priority order: code > reasoning > deep > chat.
+    """
+    lower = text.lower()
+
+    # Step 1 — code keywords (any match)
+    if any(kw in lower for kw in CODE_KEYWORDS):
+        return (ROUTER_CODE_MODEL, "code")
+
+    # Step 2 — reasoning: 2+ keywords OR ends with "?"
+    reason_hits = sum(1 for kw in REASON_KEYWORDS if kw in lower)
+    if reason_hits >= 2 or lower.rstrip().endswith("?"):
+        return (ROUTER_REASON_MODEL, "reasoning")
+
+    # Step 3 — deep: any keyword AND long message
+    if len(text) > 100 and any(kw in lower for kw in DEEP_KEYWORDS):
+        return (ROUTER_DEEP_MODEL, "deep")
+
+    # Step 4 — default chat
+    return (ROUTER_DEFAULT_MODEL, "chat")
+
+
+def format_model_tag(model: str, category: str) -> str:
+    """Return '[model_name]' tag for response annotation, or '' if suppressed."""
+    if ROUTER_ANNOUNCE == "never":
+        return ""
+    if ROUTER_ANNOUNCE == "nondefault" and model == ROUTER_DEFAULT_MODEL:
+        return ""
+    return f"[{model}]"
+
+
+# -----------------------------
 # Telegram Bot
 # -----------------------------
 ALLOWED_USER_ID = 8757958279
@@ -2092,7 +2171,9 @@ def run_telegram_bot() -> None:
             "/email — read, search, draft and send emails\n"
             "/calendar — view and create calendar events\n"
             "/remind <time> <msg> — set a Telegram reminder\n"
-            "plain text — sent directly to Ollama, response returned"
+            "plain text — sent directly to Ollama, response returned\n"
+            f"Models auto-routed: chat→{ROUTER_DEFAULT_MODEL}, code→{ROUTER_CODE_MODEL}, "
+            f"reasoning→{ROUTER_REASON_MODEL}, deep→{ROUTER_DEEP_MODEL}"
         )
 
     async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2696,30 +2777,38 @@ def run_telegram_bot() -> None:
                     )
                 except ValueError:
                     augmented = text
+                routed_model, category = route_model(text_without_url or text)
                 persona = load_persona_with_memory()
                 messages: List[Dict[str, str]] = []
                 if persona:
                     messages.append({"role": "system", "content": persona})
                 messages.append({"role": "user", "content": augmented})
                 try:
-                    response = ollama_chat(messages, temperature=0.4)
+                    response = ollama_chat(messages, temperature=0.4, model=routed_model)
                 except Exception as e:
                     response = f"❌ Ollama error: {e}"
+                tag = format_model_tag(routed_model, category)
+                if tag:
+                    response = response + f"\n\n{tag}"
                 await send_long(update, response)
                 if BEAST_AUTO_MEMORY:
                     asyncio.create_task(asyncio.to_thread(auto_extract_memory, text, response))
                 return
 
         # Normal message
+        routed_model, category = route_model(text)
         try:
             persona = load_persona_with_memory()
             messages = []
             if persona:
                 messages.append({"role": "system", "content": persona})
             messages.append({"role": "user", "content": text})
-            response = ollama_chat(messages, temperature=0.4)
+            response = ollama_chat(messages, temperature=0.4, model=routed_model)
         except Exception as e:
             response = f"❌ Ollama error: {e}"
+        tag = format_model_tag(routed_model, category)
+        if tag:
+            response = response + f"\n\n{tag}"
         await send_long(update, response)
         if BEAST_AUTO_MEMORY:
             asyncio.create_task(asyncio.to_thread(auto_extract_memory, text, response))
@@ -3078,9 +3167,30 @@ CLI FLAGS SUMMARY
   --setup-gmail                   Authorize Gmail/Calendar
   --briefing                      Send daily briefing
   --capabilities                  Print this list
+  --route-test                    Show routing table for sample inputs
   ask <question>                  Ask BEAST a question
   cite <question>                 Ask with RAG sources
   agent <task>                    Run autonomous agent task
 """)
+    elif len(sys.argv) > 1 and sys.argv[1] == "--route-test":
+        _TEST_INPUTS = [
+            "fix the bug in my python script",
+            "def calculate_tax(income):",
+            "why does async/await work this way",
+            "compare redis vs postgres for caching",
+            "design a complete microservices architecture",
+            "what time is it",
+            "summarize my emails",
+            "write a comprehensive system design for a chat app",
+            "explain the difference between TCP and UDP",
+            "help me debug this traceback",
+        ]
+        header = f"{'Input (40 chars)':<42} {'Category':<12} {'Model'}"
+        print(header)
+        print("-" * len(header))
+        for inp in _TEST_INPUTS:
+            mdl, cat = route_model(inp)
+            short = (inp[:39] + "…") if len(inp) > 40 else inp
+            print(f"{short:<42} {cat:<12} {mdl}")
     else:
         main()
