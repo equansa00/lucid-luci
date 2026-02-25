@@ -2587,43 +2587,63 @@ def run_telegram_bot() -> None:
             return
         full = " ".join(context.args)
         now_unix = time.time()
-        now_human = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now_unix))
-        system = (
-            f"Current time: {now_human} EST (unix: {int(now_unix)}). "
-            "Parse the reminder text. Extract: when the reminder should fire, and what the reminder says. "
-            'Return ONLY JSON: {"trigger_iso": "<ISO datetime>", "text": "<reminder message>", "confident": <true|false>}. '
-            "No other text. User timezone is EST (UTC-5)."
-        )
-        try:
-            payload = {
-                "model": EMAIL_SUMMARY_MODEL,
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": full},
-                ],
-                "stream": False,
-                "options": {"temperature": 0.0},
-            }
-            r = requests.post(OLLAMA_CHAT_URL, json=payload, timeout=15)
-            r.raise_for_status()
-            raw = (r.json().get("message") or {}).get("content", "").strip()
-            if not (raw.startswith("{") and raw.endswith("}")):
-                raise ValueError("Could not parse time — try: /remind in 30 minutes <message>")
-            obj = json.loads(raw)
-            trigger_iso = str(obj.get("trigger_iso", "")).strip()
-            reminder_text = str(obj.get("text", full)).strip() or full
-            confident = bool(obj.get("confident", False))
 
-            # Parse ISO datetime
-            try:
-                dt = datetime.datetime.fromisoformat(trigger_iso)
-                # Treat naive datetimes as EST (UTC-5)
-                if dt.tzinfo is None:
+        try:
+            trigger_unix: Optional[float] = None
+            reminder_text: str = full
+            confident = False
+
+            # --- Fast path: detect relative time patterns in Python (no LLM) ---
+            _UNITS = {"minute": 60, "hour": 3600, "day": 86400}
+            rel_m = re.match(
+                r'^in\s+(\d+(?:\.\d+)?)\s*(minute|hour|day)s?\b(.*)$',
+                full,
+                re.IGNORECASE,
+            )
+            if rel_m:
+                amount = float(rel_m.group(1))
+                unit = rel_m.group(2).lower()
+                rest = rel_m.group(3).strip()
+                trigger_unix = now_unix + amount * _UNITS[unit]
+                reminder_text = rest if rest else full
+                confident = True
+
+            # --- Slow path: LLM parses absolute time expressions ---
+            if trigger_unix is None:
+                now_human = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now_unix))
+                system = (
+                    f"Current time: {now_human} EST (unix: {int(now_unix)}). "
+                    "Parse the reminder. Return ONLY JSON with keys: "
+                    '"trigger_iso" (ISO 8601 datetime, EST timezone), '
+                    '"text" (reminder message, without the time phrase), '
+                    '"confident" (true/false). No other text.'
+                )
+                payload = {
+                    "model": EMAIL_SUMMARY_MODEL,
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": full},
+                    ],
+                    "stream": False,
+                    "options": {"temperature": 0.0},
+                }
+                r = requests.post(OLLAMA_CHAT_URL, json=payload, timeout=15)
+                r.raise_for_status()
+                raw = (r.json().get("message") or {}).get("content", "").strip()
+                if not (raw.startswith("{") and raw.endswith("}")):
+                    raise ValueError("Could not parse time — try: /remind in 30 minutes <message>")
+                obj = json.loads(raw)
+                trigger_iso = str(obj.get("trigger_iso", "")).strip()
+                reminder_text = str(obj.get("text", full)).strip() or full
+                confident = bool(obj.get("confident", False))
+                try:
                     import zoneinfo
-                    dt = dt.replace(tzinfo=zoneinfo.ZoneInfo("America/New_York"))
-                trigger_unix = dt.timestamp()
-            except Exception:
-                raise ValueError(f"Could not parse time from: {trigger_iso!r}")
+                    dt = datetime.datetime.fromisoformat(trigger_iso)
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=zoneinfo.ZoneInfo("America/New_York"))
+                    trigger_unix = dt.timestamp()
+                except Exception:
+                    raise ValueError(f"Could not parse time from model: {trigger_iso!r}")
 
             if trigger_unix <= now_unix:
                 await update.message.reply_text("❌ That time is in the past. Try again.")
