@@ -3015,5 +3015,72 @@ if __name__ == "__main__":
         send_daily_briefing()
     elif len(sys.argv) > 1 and sys.argv[1] == "--setup-gmail":
         setup_gmail()
+    elif len(sys.argv) > 1 and sys.argv[1] == "--capabilities":
+        print("""
+BEAST CAPABILITIES — All 5 Phases
+===================================
+
+PHASE 1 — Personality + Telegram Control
+  /start                          Wake BEAST
+  /help                           Full command list
+  /status                         Ollama + system status
+  /models                         List all Ollama models
+  /run <command>                  Execute allowlisted shell command
+  /patch                          Send a unified diff to apply
+  plain text                      Talk to BEAST (Jarvis-style)
+
+PHASE 2 — Heartbeat + Monitoring
+  /heartbeat                      Manual health check now
+  --heartbeat                     CLI: run heartbeat and exit
+  [auto]                          Runs every 30 min via systemd timer
+  [alerts]                        Disk, RAM, CPU, Ollama, service crashes
+
+PHASE 3 — Memory
+  /memory                         Show what BEAST knows about you
+  /memoryfull                     Complete memory dump
+  /remember <text>                Save something to memory
+  /forget <text>                  Remove a memory entry
+  --init-memory                   CLI: reinitialize memory from scratch
+  [auto]                          BEAST_AUTO_MEMORY=1 to enable auto-extract
+
+PHASE 4 — Web
+  /web <query>                    Search DuckDuckGo + summarize
+  /web <url>                      Fetch and summarize a page
+  /monitor <url>                  Watch a URL for changes
+  /monitor list                   Show all monitored URLs
+  /monitor remove <url>           Stop watching a URL
+  /monitor check                  Check all monitors now
+  /yes                            Confirm a pending URL fetch
+  [auto]                          Monitors checked every heartbeat (30 min)
+
+PHASE 5 — Email + Calendar + Reminders
+  /email                          List + summarize unread emails
+  /email read <id>                Read full email
+  /email search <query>           Search inbox
+  /email draft to:<a> subject:<s> <body>   Create draft
+  /email send <draft_id>          Send a draft
+  /email reply <id> <text>        Create reply draft
+  /calendar                       Next 7 days
+  /calendar today                 Today only
+  /calendar week                  This week
+  /calendar add <title> <date> <time> [mins]  Create event (confirm-first)
+  /remind <time> <message>        Set a Telegram reminder (confirm-first)
+  /yes                            Confirm pending reminder or calendar event
+  --briefing                      CLI: send daily briefing now
+  --setup-gmail                   CLI: authorize Gmail + Calendar (once)
+  [auto]                          Daily briefing at 8am via systemd timer
+  [auto]                          Reminders checked every heartbeat
+
+CLI FLAGS SUMMARY
+  --telegram                      Start Telegram bot
+  --heartbeat                     Run heartbeat check
+  --init-memory                   Initialize memory files
+  --setup-gmail                   Authorize Gmail/Calendar
+  --briefing                      Send daily briefing
+  --capabilities                  Print this list
+  ask <question>                  Ask BEAST a question
+  cite <question>                 Ask with RAG sources
+  agent <task>                    Run autonomous agent task
+""")
     else:
         main()
