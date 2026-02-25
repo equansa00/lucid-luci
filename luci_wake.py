@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-BEAST Wake Word Daemon — Sub-phase C
-Listens for "Hey BEAST", then records, transcribes, routes, and speaks
+LUCI Wake Word Daemon — Sub-phase C
+Listens for "Hey LUCI", then records, transcribes, routes, and speaks
 a response. Internally uses the hey_jarvis openwakeword model; that
 detail is never surfaced to the user.
 
@@ -20,16 +20,16 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-WAKE_WORD = os.getenv("BEAST_WAKE_WORD", "hey_beast")
-WAKE_THRESHOLD = float(os.getenv("BEAST_WAKE_THRESHOLD", "0.5"))
-LISTEN_DURATION = int(os.getenv("BEAST_LISTEN_DURATION", "5"))
+WAKE_WORD = os.getenv("LUCI_WAKE_WORD", "hey_beast")
+WAKE_THRESHOLD = float(os.getenv("LUCI_WAKE_THRESHOLD", "0.5"))
+LISTEN_DURATION = int(os.getenv("LUCI_LISTEN_DURATION", "5"))
 WAKE_MODEL_DIR = Path.home() / "beast" / "workspace" / "wake_models"
 
 # ---------------------------------------------------------------------------
-# Imports from mini_beast
+# Imports from luci
 # ---------------------------------------------------------------------------
 sys.path.insert(0, str(Path(__file__).parent))
-from mini_beast import (  # noqa: E402
+from luci import (  # noqa: E402
     ollama_chat,
     route_model,
     format_model_tag,
@@ -38,7 +38,7 @@ from mini_beast import (  # noqa: E402
     stt_record,
     stt_transcribe,
     RUNS_DIR,
-    BEAST_AUTO_MEMORY,
+    LUCI_AUTO_MEMORY,
     auto_extract_memory,
 )
 
@@ -97,7 +97,7 @@ def listen_for_wake_word() -> bool:
             input=True,
             frames_per_buffer=1280,
         )
-        print("👂 Listening for 'Hey BEAST'...", flush=True)
+        print("👂 Listening for 'Hey LUCI'...", flush=True)
 
         while True:
             try:
@@ -110,7 +110,7 @@ def listen_for_wake_word() -> bool:
             scores = model.predict(chunk)
 
             if scores.get(_WAKE_KEY, 0) > WAKE_THRESHOLD:
-                print("🔔 Hey BEAST detected!", flush=True)
+                print("🔔 Hey LUCI detected!", flush=True)
                 return True
 
     except KeyboardInterrupt:
@@ -172,7 +172,7 @@ def handle_wake_activation() -> None:
     tag = format_model_tag(routed_model, category)
 
     # 5. Print
-    print(f"\nBEAST: {response}", flush=True)
+    print(f"\nLUCI: {response}", flush=True)
     if tag:
         print(tag, flush=True)
 
@@ -180,7 +180,7 @@ def handle_wake_activation() -> None:
     tts_speak(response)
 
     # 7. Background memory extract
-    if BEAST_AUTO_MEMORY:
+    if LUCI_AUTO_MEMORY:
         threading.Thread(
             target=auto_extract_memory,
             args=(text, response),
@@ -193,8 +193,8 @@ def handle_wake_activation() -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    print("BEAST Wake Word Daemon starting...", flush=True)
-    print(f"Wake word:       Hey BEAST", flush=True)
+    print("LUCI Wake Word Daemon starting...", flush=True)
+    print(f"Wake word:       Hey LUCI", flush=True)
     print(f"Threshold:       {WAKE_THRESHOLD}", flush=True)
     print(f"Listen duration: {LISTEN_DURATION}s", flush=True)
     print("Press Ctrl+C to stop\n", flush=True)
@@ -205,7 +205,7 @@ def main() -> None:
             handle_wake_activation()
         else:
             # KeyboardInterrupt or unrecoverable audio error
-            print("\nBEAST wake word daemon stopped.", flush=True)
+            print("\nLUCI wake word daemon stopped.", flush=True)
             break
 
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-mini-BEAST (laptop dev agent) — CLI-first, local-only, single Ollama API endpoint (/api/chat)
+mini-LUCI (laptop dev agent) — CLI-first, local-only, single Ollama API endpoint (/api/chat)
 
 Modes:
 - ask: direct prompt to model
@@ -10,7 +10,7 @@ Modes:
 Security posture:
 - Treat model output, docs, and patch as adversarial.
 - Strict JSON parsing for agent loop.
-- Patch allowlist by path prefix (BEAST_PATCH_ALLOWED_PREFIXES).
+- Patch allowlist by path prefix (LUCI_PATCH_ALLOWED_PREFIXES).
 - Tool command allowlist with flag/path validation.
 - TOCTOU: hash patch before and after disk write, verify before apply.
 
@@ -55,46 +55,46 @@ OLLAMA_CHAT_URL = os.getenv("OLLAMA_CHAT_URL", "http://127.0.0.1:11434/api/chat"
 MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:70b")
 
 # Model router
-ROUTER_DEFAULT_MODEL = os.getenv("BEAST_ROUTER_DEFAULT", "llama3.1:8b")
-ROUTER_CODE_MODEL = os.getenv("BEAST_ROUTER_CODE", "qwen2.5-coder:7b")
-ROUTER_REASON_MODEL = os.getenv("BEAST_ROUTER_REASON", "deepseek-r1:8b")
-ROUTER_DEEP_MODEL = os.getenv("BEAST_ROUTER_DEEP", "beast70b:latest")
-ROUTER_AGENT_MODEL = os.getenv("BEAST_ROUTER_AGENT", "llama3.1:70b")
-ROUTER_ANNOUNCE = os.getenv("BEAST_ROUTER_ANNOUNCE", "nondefault")
+ROUTER_DEFAULT_MODEL = os.getenv("LUCI_ROUTER_DEFAULT", "llama3.1:8b")
+ROUTER_CODE_MODEL = os.getenv("LUCI_ROUTER_CODE", "qwen2.5-coder:7b")
+ROUTER_REASON_MODEL = os.getenv("LUCI_ROUTER_REASON", "deepseek-r1:8b")
+ROUTER_DEEP_MODEL = os.getenv("LUCI_ROUTER_DEEP", "beast70b:latest")
+ROUTER_AGENT_MODEL = os.getenv("LUCI_ROUTER_AGENT", "llama3.1:70b")
+ROUTER_ANNOUNCE = os.getenv("LUCI_ROUTER_ANNOUNCE", "nondefault")
 
-WORKSPACE = Path(os.getenv("BEAST_WORKSPACE", str(Path.home() / "beast" / "workspace"))).resolve()
+WORKSPACE = Path(os.getenv("LUCI_WORKSPACE", str(Path.home() / "beast" / "workspace"))).resolve()
 DOCS_DIR = WORKSPACE / "docs"
 REPO_DIR = WORKSPACE / "repo"
 RUNS_DIR = WORKSPACE / "runs"
-PERSONA_PATH = os.getenv("BEAST_PERSONA_PATH", str(WORKSPACE / "persona_agent.txt"))
+PERSONA_PATH = os.getenv("LUCI_PERSONA_PATH", str(WORKSPACE / "persona_agent.txt"))
 MEMORY_PATH = WORKSPACE / "memory.md"
 MEMORIES_DIR = WORKSPACE / "memories"
-MEMORY_EXTRACT_MODEL = os.getenv("BEAST_MEMORY_EXTRACT_MODEL", "llama3.1:8b")
-BEAST_AUTO_MEMORY = os.getenv("BEAST_AUTO_MEMORY", "0") == "1"
+MEMORY_EXTRACT_MODEL = os.getenv("LUCI_MEMORY_EXTRACT_MODEL", "llama3.1:8b")
+LUCI_AUTO_MEMORY = os.getenv("LUCI_AUTO_MEMORY", "0") == "1"
 
 # Web system
-WEB_MAX_BYTES = int(os.getenv("BEAST_WEB_MAX_BYTES", str(512 * 1024)))
-WEB_TIMEOUT_SEC = int(os.getenv("BEAST_WEB_TIMEOUT_SEC", "10"))
-WEB_SUMMARY_MODEL = os.getenv("BEAST_WEB_SUMMARY_MODEL", "llama3.1:8b")
+WEB_MAX_BYTES = int(os.getenv("LUCI_WEB_MAX_BYTES", str(512 * 1024)))
+WEB_TIMEOUT_SEC = int(os.getenv("LUCI_WEB_TIMEOUT_SEC", "10"))
+WEB_SUMMARY_MODEL = os.getenv("LUCI_WEB_SUMMARY_MODEL", "llama3.1:8b")
 WEB_MONITORS_PATH = WORKSPACE / "monitors.json"
-WEB_USER_AGENT = "Mozilla/5.0 (compatible; BEAST-Agent/1.0)"
+WEB_USER_AGENT = "Mozilla/5.0 (compatible; LUCI-Agent/1.0)"
 
 # Email / Calendar
-EMAIL_DRAFT_ONLY = os.getenv("BEAST_EMAIL_DRAFT_ONLY", "1") == "1"
+EMAIL_DRAFT_ONLY = os.getenv("LUCI_EMAIL_DRAFT_ONLY", "1") == "1"
 GMAIL_CREDENTIALS_PATH = WORKSPACE / "gmail_credentials.json"
 GMAIL_TOKEN_PATH = WORKSPACE / "gmail_token.json"
-CALENDAR_ID = os.getenv("BEAST_CALENDAR_ID", "primary")
+CALENDAR_ID = os.getenv("LUCI_CALENDAR_ID", "primary")
 REMINDERS_PATH = WORKSPACE / "reminders.json"
-DAILY_BRIEFING_HOUR = int(os.getenv("BEAST_BRIEFING_HOUR", "8"))
-REMINDER_MAX_DAYS = int(os.getenv("BEAST_REMINDER_MAX_DAYS", "30"))
-EMAIL_SUMMARY_MODEL = os.getenv("BEAST_EMAIL_SUMMARY_MODEL", "llama3.1:8b")
+DAILY_BRIEFING_HOUR = int(os.getenv("LUCI_BRIEFING_HOUR", "8"))
+REMINDER_MAX_DAYS = int(os.getenv("LUCI_REMINDER_MAX_DAYS", "30"))
+EMAIL_SUMMARY_MODEL = os.getenv("LUCI_EMAIL_SUMMARY_MODEL", "llama3.1:8b")
 
 # Voice
 PIPER_BIN = WORKSPACE / "piper" / "piper"
 PIPER_MODEL = WORKSPACE / "piper" / "en_US-lessac-medium.onnx"
-PIPER_ENABLED = os.getenv("BEAST_PIPER_ENABLED", "1") == "1"
-WHISPER_MODEL = os.getenv("BEAST_WHISPER_MODEL", "base.en")
-VOICE_ENABLED = os.getenv("BEAST_VOICE_ENABLED", "1") == "1"
+PIPER_ENABLED = os.getenv("LUCI_PIPER_ENABLED", "1") == "1"
+WHISPER_MODEL = os.getenv("LUCI_WHISPER_MODEL", "base.en")
+VOICE_ENABLED = os.getenv("LUCI_VOICE_ENABLED", "1") == "1"
 
 # OAuth scopes
 GOOGLE_SCOPES = [
@@ -106,32 +106,32 @@ GOOGLE_SCOPES = [
 ]
 
 # RAG bounds
-CHUNK_SIZE = int(os.getenv("BEAST_CHUNK_SIZE", "900"))
-CHUNK_OVERLAP = int(os.getenv("BEAST_CHUNK_OVERLAP", "150"))
-TOP_K = int(os.getenv("BEAST_TOP_K", "5"))
-MAX_DOC_FILES = int(os.getenv("BEAST_MAX_DOC_FILES", "500"))
-MAX_DOC_BYTES = int(os.getenv("BEAST_MAX_DOC_BYTES", str(2 * 1024 * 1024)))  # 2MB per file
-MAX_CHUNKS = int(os.getenv("BEAST_MAX_CHUNKS", "20000"))
+CHUNK_SIZE = int(os.getenv("LUCI_CHUNK_SIZE", "900"))
+CHUNK_OVERLAP = int(os.getenv("LUCI_CHUNK_OVERLAP", "150"))
+TOP_K = int(os.getenv("LUCI_TOP_K", "5"))
+MAX_DOC_FILES = int(os.getenv("LUCI_MAX_DOC_FILES", "500"))
+MAX_DOC_BYTES = int(os.getenv("LUCI_MAX_DOC_BYTES", str(2 * 1024 * 1024)))  # 2MB per file
+MAX_CHUNKS = int(os.getenv("LUCI_MAX_CHUNKS", "20000"))
 
 # Agent bounds
-MAX_ITERS = int(os.getenv("BEAST_MAX_ITERS", "3"))
-OLLAMA_TIMEOUT_SEC = int(os.getenv("BEAST_OLLAMA_TIMEOUT_SEC", "300"))
-CMD_TIMEOUT_SEC = int(os.getenv("BEAST_CMD_TIMEOUT_SEC", "180"))
-MAX_CMD_CHARS = int(os.getenv("BEAST_MAX_CMD_CHARS", "4096"))
-MAX_SUBPROCESS_OUTPUT = int(os.getenv("BEAST_MAX_SUBPROCESS_OUTPUT", str(128 * 1024)))  # 128KB
+MAX_ITERS = int(os.getenv("LUCI_MAX_ITERS", "3"))
+OLLAMA_TIMEOUT_SEC = int(os.getenv("LUCI_OLLAMA_TIMEOUT_SEC", "300"))
+CMD_TIMEOUT_SEC = int(os.getenv("LUCI_CMD_TIMEOUT_SEC", "180"))
+MAX_CMD_CHARS = int(os.getenv("LUCI_MAX_CMD_CHARS", "4096"))
+MAX_SUBPROCESS_OUTPUT = int(os.getenv("LUCI_MAX_SUBPROCESS_OUTPUT", str(128 * 1024)))  # 128KB
 
 # Patch controls
 # Default-deny: if prefixes empty => patches disallowed.
-# Example: export BEAST_PATCH_ALLOWED_PREFIXES="src,tests,pyproject.toml,README.md"
+# Example: export LUCI_PATCH_ALLOWED_PREFIXES="src,tests,pyproject.toml,README.md"
 PATCH_ALLOWED_PREFIXES: List[str] = [
-    p.strip() for p in os.getenv("BEAST_PATCH_ALLOWED_PREFIXES", "").split(",") if p.strip()
+    p.strip() for p in os.getenv("LUCI_PATCH_ALLOWED_PREFIXES", "").split(",") if p.strip()
 ]
-PATCH_MAX_BYTES = int(os.getenv("BEAST_PATCH_MAX_BYTES", str(512 * 1024)))  # 512KB
+PATCH_MAX_BYTES = int(os.getenv("LUCI_PATCH_MAX_BYTES", str(512 * 1024)))  # 512KB
 
 # Tool path controls (positional args allowed for tools)
-# Example: export BEAST_TOOL_ALLOWED_PREFIXES="src,tests,pyproject.toml"
+# Example: export LUCI_TOOL_ALLOWED_PREFIXES="src,tests,pyproject.toml"
 TOOL_ALLOWED_PREFIXES: List[str] = [
-    p.strip() for p in os.getenv("BEAST_TOOL_ALLOWED_PREFIXES", "src,tests").split(",") if p.strip()
+    p.strip() for p in os.getenv("LUCI_TOOL_ALLOWED_PREFIXES", "src,tests").split(",") if p.strip()
 ]
 
 # Tool flag allowlists (tight by default)
@@ -160,7 +160,7 @@ RUFF_ALLOWED_FLAGS = {
     "--show-fixes",
     "--exit-zero",
     # NOTE: intentionally NOT allowing --fix / --unsafe-fixes (write operations
-    # bypass patch validation; opt-in via BEAST_ALLOW_AUTOFIX=1 if needed)
+    # bypass patch validation; opt-in via LUCI_ALLOW_AUTOFIX=1 if needed)
 }
 RUFF_FLAGS_REQUIRING_VALUE = {
     "--select", "--ignore", "--extend-select", "--extend-ignore",
@@ -175,7 +175,7 @@ GIT_ALLOWED_EXACT = {
 }
 
 # Opt-in ruff autofix (still no --unsafe-fixes)
-if os.getenv("BEAST_ALLOW_AUTOFIX", "0").strip() == "1":
+if os.getenv("LUCI_ALLOW_AUTOFIX", "0").strip() == "1":
     RUFF_ALLOWED_FLAGS = RUFF_ALLOWED_FLAGS | {"--fix"}
 
 
@@ -623,7 +623,7 @@ def validate_patch_unified_diff(diff: str) -> Tuple[bool, str]:
         return False, "patch_missing_file_headers"
 
     if not PATCH_ALLOWED_PREFIXES:
-        return False, "patch_disallowed: BEAST_PATCH_ALLOWED_PREFIXES is empty (default-deny)"
+        return False, "patch_disallowed: LUCI_PATCH_ALLOWED_PREFIXES is empty (default-deny)"
 
     for p in seen_paths:
         if not is_patch_path_allowed(p):
@@ -771,7 +771,7 @@ def agent_prompt(task: str, sources_text: str, feedback: str, last_error: str, r
     mem_section = ""
     if memory_text.strip():
         mem_section = f"\n## WHAT YOU REMEMBER ABOUT EDWARD:\n{memory_text.strip()}\n"
-    return f"""You are BEAST — Edward's personal autonomous agent running locally on his machine.
+    return f"""You are LUCI — Edward's personal autonomous agent running locally on his machine.
 You are not a chatbot. You are an autonomous agent with tools, memory, and the ability to act.
 You think, plan, execute, and report back. You answer only to Edward.
 
@@ -1089,7 +1089,7 @@ def agent_loop(
 # CLI
 # -----------------------------
 def main() -> None:
-    parser = argparse.ArgumentParser(description="mini-BEAST (laptop dev agent)")
+    parser = argparse.ArgumentParser(description="mini-LUCI (laptop dev agent)")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     p_ask = sub.add_parser("ask", help="Direct query to Ollama")
@@ -1285,7 +1285,7 @@ def auto_extract_memory(user_msg: str, beast_response: str) -> None:
         "Be selective — only save concrete, reusable facts. "
         "Return ONLY a JSON object, no other text."
     )
-    prompt = f"USER: {user_msg[:600]}\nBEAST: {beast_response[:600]}"
+    prompt = f"USER: {user_msg[:600]}\nLUCI: {beast_response[:600]}"
     try:
         payload = {
             "model": MEMORY_EXTRACT_MODEL,
@@ -1359,7 +1359,7 @@ def init_memory() -> None:
     ts = now_ts()
     models_str = "\n".join(f"  - {m}" for m in models) if models else "  - (none detected)"
 
-    safe_write_text(MEMORY_PATH, f"""# BEAST Memory — Edward's Agent
+    safe_write_text(MEMORY_PATH, f"""# LUCI Memory — Edward's Agent
 *Initialized: {ts}*
 
 ## Identity
@@ -1390,7 +1390,7 @@ def init_memory() -> None:
 - Never execute destructive operations without confirmation
 
 ## Projects
-- mini_beast: autonomous agent, ~/beast/workspace, github.com/equansa00/mini_beast
+- luci: autonomous agent, ~/beast/workspace, github.com/equansa00/luci
 - Primary model: llama3.1:70b
 - Agent model for coding: beast70b:latest
 
@@ -1427,7 +1427,7 @@ def init_memory() -> None:
     safe_write_text(MEMORIES_DIR / "projects.md", f"""# Projects Memory
 *Initialized: {ts}*
 
-- mini_beast: autonomous agent, ~/beast/workspace, github.com/equansa00/mini_beast
+- luci: autonomous agent, ~/beast/workspace, github.com/equansa00/luci
 - Primary model: llama3.1:70b
 - Agent model for coding: beast70b:latest
 """)
@@ -1620,7 +1620,7 @@ def google_get_credentials(interactive: bool = False):
         raise ValueError(
             "Gmail not set up. Go to https://console.cloud.google.com, create OAuth2 "
             "credentials, download as ~/beast/workspace/gmail_credentials.json, "
-            "then run: python3 mini_beast.py --setup-gmail"
+            "then run: python3 luci.py --setup-gmail"
         )
 
     creds = None
@@ -1642,7 +1642,7 @@ def google_get_credentials(interactive: bool = False):
             creds = None
 
     if not interactive:
-        raise ValueError("Run: python3 mini_beast.py --setup-gmail to authorize")
+        raise ValueError("Run: python3 luci.py --setup-gmail to authorize")
 
     from google_auth_oauthlib.flow import InstalledAppFlow
     flow = InstalledAppFlow.from_client_secrets_file(str(GMAIL_CREDENTIALS_PATH), GOOGLE_SCOPES)
@@ -2208,7 +2208,7 @@ def stt_transcribe(audio_path: Path) -> str:
 def stt_record(duration_sec: int = 5) -> Path:
     """Record audio from mic and save to WAV. Returns path."""
     if not VOICE_ENABLED:
-        raise ValueError("Voice disabled (BEAST_VOICE_ENABLED=0)")
+        raise ValueError("Voice disabled (LUCI_VOICE_ENABLED=0)")
     import sounddevice as sd  # type: ignore
     import soundfile as sf    # type: ignore
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
@@ -2275,7 +2275,7 @@ def run_telegram_bot() -> None:
         if not allowed(update):
             return
         await update.message.reply_text(
-            "BEAST online.\n\n"
+            "LUCI online.\n\n"
             "I'm your autonomous agent running locally on your machine. "
             "I think, plan, execute, and report back.\n\n"
             "/help to see what I can do."
@@ -2302,7 +2302,7 @@ def run_telegram_bot() -> None:
             "/email — read, search, draft and send emails\n"
             "/calendar — view and create calendar events\n"
             "/remind <time> <msg> — set a Telegram reminder\n"
-            "Voice: send a voice message to talk to BEAST\n"
+            "Voice: send a voice message to talk to LUCI\n"
             "plain text — sent directly to Ollama, response returned\n"
             f"Models auto-routed: chat→{ROUTER_DEFAULT_MODEL}, code→{ROUTER_CODE_MODEL}, "
             f"reasoning→{ROUTER_REASON_MODEL}, deep→{ROUTER_DEEP_MODEL}"
@@ -2353,7 +2353,7 @@ def run_telegram_bot() -> None:
     async def cmd_patch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not allowed(update):
             return
-        prefixes = ", ".join(PATCH_ALLOWED_PREFIXES) or "(none — set BEAST_PATCH_ALLOWED_PREFIXES)"
+        prefixes = ", ".join(PATCH_ALLOWED_PREFIXES) or "(none — set LUCI_PATCH_ALLOWED_PREFIXES)"
         await update.message.reply_text(
             "Send a unified diff as plain text.\n"
             "Use standard format: --- a/file and +++ b/file headers.\n"
@@ -2390,7 +2390,7 @@ def run_telegram_bot() -> None:
         mem = load_memory()
         if not mem:
             await update.message.reply_text(
-                "❌ No memory file found. Run: python3 mini_beast.py --init-memory"
+                "❌ No memory file found. Run: python3 luci.py --init-memory"
             )
             return
         if len(mem) <= 3000:
@@ -2686,7 +2686,7 @@ def run_telegram_bot() -> None:
                 if EMAIL_DRAFT_ONLY:
                     await update.message.reply_text(
                         "❌ Draft-only mode active.\n"
-                        "Set BEAST_EMAIL_DRAFT_ONLY=0 in .env to enable sending."
+                        "Set LUCI_EMAIL_DRAFT_ONLY=0 in .env to enable sending."
                     )
                     return
                 ok = email_send_draft(args[1])
@@ -2923,7 +2923,7 @@ def run_telegram_bot() -> None:
                 if tag:
                     response = response + f"\n\n{tag}"
                 await send_long(update, response)
-                if BEAST_AUTO_MEMORY:
+                if LUCI_AUTO_MEMORY:
                     asyncio.create_task(asyncio.to_thread(auto_extract_memory, text, response))
                 return
 
@@ -2942,7 +2942,7 @@ def run_telegram_bot() -> None:
         if tag:
             response = response + f"\n\n{tag}"
         await send_long(update, response)
-        if BEAST_AUTO_MEMORY:
+        if LUCI_AUTO_MEMORY:
             asyncio.create_task(asyncio.to_thread(auto_extract_memory, text, response))
 
     app = Application.builder().token(token).build()
@@ -3031,12 +3031,12 @@ def run_telegram_bot() -> None:
         ogg_path.unlink(missing_ok=True)
         wav_path.unlink(missing_ok=True)
 
-        if BEAST_AUTO_MEMORY:
+        if LUCI_AUTO_MEMORY:
             asyncio.create_task(asyncio.to_thread(auto_extract_memory, text, response))
 
     app.add_handler(MessageHandler(filters.VOICE, handle_voice))
 
-    print(f"BEAST bot starting (model: {MODEL})", flush=True)
+    print(f"LUCI bot starting (model: {MODEL})", flush=True)
     app.run_polling(drop_pending_updates=True)
 
 
@@ -3261,7 +3261,7 @@ def run_heartbeat() -> None:
     safe_write_text(log_path, "".join(all_lines))
 
     # Print result
-    print(f"BEAST HEARTBEAT [{ts}] — {status}")
+    print(f"LUCI HEARTBEAT [{ts}] — {status}")
     if warns:
         for w in warns:
             print(f"  ⚠  {w}")
@@ -3280,7 +3280,7 @@ def run_heartbeat() -> None:
                 await bot.send_message(chat_id=ALLOWED_USER_ID, text=chunk)
 
     if warns:
-        msg = f"⚠️ BEAST HEARTBEAT — {ts}\n\n" + "\n".join(f"• {w}" for w in warns)
+        msg = f"⚠️ LUCI HEARTBEAT — {ts}\n\n" + "\n".join(f"• {w}" for w in warns)
         asyncio.run(_send(msg))
     else:
         send_ok = True
@@ -3309,17 +3309,17 @@ if __name__ == "__main__":
         setup_gmail()
     elif len(sys.argv) > 1 and sys.argv[1] == "--capabilities":
         print("""
-BEAST CAPABILITIES — All 5 Phases
+LUCI CAPABILITIES — All 5 Phases
 ===================================
 
 PHASE 1 — Personality + Telegram Control
-  /start                          Wake BEAST
+  /start                          Wake LUCI
   /help                           Full command list
   /status                         Ollama + system status
   /models                         List all Ollama models
   /run <command>                  Execute allowlisted shell command
   /patch                          Send a unified diff to apply
-  plain text                      Talk to BEAST (Jarvis-style)
+  plain text                      Talk to LUCI (Jarvis-style)
 
 PHASE 2 — Heartbeat + Monitoring
   /heartbeat                      Manual health check now
@@ -3328,12 +3328,12 @@ PHASE 2 — Heartbeat + Monitoring
   [alerts]                        Disk, RAM, CPU, Ollama, service crashes
 
 PHASE 3 — Memory
-  /memory                         Show what BEAST knows about you
+  /memory                         Show what LUCI knows about you
   /memoryfull                     Complete memory dump
   /remember <text>                Save something to memory
   /forget <text>                  Remove a memory entry
   --init-memory                   CLI: reinitialize memory from scratch
-  [auto]                          BEAST_AUTO_MEMORY=1 to enable auto-extract
+  [auto]                          LUCI_AUTO_MEMORY=1 to enable auto-extract
 
 PHASE 4 — Web
   /web <query>                    Search DuckDuckGo + summarize
@@ -3371,7 +3371,7 @@ CLI FLAGS SUMMARY
   --briefing                      Send daily briefing
   --capabilities                  Print this list
   --route-test                    Show routing table for sample inputs
-  ask <question>                  Ask BEAST a question
+  ask <question>                  Ask LUCI a question
   cite <question>                 Ask with RAG sources
   agent <task>                    Run autonomous agent task
 """)
@@ -3419,7 +3419,7 @@ CLI FLAGS SUMMARY
         print(f"aplay:         {'✅' if shutil.which('aplay') else '❌'}")
         print(f"ffmpeg:        {'✅' if shutil.which('ffmpeg') else '❌'}")
         print("Testing TTS...")
-        tts_speak("BEAST voice system online. Testing audio output.")
+        tts_speak("LUCI voice system online. Testing audio output.")
         print("✅ TTS: spoken (check speakers)")
         print("Testing STT model load...")
         try:

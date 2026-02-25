@@ -1,4 +1,4 @@
-# BEAST Memory — Edward's Agent
+# LUCI Memory — Edward's Agent
 *Initialized: 20260224-164159*
 
 ## Identity
@@ -39,7 +39,7 @@
 - Never execute destructive operations without confirmation
 
 ## Projects
-- mini_beast: autonomous agent, ~/beast/workspace, github.com/equansa00/mini_beast
+- luci: autonomous agent, ~/beast/workspace, github.com/equansa00/luci
 - Primary model: llama3.1:70b
 - Agent model for coding: beast70b:latest
 

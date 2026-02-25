@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BEAST Web Interface — Sub-phase B
+LUCI Web Interface — Sub-phase B
 FastAPI + WebSockets + voice upload.
 """
 
@@ -16,20 +16,20 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-WEB_HOST = os.getenv("BEAST_WEB_HOST", "0.0.0.0")
-WEB_PORT = int(os.getenv("BEAST_WEB_PORT", "7860"))
-WEB_SECRET = os.getenv("BEAST_WEB_SECRET", "")
+WEB_HOST = os.getenv("LUCI_WEB_HOST", "0.0.0.0")
+WEB_PORT = int(os.getenv("LUCI_WEB_PORT", "7860"))
+WEB_SECRET = os.getenv("LUCI_WEB_SECRET", "")
 
 # ---------------------------------------------------------------------------
-# Imports from mini_beast
+# Imports from luci
 # ---------------------------------------------------------------------------
 sys.path.insert(0, str(Path(__file__).parent))
-from mini_beast import (  # noqa: E402
+from luci import (  # noqa: E402
     MODEL,
     RUNS_DIR,
     MEMORY_PATH,
     PIPER_BIN,
-    BEAST_AUTO_MEMORY,
+    LUCI_AUTO_MEMORY,
     auto_extract_memory,
     ollama_chat,
     route_model,
@@ -45,7 +45,7 @@ from mini_beast import (  # noqa: E402
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Request
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 
-app = FastAPI(title="BEAST Web Interface")
+app = FastAPI(title="LUCI Web Interface")
 
 # ---------------------------------------------------------------------------
 # Chat UI HTML
@@ -55,7 +55,7 @@ _HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BEAST — Personal AI Agent</title>
+<title>LUCI — Personal AI Agent</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -100,7 +100,7 @@ _HTML = r"""<!DOCTYPE html>
   /* ---- bubbles ---- */
   .row { display: flex; }
   .row.user  { justify-content: flex-end; }
-  .row.beast { justify-content: flex-start; }
+  .row.luci { justify-content: flex-start; }
 
   .bubble {
     max-width: min(72%, 540px); padding: 10px 14px;
@@ -108,7 +108,7 @@ _HTML = r"""<!DOCTYPE html>
     word-break: break-word;
   }
   .row.user  .bubble { background: var(--user-bg);  border-bottom-right-radius: 4px; }
-  .row.beast .bubble { background: var(--surface2); border-bottom-left-radius: 4px; }
+  .row.luci .bubble { background: var(--surface2); border-bottom-left-radius: 4px; }
 
   .tag { font-size: .7rem; color: var(--muted); margin-top: 4px;
     padding: 0 2px; display: block; }
@@ -182,7 +182,7 @@ _HTML = r"""<!DOCTYPE html>
 <!-- Auth modal (shown only when WEB_SECRET is set) -->
 <div id="authModal" style="display:none">
   <div id="authBox">
-    <h2>🔒 BEAST Login</h2>
+    <h2>🔒 LUCI Login</h2>
     <p>Enter access password to continue.</p>
     <input type="password" id="authInput" placeholder="Password" autocomplete="current-password">
     <button id="authBtn" style="background:var(--accent);color:#fff">Connect</button>
@@ -194,7 +194,7 @@ _HTML = r"""<!DOCTYPE html>
   <div id="header">
     <div class="dot"></div>
     <div>
-      <h1>BEAST</h1>
+      <h1>LUCI</h1>
       <p>Personal AI Agent</p>
     </div>
   </div>
@@ -202,7 +202,7 @@ _HTML = r"""<!DOCTYPE html>
   <div id="messages"></div>
 
   <div id="inputbar">
-    <textarea id="msg" rows="1" placeholder="Message BEAST..."></textarea>
+    <textarea id="msg" rows="1" placeholder="Message LUCI..."></textarea>
     <button id="recBtn" title="Record voice">🎤</button>
     <button id="sendBtn">Send</button>
   </div>
@@ -251,11 +251,11 @@ function addBubble(side, text, tag) {
 
 function addTyping() {
   const row = document.createElement("div");
-  row.className = "row beast";
+  row.className = "row luci";
   row.id = "typing";
   const bub = document.createElement("div");
   bub.className = "bubble typing";
-  bub.textContent = "BEAST is thinking...";
+  bub.textContent = "LUCI is thinking...";
   row.appendChild(bub);
   msgs.appendChild(row);
   scrollBottom();
@@ -282,10 +282,10 @@ function connectWS(secret) {
     if (d.type === "status") {
       wsReady = true;
       modal.style.display = "none";
-      if (d.text) addBubble("beast", d.text, "");
+      if (d.text) addBubble("luci", d.text, "");
     } else if (d.type === "response") {
       removeTyping();
-      addBubble("beast", d.text, d.model || "");
+      addBubble("luci", d.text, d.model || "");
     } else if (d.type === "auth_failed") {
       authErr.style.display = "block";
       ws.close();
@@ -334,7 +334,7 @@ recBtn.addEventListener("click", async () => {
       recBtn.classList.add("recording");
       recBtn.title = "Stop recording";
     } catch (err) {
-      addBubble("beast", "❌ Mic access denied: " + err.message, "");
+      addBubble("luci", "❌ Mic access denied: " + err.message, "");
     }
   } else {
     mediaRecorder.stop();
@@ -350,13 +350,13 @@ async function sendVoice(blob) {
   const form = new FormData();
   form.append("audio", blob, "voice.webm");
   const headers = {};
-  if (SECRET) headers["X-BEAST-SECRET"] = SECRET;
+  if (SECRET) headers["X-LUCI-SECRET"] = SECRET;
   try {
     const resp = await fetch("/voice", {method: "POST", headers, body: form});
     const data = await resp.json();
     removeTyping();
     if (data.error) {
-      addBubble("beast", "❌ " + data.error, "");
+      addBubble("luci", "❌ " + data.error, "");
       return;
     }
     if (data.transcription) {
@@ -364,14 +364,14 @@ async function sendVoice(blob) {
       const lastUser = [...msgs.querySelectorAll(".row.user .bubble")].at(-1);
       if (lastUser) lastUser.textContent = "🎤 " + data.transcription;
     }
-    addBubble("beast", data.response, data.model || "");
+    addBubble("luci", data.response, data.model || "");
     if (data.audio_url) {
       const audio = new Audio(data.audio_url);
       audio.play().catch(() => {});
     }
   } catch (err) {
     removeTyping();
-    addBubble("beast", "❌ Voice request failed: " + err.message, "");
+    addBubble("luci", "❌ Voice request failed: " + err.message, "");
   }
 }
 
@@ -440,7 +440,7 @@ async def voice_upload(request: Request, audio: UploadFile = File(...)):
     # Auth check
     if WEB_SECRET:
         secret = (
-            request.headers.get("X-BEAST-SECRET")
+            request.headers.get("X-LUCI-SECRET")
             or request.query_params.get("secret", "")
         )
         if secret != WEB_SECRET:
@@ -482,7 +482,7 @@ async def voice_upload(request: Request, audio: UploadFile = File(...)):
 
     upload_path.unlink(missing_ok=True)
 
-    if BEAST_AUTO_MEMORY:
+    if LUCI_AUTO_MEMORY:
         asyncio.create_task(asyncio.to_thread(auto_extract_memory, text, response_text))
 
     return JSONResponse({
@@ -511,7 +511,7 @@ async def websocket_endpoint(ws: WebSocket):
             await ws.close(code=1008)
             return
 
-    await ws.send_text('{"type":"status","text":"BEAST online"}')
+    await ws.send_text('{"type":"status","text":"LUCI online"}')
 
     try:
         while True:
@@ -545,7 +545,7 @@ async def websocket_endpoint(ws: WebSocket):
                 "model": tag,
             }))
 
-            if BEAST_AUTO_MEMORY:
+            if LUCI_AUTO_MEMORY:
                 asyncio.create_task(
                     asyncio.to_thread(auto_extract_memory, text, response)
                 )
