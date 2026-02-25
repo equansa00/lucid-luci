@@ -2101,6 +2101,15 @@ def route_model(text: str) -> Tuple[str, str]:
     if any(kw in lower for kw in CODE_KEYWORDS):
         return (ROUTER_CODE_MODEL, "code")
 
+    # Step 1b — personal/capability questions → main model honours persona best
+    _capability_kw = [
+        "can you", "do you have", "are you able", "what can you",
+        "do you support", "can you hear", "can you see", "can you process",
+        "do you remember", "what are you", "who are you", "tell me about yourself",
+    ]
+    if any(kw in lower for kw in _capability_kw):
+        return (ROUTER_DEFAULT_MODEL, "assistant")
+
     # Step 2 — reasoning: 1+ keyword OR ends with "?"
     reason_hits = sum(1 for kw in REASON_KEYWORDS if kw in lower)
     if reason_hits >= 1 or lower.rstrip().endswith("?"):
