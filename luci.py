@@ -180,6 +180,25 @@ if os.getenv("LUCI_ALLOW_AUTOFIX", "0").strip() == "1":
 
 
 # -----------------------------
+# GitHub integration lazy loader
+# -----------------------------
+def _gh() -> dict:
+    """Lazy-load luci_github to avoid import-time side effects."""
+    from luci_github import (  # noqa: F401
+        github_list_repos,
+        scan_one_repo,
+        scan_all_repos,
+        apply_luci_fix,
+        format_repo_list,
+        format_scan_summary,
+    )
+    import inspect
+    frame = inspect.currentframe()
+    locs = frame.f_locals if frame else {}
+    return {k: v for k, v in locs.items() if not k.startswith("_")}
+
+
+# -----------------------------
 # Utilities
 # -----------------------------
 def die(msg: str, code: int = 1) -> None:
@@ -2302,6 +2321,7 @@ def run_telegram_bot() -> None:
             "/email — read, search, draft and send emails\n"
             "/calendar — view and create calendar events\n"
             "/remind <time> <msg> — set a Telegram reminder\n"
+            "/github list/scan/fix — GitHub repo management\n"
             "Voice: send a voice message to talk to LUCI\n"
             "plain text — sent directly to Ollama, response returned\n"
             f"Models auto-routed: chat→{ROUTER_DEFAULT_MODEL}, code→{ROUTER_CODE_MODEL}, "
@@ -2945,6 +2965,75 @@ def run_telegram_bot() -> None:
         if LUCI_AUTO_MEMORY:
             asyncio.create_task(asyncio.to_thread(auto_extract_memory, text, response))
 
+    async def cmd_github(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not allowed(update):
+            return
+        args = context.args or []
+
+        if not args or args[0] == "list":
+            await update.message.reply_text("📦 Fetching your repos...")
+            try:
+                gh = _gh()
+                repos = await asyncio.to_thread(gh["github_list_repos"])
+                await send_long(update, gh["format_repo_list"](repos))
+            except Exception as e:
+                await update.message.reply_text(f"❌ {e}")
+
+        elif args[0] == "scan" and len(args) == 1:
+            await update.message.reply_text(
+                "🔍 Full scan started — scanning all repos.\n"
+                "This will take a while. I'll message you when done."
+            )
+            async def _do_scan():
+                gh = _gh()
+                results = await asyncio.to_thread(gh["scan_all_repos"])
+                await send_long(update, gh["format_scan_summary"](results))
+            asyncio.create_task(_do_scan())
+
+        elif args[0] == "scan" and len(args) == 2:
+            repo = args[1]
+            await update.message.reply_text(f"🔍 Scanning {repo}...")
+            try:
+                gh = _gh()
+                result = await asyncio.to_thread(gh["scan_one_repo"], repo)
+                if result["review_path"]:
+                    review = Path(result["review_path"]).read_text()
+                    await send_long(update, review[:4000])
+                else:
+                    await update.message.reply_text(f"❌ Scan failed: {result.get('error')}")
+            except Exception as e:
+                await update.message.reply_text(f"❌ {e}")
+
+        elif args[0] == "fix" and len(args) >= 3:
+            repo = args[1]
+            desc = " ".join(args[2:])
+            await update.message.reply_text(
+                f"🔧 Working on {repo}...\n"
+                f"Task: {desc}\n"
+                "I'll open a PR when done."
+            )
+            async def _do_fix():
+                try:
+                    gh = _gh()
+                    result = await asyncio.to_thread(gh["apply_luci_fix"], repo, desc)
+                    await update.message.reply_text(
+                        f"✅ Fix applied!\n"
+                        f"Branch: {result['branch']}\n"
+                        f"PR: {result['pr_url']}"
+                    )
+                except Exception as e:
+                    await update.message.reply_text(f"❌ Fix failed: {e}")
+            asyncio.create_task(_do_fix())
+
+        else:
+            await update.message.reply_text(
+                "GitHub commands:\n"
+                "/github list — list all repos\n"
+                "/github scan — scan all repos (background)\n"
+                "/github scan <repo> — scan one repo\n"
+                "/github fix <repo> <description> — fix and open PR"
+            )
+
     app = Application.builder().token(token).build()
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_help))
@@ -2963,6 +3052,7 @@ def run_telegram_bot() -> None:
     app.add_handler(CommandHandler("email", cmd_email))
     app.add_handler(CommandHandler("calendar", cmd_calendar))
     app.add_handler(CommandHandler("remind", cmd_remind))
+    app.add_handler(CommandHandler("github", cmd_github))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
