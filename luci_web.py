@@ -6,11 +6,15 @@ Full-screen face + Three.js particle field + Web Audio waveform + PWA.
 from __future__ import annotations
 
 import asyncio
+import base64
+import io
 import json
 import os
 import re
+import subprocess
 import sys
 import time
+import wave
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -34,6 +38,7 @@ from luci import (  # noqa: E402
     RUNS_DIR,
     MEMORY_PATH,
     PIPER_BIN,
+    PIPER_MODEL,
     LUCI_AUTO_MEMORY,
     auto_extract_memory,
     ollama_chat,
@@ -118,6 +123,41 @@ async def broadcast_transcript(text: str) -> None:
             await conn.send_text(msg)
         except Exception:
             _connected_ws.discard(conn)
+
+
+def _piper_tts_to_wav_bytes(text: str) -> bytes | None:
+    """Run Piper TTS and return WAV bytes, or None on failure."""
+    if not PIPER_BIN.exists() or not PIPER_MODEL.exists():
+        return None
+    try:
+        # Clean text for TTS (strip markdown, cap length)
+        import re as _re
+        clean = _re.sub(r'```.*?```', '', text, flags=_re.DOTALL)
+        clean = _re.sub(r'`[^`]+`', '', clean)
+        clean = _re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', clean)
+        clean = _re.sub(r'https?://\S+', '', clean)
+        clean = _re.sub(r'\s+', ' ', clean).strip()[:500]
+        if not clean:
+            return None
+
+        proc = subprocess.run(
+            [str(PIPER_BIN), "--model", str(PIPER_MODEL), "--output_raw"],
+            input=clean.encode("utf-8"),
+            capture_output=True,
+            timeout=30,
+        )
+        if proc.returncode != 0 or not proc.stdout:
+            return None
+
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)   # 16-bit PCM
+            wf.setframerate(22050)
+            wf.writeframes(proc.stdout)
+        return buf.getvalue()
+    except Exception:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -381,20 +421,41 @@ _HTML = r"""<!DOCTYPE html>
 
   /* === Subtitle === */
   #subtitle {
-    position: fixed; bottom: 14%; left: 50%;
+    position: fixed; bottom: 12%; left: 50%;
     transform: translateX(-50%);
-    width: min(700px, 88vw);
+    width: min(340px, 88vw);
     text-align: center;
-    font-size: 17px; line-height: 1.6;
+    font-size: 16px; line-height: 1.6;
     color: var(--warm);
-    text-shadow: 0 0 20px rgba(245,230,200,0.35);
+    text-shadow: 0 0 18px rgba(245,230,200,0.3);
     opacity: 0;
     transition: opacity 0.5s ease;
     z-index: 20; pointer-events: none;
     padding: 0 16px;
+    /* Clamp to 3 visible lines */
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
   #subtitle.visible  { opacity: 1; }
-  #subtitle.response { color: var(--gold); text-shadow: 0 0 22px rgba(212,175,55,0.5); }
+  #subtitle.response { color: var(--gold); text-shadow: 0 0 20px rgba(212,175,55,0.45); }
+
+  /* === Audio unlock nudge === */
+  #audio-unlock {
+    position: fixed; bottom: 8%; left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(212,175,55,0.5);
+    pointer-events: none; z-index: 25;
+    transition: opacity 0.6s ease;
+    animation: unlockPulse 2s ease-in-out infinite;
+  }
+  #audio-unlock.hidden { opacity: 0; }
+  @keyframes unlockPulse {
+    0%,100% { opacity: 0.45; } 50% { opacity: 0.85; }
+  }
 
   /* === Tap hint === */
   #tap-hint {
@@ -500,6 +561,7 @@ _HTML = r"""<!DOCTYPE html>
 
 <!-- Subtitle overlay -->
 <div id="subtitle"></div>
+<div id="audio-unlock">tap once to enable voice</div>
 <div id="tap-hint">tap or speak to interact</div>
 
 <!-- Debug overlay -->
@@ -544,6 +606,8 @@ let subtitleTimer = null;
 let currentAudio  = null;
 let dpr           = window.devicePixelRatio || 1;
 let _lastLevelLog = 0;
+let _audioUnlocked = false;
+let _audioCtx      = null;
 
 // DOM refs
 const faceImg       = document.getElementById('face-img');
@@ -553,6 +617,7 @@ const waveCtx       = waveCanvas.getContext('2d');
 const subtitleEl    = document.getElementById('subtitle');
 const wakeIndicator = document.getElementById('wake-indicator');
 const tapHint       = document.getElementById('tap-hint');
+const audioUnlockEl = document.getElementById('audio-unlock');
 const authModal     = document.getElementById('auth-modal');
 const authInput     = document.getElementById('auth-input');
 const authBtn       = document.getElementById('auth-btn');
@@ -651,6 +716,14 @@ function connectWS() {
       showSubtitle(d.text, true);
       if (currentState !== 'speaking') setState('speaking');
 
+    } else if (d.type === 'audio') {
+      dbg('\uD83D\uDD0A audio received (' + Math.round(d.data.length * 0.75 / 1024) + 'kb)');
+      playWavBase64(d.data, () => {
+        currentAudio = null;
+        setState('idle');
+        dbg('\uD83D\uDD0A playback finished');
+      });
+
     } else if (d.type === 'auth_failed') {
       dbg('\u274c auth failed');
       authError.style.display = 'block';
@@ -666,6 +739,52 @@ function connectWS() {
 // Auth modal
 // =========================================================================
 function hideAuthModal() { authModal.style.display = 'none'; }
+
+// =========================================================================
+// Audio unlock (browsers require user gesture before playing audio)
+// =========================================================================
+function _unlockAudio() {
+  if (_audioUnlocked) return;
+  _audioUnlocked = true;
+  _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  _audioCtx.resume();
+  audioUnlockEl.classList.add('hidden');
+  dbg('\uD83D\uDD0A audio unlocked');
+}
+// Unlock on first any-click (covers tap-to-speak too)
+document.addEventListener('click', _unlockAudio, {once: false});
+
+// =========================================================================
+// Play WAV from base64
+// =========================================================================
+function playWavBase64(b64, onEnded) {
+  try {
+    const bytes    = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    const blob     = new Blob([bytes], {type: 'audio/wav'});
+    const url      = URL.createObjectURL(blob);
+    currentAudio   = new Audio(url);
+    currentAudio.oncanplaythrough = () => {
+      currentAudio.play().catch(e => {
+        dbg('\u274c play blocked: ' + e.message);
+        URL.revokeObjectURL(url);
+        if (onEnded) onEnded();
+      });
+    };
+    currentAudio.onended = () => {
+      URL.revokeObjectURL(url);
+      currentAudio = null;
+      if (onEnded) onEnded();
+    };
+    currentAudio.onerror = () => {
+      URL.revokeObjectURL(url);
+      currentAudio = null;
+      if (onEnded) onEnded();
+    };
+  } catch (e) {
+    dbg('\u274c playWavBase64: ' + e.message);
+    if (onEnded) onEnded();
+  }
+}
 
 if (SECRET) {
   authModal.style.display = 'flex';
@@ -1147,12 +1266,29 @@ async def websocket_endpoint(websocket: WebSocket):
                 response = f"❌ Error: {e}"
 
             tag = format_model_tag(model_name, category)
+
+            # Run Piper TTS in thread while we still have the response
+            wav_bytes: bytes | None = await loop.run_in_executor(
+                None, lambda: _piper_tts_to_wav_bytes(response)
+            )
+
             await broadcast_state("speaking")
             await websocket.send_text(json.dumps({
                 "type": "response",
                 "text": response,
                 "model": tag,
             }))
+
+            # Send WAV audio as base64 so the browser can play it
+            if wav_bytes:
+                await websocket.send_text(json.dumps({
+                    "type": "audio",
+                    "data": base64.b64encode(wav_bytes).decode(),
+                    "format": "wav",
+                }))
+            else:
+                # No audio produced — let frontend idle out after subtitle
+                await websocket.send_text('{"type":"state","state":"idle"}')
 
             if LUCI_AUTO_MEMORY:
                 asyncio.create_task(
