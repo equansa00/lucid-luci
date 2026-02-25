@@ -66,7 +66,16 @@ async def transcribe(audio: UploadFile = File(...)) -> JSONResponse:
             tmp.write(data)
             tmp_path = tmp.name
 
-        result = model.transcribe(tmp_path, fp16=_FP16, language="en")
+        result = model.transcribe(
+            tmp_path, fp16=_FP16, language="en",
+            initial_prompt=(
+                "LUCI is a personal AI assistant. "
+                "Chip and Edward are the same person, the user. "
+                "Ogechi is his wife. "
+                "Names: LUCI, Chip, Edward, Ogechi, Andrew, Christopher, Athena. "
+                "Common topics: medication, Zoloft, Lyrica, health, code, GitHub, projects."
+            ),
+        )
         text = (result.get("text") or "").strip()
         return JSONResponse({"text": text, "duration": result.get("duration", 0)})
     except Exception as e:
@@ -87,7 +96,16 @@ async def transcribe_path(request: Request) -> JSONResponse:
         path = body.get("path", "")
         if not path or not Path(path).exists():
             return JSONResponse({"text": "", "error": "file not found"}, status_code=400)
-        result = model.transcribe(path, fp16=_FP16, language="en")
+        result = model.transcribe(
+            path, fp16=_FP16, language="en",
+            initial_prompt=(
+                "LUCI is a personal AI assistant. "
+                "Chip and Edward are the same person, the user. "
+                "Ogechi is his wife. "
+                "Names: LUCI, Chip, Edward, Ogechi, Andrew, Christopher, Athena. "
+                "Common topics: medication, Zoloft, Lyrica, health, code, GitHub, projects."
+            ),
+        )
         text = (result.get("text") or "").strip()
         return JSONResponse({"text": text})
     except Exception as e:

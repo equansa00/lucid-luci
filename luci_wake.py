@@ -284,12 +284,33 @@ def _al_process(frames: list[bytes], pa_format: int, rate: int) -> None:
         wav_path.unlink(missing_ok=True)
         return
 
+    # Minimum duration filter — skip clips under 0.8s (fan noise bursts)
+    try:
+        with wave.open(str(wav_path), 'rb') as wf:
+            duration_ms = (wf.getnframes() / wf.getframerate()) * 1000
+        if duration_ms < 800:
+            print(f"[al] clip too short ({duration_ms:.0f}ms), skipping", flush=True)
+            wav_path.unlink(missing_ok=True)
+            return
+    except Exception:
+        pass
+
     # Transcribe
     text = _al_transcribe_wav(wav_path)
     wav_path.unlink(missing_ok=True)
 
     if not text:
         print("[al] No speech detected or transcription empty.", flush=True)
+        return
+
+    # Filter single-word garbage / common mishears
+    JUNK_PHRASES = {"you", "the", "the and", "and", "a", "i", "ok", "okay",
+                    "um", "uh", "hmm", "hm", "oh", "ah", "hey"}
+    if text.lower().strip(".,!?") in JUNK_PHRASES:
+        print(f"[al] filtered junk: '{text}'", flush=True)
+        return
+    if len(text.split()) < 2:
+        print(f"[al] too short to process: '{text}'", flush=True)
         return
 
     print(f"\nYou: {text}", flush=True)
@@ -382,15 +403,20 @@ def always_listen_loop() -> None:
                 time.sleep(0.05)
                 continue
 
+            # Echo gate: skip normal VAD while LUCI is speaking to prevent echo loop
+            if _al_speaking.is_set():
+                chunk = np.frombuffer(data, dtype=np.int16)
+                rms = float(np.sqrt(np.mean(chunk.astype(np.float32) ** 2)))
+                if rms > AL_THRESHOLD * 2.5:  # deliberate interruption (very loud)
+                    print("⚡ Interrupted.", flush=True)
+                    _al_interrupt()
+                continue  # skip normal VAD processing while speaking
+
             chunk = np.frombuffer(data, dtype=np.int16)
             rms = float(np.sqrt(np.mean(chunk.astype(np.float32) ** 2)))
             is_speech = rms > AL_THRESHOLD
 
             if is_speech:
-                # Interrupt playback if LUCI is speaking
-                if _al_speaking.is_set():
-                    print("⚡ Interrupted.", flush=True)
-                    _al_interrupt()
 
                 if not recording:
                     recording = True
