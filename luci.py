@@ -96,6 +96,20 @@ PIPER_ENABLED = os.getenv("LUCI_PIPER_ENABLED", "1") == "1"
 WHISPER_MODEL = os.getenv("LUCI_WHISPER_MODEL", "base.en")
 VOICE_ENABLED = os.getenv("LUCI_VOICE_ENABLED", "1") == "1"
 
+PIPER_VOICES = {
+    "luci-male":    WORKSPACE / "piper" / "en_US-lessac-medium.onnx",
+    "luci-female":  WORKSPACE / "piper" / "en_US-amy-medium.onnx",
+    "luci-crisp":   WORKSPACE / "piper" / "en_US-ljspeech-high.onnx",
+    "luci-british": WORKSPACE / "piper" / "en_GB-alba-medium.onnx",
+}
+PIPER_VOICE_LABELS = {
+    "luci-male":    "LUCI Classic (Male)",
+    "luci-female":  "LUCI Female (Warm)",
+    "luci-crisp":   "LUCI Female (Crisp)",
+    "luci-british": "LUCI British",
+}
+DEFAULT_VOICE = os.getenv("LUCI_VOICE", "luci-female")
+
 # OAuth scopes
 GOOGLE_SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
@@ -2188,15 +2202,20 @@ def tts_speak(text: str) -> None:
         pass
 
 
-def tts_to_file(text: str, output_path: Path) -> bool:
+def tts_to_file(text: str, output_path: Path, voice: str = DEFAULT_VOICE) -> bool:
     """Render text to a WAV file via Piper. Returns True on success."""
     global _piper_warned
     if not VOICE_ENABLED or not PIPER_ENABLED:
         return False
-    if not PIPER_BIN.exists() or not PIPER_MODEL.exists():
+    if not PIPER_BIN.exists():
         if not _piper_warned:
             print(f"[voice] Piper not found at {PIPER_BIN} — TTS disabled", file=sys.stderr)
             _piper_warned = True
+        return False
+    model_path = PIPER_VOICES.get(voice, PIPER_MODEL)
+    if not model_path.exists():
+        model_path = PIPER_MODEL  # fallback to default
+    if not model_path.exists():
         return False
     clean = _clean_for_tts(text)
     if not clean:
@@ -2204,7 +2223,7 @@ def tts_to_file(text: str, output_path: Path) -> bool:
     try:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         result = subprocess.run(
-            [str(PIPER_BIN), "--model", str(PIPER_MODEL), "--output_file", str(output_path)],
+            [str(PIPER_BIN), "--model", str(model_path), "--output_file", str(output_path)],
             input=clean.encode("utf-8"),
             capture_output=True,
             timeout=30,

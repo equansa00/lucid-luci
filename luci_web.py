@@ -39,6 +39,9 @@ from luci import (  # noqa: E402
     MEMORY_PATH,
     PIPER_BIN,
     PIPER_MODEL,
+    PIPER_VOICES,
+    PIPER_VOICE_LABELS,
+    DEFAULT_VOICE,
     LUCI_AUTO_MEMORY,
     auto_extract_memory,
     ollama_chat,
@@ -481,6 +484,100 @@ _HTML = r"""<!DOCTYPE html>
     max-width: 280px;
   }
 
+  /* === Always-listen toggle === */
+  #always-listen-toggle {
+    position: fixed; bottom: 10%; left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+  }
+  #al-btn {
+    background: rgba(10,7,5,0.8);
+    border: 1px solid rgba(212,175,55,0.3);
+    color: rgba(212,175,55,0.6);
+    border-radius: 20px; padding: 8px 18px;
+    font-size: 12px; letter-spacing: 0.1em;
+    cursor: pointer; backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: all 0.2s;
+  }
+  #al-btn.active {
+    border-color: rgba(212,175,55,0.8);
+    color: #D4AF37;
+    box-shadow: 0 0 16px rgba(212,175,55,0.2);
+  }
+  #al-btn.interrupted {
+    border-color: rgba(220,38,38,0.6);
+    color: #ef4444;
+  }
+
+  /* === Voice settings gear button === */
+  #voice-settings-btn {
+    position: fixed; top: 16px; right: 68px;
+    z-index: 200;
+    background: rgba(12,9,6,0.7);
+    border: 1px solid rgba(212,175,55,0.35);
+    color: #D4AF37; font-size: 16px;
+    width: 40px; height: 40px;
+    border-radius: 50%; cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: all 0.2s;
+  }
+  #voice-settings-btn:hover { background: rgba(212,175,55,0.15); }
+
+  /* === Voice settings panel === */
+  #voice-settings-panel {
+    position: fixed; top: 68px; right: 20px;
+    width: 260px; z-index: 150;
+    background: rgba(10,7,5,0.95);
+    border: 1px solid rgba(212,175,55,0.28);
+    border-radius: 16px; padding: 0;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    display: none; overflow: hidden;
+  }
+  #voice-settings-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid rgba(212,175,55,0.12);
+    font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: rgba(212,175,55,0.55);
+  }
+  #voice-settings-close {
+    background: none; border: none; color: rgba(212,175,55,0.5);
+    cursor: pointer; font-size: 14px; padding: 0;
+  }
+  #voice-list { padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .voice-option {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 10px;
+    border: 1px solid transparent; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .voice-option:hover { background: rgba(212,175,55,0.08); }
+  .voice-option.selected {
+    background: rgba(212,175,55,0.12);
+    border-color: rgba(212,175,55,0.3);
+  }
+  .voice-option-name { flex: 1; font-size: 13px; color: rgba(245,230,200,0.8); }
+  .voice-option.selected .voice-option-name { color: #F5E6C8; }
+  .voice-preview-btn {
+    background: none; border: 1px solid rgba(212,175,55,0.25);
+    color: #D4AF37; border-radius: 6px; padding: 4px 8px;
+    font-size: 11px; cursor: pointer; transition: all 0.15s; flex-shrink: 0;
+  }
+  .voice-preview-btn:hover { background: rgba(212,175,55,0.15); }
+  .voice-preview-btn.playing { color: #ef4444; border-color: rgba(220,38,38,0.4); }
+  #voice-speed-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px 16px;
+    border-top: 1px solid rgba(212,175,55,0.1);
+    font-size: 12px; color: rgba(212,175,55,0.5);
+  }
+  #voice-speed { flex: 1; accent-color: #D4AF37; }
+  #voice-speed-val { font-size: 11px; color: rgba(212,175,55,0.6); width: 28px; }
+
   /* === Mode toggle button === */
   #mode-toggle {
     position: fixed; top: 16px; right: 20px;
@@ -723,6 +820,22 @@ _HTML = r"""<!DOCTYPE html>
 
 <!-- Mode toggle — always visible in both modes -->
 <button id="mode-toggle" title="Switch mode">&#x1F4AC;</button>
+<!-- Voice settings gear — always visible -->
+<button id="voice-settings-btn" title="Voice settings">&#x2699;</button>
+
+<!-- Voice settings panel -->
+<div id="voice-settings-panel">
+  <div id="voice-settings-header">
+    <span>Voice Settings</span>
+    <button id="voice-settings-close">&#x2715;</button>
+  </div>
+  <div id="voice-list"></div>
+  <div id="voice-speed-row">
+    <span>Speed</span>
+    <input type="range" id="voice-speed" min="0.7" max="1.5" step="0.1" value="1.0">
+    <span id="voice-speed-val">1.0&times;</span>
+  </div>
+</div>
 
 <!-- ============================================================
      AMBIENT MODE
@@ -757,6 +870,11 @@ _HTML = r"""<!DOCTYPE html>
 <div id="subtitle"></div>
 <div id="audio-unlock">tap once to enable voice</div>
 <div id="tap-hint">tap or speak to interact</div>
+
+<!-- Always-listen toggle -->
+<div id="always-listen-toggle">
+  <button id="al-btn">&#x1F442; Always Listen</button>
+</div>
 
 <!-- Debug overlay -->
 <div id="debug-overlay">
@@ -1108,7 +1226,7 @@ async function sendVoice() {
   dbg('\uD83D\uDCE4 uploading ' + (blob.size / 1024).toFixed(1) + 'kb...');
 
   try {
-    const resp = await fetch('/voice', {method: 'POST', body: form});
+    const resp = await fetch('/voice?voice=' + encodeURIComponent(selectedVoice), {method: 'POST', body: form});
     const data = await resp.json();
 
     if (data.error) {
@@ -1284,6 +1402,217 @@ if ('serviceWorker' in navigator) {
 }
 
 // =========================================================================
+// VOICE SETTINGS
+// =========================================================================
+let selectedVoice = localStorage.getItem('luci-voice') || 'luci-female';
+let voiceSpeed    = parseFloat(localStorage.getItem('luci-voice-speed') || '1.0');
+let voicesData    = {};
+
+async function loadVoices() {
+  try {
+    const resp = await fetch('/voices');
+    const data = await resp.json();
+    voicesData = data.voices || {};
+    if (!voicesData[selectedVoice]) {
+      selectedVoice = data.default || 'luci-female';
+      localStorage.setItem('luci-voice', selectedVoice);
+    }
+    renderVoiceList();
+  } catch {}
+}
+
+function renderVoiceList() {
+  const list = document.getElementById('voice-list');
+  if (!list) return;
+  list.innerHTML = Object.entries(voicesData).map(([id, label]) =>
+    '<div class="voice-option ' + (id === selectedVoice ? 'selected' : '') + '" onclick="selectVoice(\'' + id + '\')">' +
+    '<span class="voice-option-name">' + escHtml(label) + '</span>' +
+    '<button class="voice-preview-btn" id="preview-btn-' + id + '" onclick="event.stopPropagation();previewVoice(\'' + id + '\',this)">\u25B6 Play</button>' +
+    '</div>'
+  ).join('');
+}
+
+function selectVoice(id) {
+  selectedVoice = id;
+  localStorage.setItem('luci-voice', id);
+  renderVoiceList();
+}
+
+let previewAudio = null;
+function previewVoice(id, btn) {
+  if (previewAudio) { previewAudio.pause(); previewAudio = null; }
+  document.querySelectorAll('.voice-preview-btn').forEach(b => {
+    b.textContent = '\u25B6 Play'; b.classList.remove('playing');
+  });
+  btn.textContent = '\u23F8 Stop'; btn.classList.add('playing');
+  previewAudio = new Audio('/preview/' + id);
+  previewAudio.onended = () => { btn.textContent = '\u25B6 Play'; btn.classList.remove('playing'); previewAudio = null; };
+  previewAudio.onerror = () => { btn.textContent = '\u25B6 Play'; btn.classList.remove('playing'); previewAudio = null; };
+  previewAudio.play().catch(() => {});
+}
+
+const speedSlider = document.getElementById('voice-speed');
+const speedVal    = document.getElementById('voice-speed-val');
+if (speedSlider) {
+  speedSlider.value = voiceSpeed;
+  speedVal.textContent = voiceSpeed.toFixed(1) + '\xD7';
+  speedSlider.addEventListener('input', () => {
+    voiceSpeed = parseFloat(speedSlider.value);
+    speedVal.textContent = voiceSpeed.toFixed(1) + '\xD7';
+    localStorage.setItem('luci-voice-speed', voiceSpeed);
+  });
+}
+
+document.getElementById('voice-settings-btn')?.addEventListener('click', () => {
+  const panel = document.getElementById('voice-settings-panel');
+  panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+  if (panel.style.display === 'block' && Object.keys(voicesData).length === 0) loadVoices();
+});
+document.getElementById('voice-settings-close')?.addEventListener('click', () => {
+  document.getElementById('voice-settings-panel').style.display = 'none';
+});
+
+// =========================================================================
+// ALWAYS-LISTENING ENGINE
+// =========================================================================
+let alActive    = false;
+let alRecording = false;
+let alSilTimer  = null;
+let alSpeaking  = false;
+let alAudio     = null;
+let alRecorder  = null;
+let alChunks    = [];
+
+const AL_SPEECH_THRESHOLD = 12;
+const AL_SILENCE_MS       = 1200;
+
+async function startAlwaysListen() {
+  if (!micStream) { const ok = await initMic(); if (!ok) return; }
+  alActive = true;
+  const btn = document.getElementById('al-btn');
+  btn.classList.add('active');
+  btn.textContent = '\uD83D\uDC42 Listening\u2026';
+  localStorage.setItem('luci-always-listen', 'true');
+  alMonitorLoop();
+}
+
+function stopAlwaysListen() {
+  alActive = false; alRecording = false;
+  if (alRecorder && alRecorder.state !== 'inactive') alRecorder.stop();
+  if (alSilTimer) { clearInterval(alSilTimer); alSilTimer = null; }
+  const btn = document.getElementById('al-btn');
+  btn.classList.remove('active', 'interrupted');
+  btn.textContent = '\uD83D\uDC42 Always Listen';
+  localStorage.setItem('luci-always-listen', 'false');
+}
+
+function alMonitorLoop() {
+  if (!alActive || !analyser) return;
+  const bufLen = analyser.frequencyBinCount;
+  const data   = new Uint8Array(bufLen);
+  function tick() {
+    if (!alActive) return;
+    requestAnimationFrame(tick);
+    analyser.getByteFrequencyData(data);
+    const rms = data.reduce((s,v) => s+v, 0) / bufLen;
+    if (rms >= AL_SPEECH_THRESHOLD && !alRecording) {
+      if (alSpeaking && alAudio) {
+        alAudio.pause(); alAudio = null; alSpeaking = false;
+        setState('idle'); setChatFaceState('idle');
+        const btn = document.getElementById('al-btn');
+        btn.classList.add('interrupted');
+        setTimeout(() => btn?.classList.remove('interrupted'), 800);
+        dbg('\u26A1 interrupted LUCI');
+      }
+      alStartCapture();
+    }
+  }
+  tick();
+}
+
+function alStartCapture() {
+  if (alRecording || !alActive) return;
+  alRecording = true; alChunks = [];
+  const mime = ['audio/webm;codecs=opus','audio/webm','audio/ogg','']
+    .find(t => !t || MediaRecorder.isTypeSupported(t));
+  try { alRecorder = new MediaRecorder(micStream, mime ? {mimeType: mime} : {}); }
+  catch { alRecorder = new MediaRecorder(micStream); }
+  alRecorder.ondataavailable = e => { if (e.data.size > 0) alChunks.push(e.data); };
+  alRecorder.onstop = alProcessCapture;
+  alRecorder.start(100);
+  let lastSpeechMs = Date.now(), silenceMs = 0;
+  alSilTimer = setInterval(() => {
+    if (!alActive || !alRecording) { clearInterval(alSilTimer); return; }
+    const d2 = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(d2);
+    const rms2 = d2.reduce((s,v) => s+v, 0) / d2.length;
+    if (rms2 >= AL_SPEECH_THRESHOLD) { lastSpeechMs = Date.now(); silenceMs = 0; }
+    else {
+      silenceMs = Date.now() - lastSpeechMs;
+      if (silenceMs >= AL_SILENCE_MS) {
+        clearInterval(alSilTimer); alSilTimer = null;
+        if (alRecorder && alRecorder.state !== 'inactive') alRecorder.stop();
+      }
+    }
+    dbg('\uD83C\uDF99 rms:' + Math.round(rms2) + ' sil:' + Math.round(silenceMs/100)/10 + 's');
+  }, 150);
+  setState('listening'); setChatFaceState('listening');
+  dbg('\uD83C\uDF99 capturing...');
+}
+
+async function alProcessCapture() {
+  alRecording = false;
+  if (!alChunks.length || !alActive) { setState('idle'); setChatFaceState('idle'); return; }
+  const blob = new Blob(alChunks, {type: 'audio/webm'});
+  if (blob.size < 2000) { setState('idle'); setChatFaceState('idle'); dbg('\u23ED too short'); return; }
+  setState('thinking'); setChatFaceState('thinking');
+  dbg('\uD83D\uDCE4 sending...');
+  const form = new FormData();
+  form.append('audio', blob, 'voice.webm');
+  try {
+    const resp = await fetch('/voice?voice=' + encodeURIComponent(selectedVoice), {method:'POST', body:form});
+    const data = await resp.json();
+    if (data.transcription) {
+      dbg('\uD83D\uDCDD ' + data.transcription.slice(0,30));
+      showSubtitle(data.transcription, false);
+      if (mode === 'chat') {
+        if (!activeConvoId || !getActiveConvo()) newConversation();
+        const isFirst = getActiveConvo().messages.length === 0;
+        addMessage('user', '\uD83D\uDC42 ' + data.transcription);
+        if (isFirst) autoTitleConvo(activeConvoId, data.transcription);
+        if (data.response) addMessage('luci', data.response, {model: data.model || ''});
+      }
+    }
+    if (data.audio_url) {
+      alSpeaking = true;
+      setState('speaking'); setChatFaceState('speaking');
+      if (data.response) setTimeout(() => showSubtitle(data.response, true), 300);
+      alAudio = new Audio(data.audio_url);
+      alAudio.onended  = () => { alSpeaking = false; alAudio = null; setState('idle'); setChatFaceState('idle'); };
+      alAudio.onerror  = () => { alSpeaking = false; alAudio = null; setState('idle'); setChatFaceState('idle'); };
+      alAudio.play().catch(() => { alSpeaking = false; setState('idle'); setChatFaceState('idle'); });
+    } else if (data.response) {
+      setState('speaking'); setChatFaceState('speaking');
+      showSubtitle(data.response, true);
+      setTimeout(() => { setState('idle'); setChatFaceState('idle'); }, 5000);
+    } else {
+      setState('idle'); setChatFaceState('idle');
+    }
+  } catch (err) {
+    dbg('\u274C ' + err.message); setState('idle'); setChatFaceState('idle');
+  }
+}
+
+document.getElementById('al-btn')?.addEventListener('click', () => {
+  alActive ? stopAlwaysListen() : startAlwaysListen();
+});
+
+// Auto-restore always-listen if it was active before
+if (localStorage.getItem('luci-always-listen') === 'true') {
+  document.addEventListener('click', () => { if (!alActive) startAlwaysListen(); }, {once: true});
+}
+
+// =========================================================================
 // MODE TOGGLE
 // =========================================================================
 let mode = localStorage.getItem('luci-mode') || 'ambient';
@@ -1439,7 +1768,7 @@ async function sendChatMessage(text) {
     const resp = await fetch('/chat', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({text})
+      body: JSON.stringify({text, voice: selectedVoice})
     });
     const data = await resp.json();
     document.getElementById(typingId)?.remove();
@@ -1528,7 +1857,7 @@ if (voiceBtn) {
         const form = new FormData();
         form.append('audio', blob, 'voice.webm');
         try {
-          const resp = await fetch('/voice', {method: 'POST', body: form});
+          const resp = await fetch('/voice?voice=' + encodeURIComponent(selectedVoice), {method: 'POST', body: form});
           const data = await resp.json();
           if (data.transcription) {
             if (!activeConvoId || !getActiveConvo()) newConversation();
@@ -1607,6 +1936,7 @@ document.getElementById('new-chat-btn')?.addEventListener('click', () => { newCo
 // =========================================================================
 if (conversations.length > 0) { setActiveConvo(conversations[0].id); } else { newConversation(); }
 renderHistoryList();
+loadVoices();
 
 // =========================================================================
 // Helper
@@ -1668,7 +1998,7 @@ async def service_worker() -> PlainTextResponse:
 
 @app.get("/audio/{filename}")
 async def serve_audio(filename: str):
-    if not re.match(r"^(reply|web_reply|chat_reply)_\d+\.wav$", filename):
+    if not re.match(r"^((reply|web_reply|chat_reply)_\d+|preview_[a-z\-]+)\.wav$", filename):
         return JSONResponse({"error": "not found"}, status_code=404)
     path = RUNS_DIR / filename
     if not path.exists():
@@ -1676,8 +2006,30 @@ async def serve_audio(filename: str):
     return FileResponse(str(path), media_type="audio/wav")
 
 
+@app.get("/voices")
+async def list_voices() -> JSONResponse:
+    available = {k: v for k, v in PIPER_VOICE_LABELS.items() if PIPER_VOICES[k].exists()}
+    return JSONResponse({"voices": available, "default": DEFAULT_VOICE})
+
+
+@app.get("/preview/{voice_id}")
+async def preview_voice(voice_id: str):
+    if voice_id not in PIPER_VOICES:
+        return JSONResponse({"error": "unknown voice"}, status_code=404)
+    preview_path = RUNS_DIR / f"preview_{voice_id}.wav"
+    RUNS_DIR.mkdir(parents=True, exist_ok=True)
+    if not preview_path.exists():
+        loop = asyncio.get_running_loop()
+        text = "Hello Chip. I am LUCI, your personal AI agent."
+        await loop.run_in_executor(None, lambda: tts_to_file(text, preview_path, voice_id))
+    if preview_path.exists():
+        return FileResponse(str(preview_path), media_type="audio/wav")
+    return JSONResponse({"error": "preview failed"}, status_code=500)
+
+
 @app.post("/voice")
 async def voice_upload(request: Request, audio: UploadFile = File(...)):
+    voice = request.query_params.get("voice", DEFAULT_VOICE)
     ts = int(time.time())
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
     upload_path = RUNS_DIR / f"web_voice_{ts}.wav"
@@ -1714,7 +2066,7 @@ async def voice_upload(request: Request, audio: UploadFile = File(...)):
     # ---- Piper TTS ----
     await broadcast_state("speaking")
     wav_ok: bool = await loop.run_in_executor(
-        None, lambda: tts_to_file(response_text, reply_path)
+        None, lambda: tts_to_file(response_text, reply_path, voice)
     )
     audio_url = f"/audio/web_reply_{ts}.wav" if wav_ok else None
 
@@ -1742,6 +2094,7 @@ async def chat_endpoint(request: Request) -> JSONResponse:
 
     text = (body.get("text") or "").strip()
     system_override = body.get("system", "")
+    voice = body.get("voice") or DEFAULT_VOICE
     if not text:
         return JSONResponse({"error": "no text"}, status_code=400)
 
@@ -1772,7 +2125,7 @@ async def chat_endpoint(request: Request) -> JSONResponse:
 
     await broadcast_state("speaking")
     wav_ok: bool = await loop.run_in_executor(
-        None, lambda: tts_to_file(response_text, reply_path)
+        None, lambda: tts_to_file(response_text, reply_path, voice)
     )
     audio_url = f"/audio/{reply_path.name}" if wav_ok else None
 
