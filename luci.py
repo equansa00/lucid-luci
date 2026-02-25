@@ -90,7 +90,7 @@ REMINDER_MAX_DAYS = int(os.getenv("LUCI_REMINDER_MAX_DAYS", "30"))
 EMAIL_SUMMARY_MODEL = os.getenv("LUCI_EMAIL_SUMMARY_MODEL", "llama3.1:8b")
 
 # Voice
-PIPER_BIN = WORKSPACE / "piper" / "piper"
+PIPER_BIN = WORKSPACE / "piper" / "piper" / "piper"
 PIPER_MODEL = WORKSPACE / "piper" / "en_US-lessac-medium.onnx"
 PIPER_ENABLED = os.getenv("LUCI_PIPER_ENABLED", "1") == "1"
 WHISPER_MODEL = os.getenv("LUCI_WHISPER_MODEL", "base.en")
@@ -2217,8 +2217,11 @@ def stt_transcribe(audio_path: Path) -> str:
     try:
         import whisper  # type: ignore
         if _whisper_model is None:
-            _whisper_model = whisper.load_model(WHISPER_MODEL)
-        result = _whisper_model.transcribe(str(audio_path))
+            import torch  # type: ignore
+            _device = "cuda" if torch.cuda.is_available() else "cpu"
+            _whisper_model = whisper.load_model(WHISPER_MODEL, device=_device)
+        _fp16 = _whisper_model.device.type == "cuda"
+        result = _whisper_model.transcribe(str(audio_path), fp16=_fp16)
         return (result.get("text") or "").strip()
     except Exception:
         return ""
