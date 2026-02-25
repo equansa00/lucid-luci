@@ -46,24 +46,39 @@ from mini_beast import (  # noqa: E402
 # Wake model setup
 # ---------------------------------------------------------------------------
 
+def _find_builtin_model(name_fragment: str = "hey_jarvis") -> Path:
+    """Locate a built-in openwakeword .onnx model by name fragment.
+
+    openwakeword 0.4 ships models inside its package resources:
+      hey_jarvis_v0.1.onnx, alexa_v0.1.onnx, hey_mycroft_v0.1.onnx,
+      hey_marvin_v0.1.onnx, timer_v0.1.onnx, weather_v0.1.onnx
+
+    Returns the first matching Path, or raises FileNotFoundError.
+    """
+    import openwakeword as _oww
+    pkg_dir = Path(_oww.__file__).parent
+    matches = sorted(pkg_dir.rglob(f"{name_fragment}*.onnx"))
+    # Exclude the shared embedding / melspectrogram models
+    matches = [p for p in matches if "embedding" not in p.name and "melspectrogram" not in p.name]
+    if not matches:
+        raise FileNotFoundError(
+            f"No built-in openwakeword model matching {name_fragment!r}. "
+            f"Available: {[p.name for p in pkg_dir.rglob('*.onnx')]}"
+        )
+    return matches[0]
+
+
 def download_wake_model() -> Path:
-    """Return path to the openwakeword model to use.
+    """Return path to the hey_jarvis built-in model (proxy for hey_beast).
 
-    openwakeword ships these built-in models:
-      hey_jarvis, alexa, hey_mycroft, timer
-
-    "hey_beast" is not built-in, so we use "hey_jarvis" as the closest
-    match. Custom model training is possible via openwakeword custom model
-    docs if you want a real "hey beast" wake word later.
+    openwakeword 0.4 API requires wakeword_model_paths=[path_to_onnx].
+    "hey_beast" is not built-in; hey_jarvis is the closest match.
     """
     WAKE_MODEL_DIR.mkdir(parents=True, exist_ok=True)
-    # openwakeword loads built-ins by name string — no file path needed.
-    # We return WAKE_MODEL_DIR as a marker; the actual model is loaded
-    # by name inside listen_for_wake_word().
-    model_name = "hey_jarvis"
-    print(f"[wake] Using built-in openwakeword model: {model_name}")
+    path = _find_builtin_model("hey_jarvis")
+    print(f"[wake] Using built-in model: {path.name}")
     print(f"[wake] (Mapped from BEAST_WAKE_WORD={WAKE_WORD!r})")
-    return WAKE_MODEL_DIR / model_name
+    return path
 
 
 # ---------------------------------------------------------------------------
@@ -88,11 +103,22 @@ def listen_for_wake_word() -> bool:
     CHUNK = 1280
     RATE = 16000
 
+    # Locate the built-in hey_jarvis .onnx file
     try:
-        oww = OWWModel(wakeword_models=["hey_jarvis"], inference_framework="onnx")
+        model_path = _find_builtin_model("hey_jarvis")
+    except FileNotFoundError as e:
+        print(f"[wake] {e}", file=sys.stderr)
+        return False
+
+    # openwakeword 0.4 API: pass explicit file paths
+    try:
+        oww = OWWModel(wakeword_model_paths=[str(model_path)])
     except Exception as e:
         print(f"[wake] Failed to load openwakeword model: {e}", file=sys.stderr)
         return False
+
+    # Discover the prediction key on the first chunk
+    _wake_key: str = ""
 
     pa = pyaudio.PyAudio()
     stream = None
@@ -106,6 +132,7 @@ def listen_for_wake_word() -> bool:
         )
         print("👂 Listening for wake word...", flush=True)
 
+        first_pred = True
         while True:
             try:
                 raw = stream.read(CHUNK, exception_on_overflow=False)
@@ -116,10 +143,21 @@ def listen_for_wake_word() -> bool:
             audio_chunk = np.frombuffer(raw, dtype=np.int16)
             scores = oww.predict(audio_chunk)
 
-            # scores is a dict keyed by model name
-            for model_name, score in scores.items():
-                if score >= WAKE_THRESHOLD:
-                    print(f"🔔 Wake word detected! (model={model_name}, score={score:.3f})",
+            # On first prediction: print available keys and pick best match
+            nonlocal_key = _wake_key  # capture for closure
+            if first_pred:
+                first_pred = False
+                keys = list(scores.keys())
+                print(f"[wake] Available model keys: {keys}", flush=True)
+                # Prefer key containing "jarvis", else first key
+                jarvis_keys = [k for k in keys if "jarvis" in k.lower()]
+                nonlocal_key = jarvis_keys[0] if jarvis_keys else (keys[0] if keys else "")
+                print(f"[wake] Using key: {nonlocal_key!r}", flush=True)
+
+            # Check all keys; use discovered key for threshold
+            for key, score in scores.items():
+                if key == nonlocal_key and score >= WAKE_THRESHOLD:
+                    print(f"🔔 Wake word detected! (key={key}, score={score:.3f})",
                           flush=True)
                     return True
 
@@ -220,4 +258,33 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 1 and sys.argv[1] == "--list-models":
+        try:
+            import numpy as np
+            from openwakeword.model import Model as OWWModel
+            import openwakeword as _oww
+            from pathlib import Path as _Path
+
+            pkg_dir = _Path(_oww.__file__).parent
+            all_onnx = sorted(
+                p for p in pkg_dir.rglob("*.onnx")
+                if "embedding" not in p.name and "melspectrogram" not in p.name
+                and "silero" not in p.name
+            )
+            print("Available built-in openwakeword models:")
+            for p in all_onnx:
+                print(f"  {p.name}  ({p})")
+
+            # Load hey_jarvis and do one dummy prediction to show keys
+            model_path = _find_builtin_model("hey_jarvis")
+            m = OWWModel(wakeword_model_paths=[str(model_path)])
+            dummy = np.zeros(1280, dtype=np.int16)
+            scores = m.predict(dummy)
+            print(f"\npredict() keys for {model_path.name}:")
+            for k, v in scores.items():
+                print(f"  {k!r}  (score={v:.4f})")
+        except Exception as e:
+            print(f"❌ {e}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        main()
