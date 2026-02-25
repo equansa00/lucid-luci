@@ -2042,16 +2042,22 @@ CODE_KEYWORDS = {
 }
 
 REASON_KEYWORDS = {
-    "why", "explain", "how does", "analyze", "compare", "pros and cons",
-    "difference between", "should i", "is it better", "trade-off",
+    "why", "why does", "why is", "why are", "why would",
+    "explain", "how does", "how do", "how is",
+    "analyze", "compare", "versus", "vs ",
+    "difference", "difference between", "contrast",
+    "pros and cons", "should i", "is it better", "trade-off",
     "step by step", "walk me through", "reason", "logic", "prove",
     "calculate", "math", "formula", "solve", "think through",
+    "what is the", "what are the",
 }
 
 DEEP_KEYWORDS = {
     "design", "architecture", "system", "plan", "strategy", "review",
     "critique", "evaluate", "assess", "comprehensive", "detailed",
     "full", "complete", "everything about", "in depth", "thorough",
+    "microservices", "distributed", "scalable", "production",
+    "enterprise", "end to end", "end-to-end",
 }
 
 
@@ -2068,13 +2074,13 @@ def route_model(text: str) -> Tuple[str, str]:
     if any(kw in lower for kw in CODE_KEYWORDS):
         return (ROUTER_CODE_MODEL, "code")
 
-    # Step 2 — reasoning: 2+ keywords OR ends with "?"
+    # Step 2 — reasoning: 1+ keyword OR ends with "?"
     reason_hits = sum(1 for kw in REASON_KEYWORDS if kw in lower)
-    if reason_hits >= 2 or lower.rstrip().endswith("?"):
+    if reason_hits >= 1 or lower.rstrip().endswith("?"):
         return (ROUTER_REASON_MODEL, "reasoning")
 
-    # Step 3 — deep: any keyword AND long message
-    if len(text) > 100 and any(kw in lower for kw in DEEP_KEYWORDS):
+    # Step 3 — deep: any keyword AND message >= 40 chars
+    if len(text) >= 40 and any(kw in lower for kw in DEEP_KEYWORDS):
         return (ROUTER_DEEP_MODEL, "deep")
 
     # Step 4 — default chat
