@@ -447,6 +447,20 @@ _HTML = r"""<!DOCTYPE html>
   #auth-btn:hover { opacity: 0.85; }
   #auth-error { color: #dc2626; font-size: 13px; display: none; }
 
+  /* === Debug overlay === */
+  #debug-overlay {
+    position: fixed;
+    bottom: 2%;
+    left: 12px;
+    z-index: 50;
+    pointer-events: none;
+    font-family: monospace;
+    font-size: 10px;
+    color: rgba(212,175,55,0.65);
+    line-height: 1.7;
+    max-width: 280px;
+  }
+
   /* === Mobile === */
   @media (max-width: 480px) {
     #face-container { width: 286px; height: 286px; }
@@ -486,7 +500,12 @@ _HTML = r"""<!DOCTYPE html>
 
 <!-- Subtitle overlay -->
 <div id="subtitle"></div>
-<div id="tap-hint">tap to speak</div>
+<div id="tap-hint">tap or speak to interact</div>
+
+<!-- Debug overlay -->
+<div id="debug-overlay">
+  <div id="debug-lines"></div>
+</div>
 
 <!-- Auth modal -->
 <div id="auth-modal">
@@ -520,9 +539,11 @@ let analyser      = null;
 let mediaRecorder = null;
 let audioChunks   = [];
 let isRecording   = false;
+let silenceTimer  = null;
 let subtitleTimer = null;
 let currentAudio  = null;
 let dpr           = window.devicePixelRatio || 1;
+let _lastLevelLog = 0;
 
 // DOM refs
 const faceImg       = document.getElementById('face-img');
@@ -545,11 +566,29 @@ const FACES = {
 };
 
 // =========================================================================
+// =========================================================================
+// Debug overlay
+// =========================================================================
+const debugLines = document.getElementById('debug-lines');
+const MAX_DEBUG  = 8;
+let debugHistory = [];
+
+function dbg(msg) {
+  const ts = new Date().toLocaleTimeString('en', {
+    hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
+  debugHistory.push(ts + ' ' + msg);
+  if (debugHistory.length > MAX_DEBUG) debugHistory.shift();
+  debugLines.innerHTML = debugHistory.map(l => '<div>' + l + '</div>').join('');
+}
+
+// =========================================================================
 // State machine
 // =========================================================================
 function setState(next) {
   if (currentState === next) return;
   currentState = next;
+  dbg('\u2192 state: ' + next);
 
   // Crossfade face image
   const target  = FACES[next] || FACES.idle;
@@ -594,6 +633,7 @@ function connectWS() {
 
   ws.onmessage = (ev) => {
     let d; try { d = JSON.parse(ev.data); } catch { return; }
+    dbg('ws: ' + d.type);
 
     if (d.type === 'status') {
       wsReady = true;
@@ -612,6 +652,7 @@ function connectWS() {
       if (currentState !== 'speaking') setState('speaking');
 
     } else if (d.type === 'auth_failed') {
+      dbg('\u274c auth failed');
       authError.style.display = 'block';
       ws.close();
     }
@@ -699,12 +740,51 @@ function startRecording() {
   mediaRecorder.start(100);
   isRecording = true;
   setState('listening');
+  dbg('\uD83C\uDF99 recording...');
+
+  // ---- Silence / VAD detector ----
+  const SILENCE_THRESHOLD = 8;
+  const SILENCE_TIMEOUT   = 1500;
+  let lastSpeechMs = Date.now();
+  let silenceMs    = 0;
+
+  silenceTimer = setInterval(() => {
+    if (!analyser || !isRecording) return;
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(data);
+    const rms = data.reduce((s, v) => s + v, 0) / data.length;
+
+    // Log level every 500ms to avoid spam
+    const now = Date.now();
+    if (now - _lastLevelLog >= 500) {
+      dbg('\uD83C\uDF99 level: ' + Math.round(rms));
+      _lastLevelLog = now;
+    }
+
+    if (rms >= SILENCE_THRESHOLD) {
+      lastSpeechMs = Date.now();
+      silenceMs    = 0;
+    } else {
+      silenceMs = Date.now() - lastSpeechMs;
+      if (silenceMs > 0 && silenceMs % 300 < 150) {
+        dbg('\uD83E\uDD2B silence ' + (Math.round(silenceMs / 100) / 10) + 's');
+      }
+      if (silenceMs >= SILENCE_TIMEOUT && isRecording) {
+        clearInterval(silenceTimer);
+        silenceTimer = null;
+        dbg('\uD83E\uDD2B auto-stop (silence)');
+        stopRecording();
+      }
+    }
+  }, 150);
 }
 
 function stopRecording() {
+  if (silenceTimer) { clearInterval(silenceTimer); silenceTimer = null; }
   if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
   isRecording = false;
   setState('thinking');
+  dbg('\u23F9 stopped \u2014 sending...');
 }
 
 async function sendVoice() {
@@ -714,17 +794,25 @@ async function sendVoice() {
   const form = new FormData();
   form.append('audio', blob, 'voice.webm');
   const headers = storedSecret ? {'X-LUCI-SECRET': storedSecret} : {};
+  dbg('\uD83D\uDCE4 uploading ' + (blob.size / 1024).toFixed(1) + 'kb...');
 
   try {
     const resp = await fetch('/voice', {method: 'POST', headers, body: form});
     const data = await resp.json();
 
-    if (data.error) { showSubtitle('\u274c ' + data.error, false); setState('idle'); return; }
-    if (data.transcription) showSubtitle(data.transcription, false);
+    if (data.error) {
+      dbg('\u274c ' + data.error);
+      showSubtitle('\u274c ' + data.error, false); setState('idle'); return;
+    }
+    if (data.transcription) {
+      dbg('\uD83D\uDCDD transcript: ' + data.transcription.slice(0, 30));
+      showSubtitle(data.transcription, false);
+    }
 
     if (data.audio_url) {
       currentAudio = new Audio(data.audio_url);
       currentAudio.oncanplaythrough = () => {
+        dbg('\uD83D\uDD0A playing response');
         setState('speaking');
         if (data.response) setTimeout(() => showSubtitle(data.response, true), 250);
         currentAudio.play().catch(() => {});
@@ -739,6 +827,7 @@ async function sendVoice() {
       setState('idle');
     }
   } catch (err) {
+    dbg('\u274c ' + err.message);
     showSubtitle('\u274c Request failed', false);
     setState('idle');
   }
