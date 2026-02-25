@@ -1,0 +1,717 @@
+{
+  "luci_memory_version": "3.3",
+  "owner": {
+    "name": "Edward",
+    "preferred_name": "Chip",
+    "spouse": { "name": "Ogechi", "nickname": "Ogige" },
+    "children": [
+      { "name": "Andrew", "age": 11, "relation": "son" },
+      { "name": "Christopher", "age": 8, "relation": "son" },
+      { "name": "Athena", "age": 3, "relation": "daughter" }
+    ]
+  },
+
+  "views": {
+    "memory": {
+      "description": "High-signal curated view for /memory",
+      "include_domains": [
+        "personal.identity",
+        "personal.family",
+        "development_ai.projects",
+        "privacy_security.custom_rom",
+        "infra.platform_defaults",
+        "backup.security",
+        "backup.storage",
+        "home_networking.core",
+        "home.smart_home"
+      ],
+      "min_salience": 4,
+      "max_items_per_domain": 25,
+      "sort": ["salience_desc", "created_at_desc"]
+    },
+    "memoryfull": {
+      "description": "Complete dump for /memoryfull",
+      "include_all": true,
+      "sort": ["domain_asc", "category_asc", "created_at_asc"]
+    }
+  },
+
+  "match_rules": {
+    "forget": {
+      "strategy": "soft_match",
+      "fields": ["summary", "embedding_text", "tags", "aliases"],
+      "case_insensitive": true,
+      "notes": "Remove entries when /forget text matches any field (case-insensitive substring)."
+    },
+    "remember": {
+      "strategy": "append",
+      "default_type": "fact",
+      "default_salience": 3,
+      "default_status": "active",
+      "default_provenance": ["manual_remember"]
+    }
+  },
+
+  "auto_extract_hints": {
+    "enabled_env_var": "LUCI_AUTO_MEMORY",
+    "when_enabled": "Extract candidate memories from user messages and propose insertions using the same schema.",
+    "types": ["fact", "preference", "plan", "project", "asset", "urgent"],
+    "domain_taxonomy": [
+      "personal.identity",
+      "personal.family",
+      "personal.housing",
+      "home_networking.core",
+      "home_networking.rack",
+      "home_networking.intercom",
+      "home.smart_home",
+      "home.basement",
+      "finance.retirement",
+      "business.surgical_supply",
+      "development_ai.learning",
+      "development_ai.projects",
+      "privacy_security.vpn",
+      "privacy_security.grapheneos",
+      "privacy_security.android_rom",
+      "privacy_security.custom_rom",
+      "backup.security",
+      "backup.storage",
+      "backup.encrypted_backup",
+      "infra.platform_defaults",
+      "travel.trips"
+    ]
+  },
+
+  "memories": [
+
+    {
+      "id": "mem_identity_preferred_name_chip_2025-10-23",
+      "type": "preference",
+      "domain": "personal.identity",
+      "category": "name",
+      "tags": ["preferred_name"],
+      "salience": 5,
+      "status": "active",
+      "created_at": "2025-10-23",
+      "summary": "Full name is Edward; prefers to be called Chip.",
+      "embedding_text": "The user's full name is Edward but he prefers to be called Chip.",
+      "aliases": ["Call me Chip", "Edward"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_personal_spouse_ogechi_2026-02-12",
+      "type": "fact",
+      "domain": "personal.family",
+      "category": "spouse",
+      "tags": ["spouse", "name"],
+      "salience": 4,
+      "status": "active",
+      "created_at": "2026-02-12",
+      "summary": "Wife's name is Ogechi (nickname: Ogige).",
+      "embedding_text": "Chip's wife's name is Ogechi (nickname: Ogige).",
+      "aliases": ["Ogechi", "Ogige"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_personal_child_andrew_2026-02-25",
+      "type": "fact",
+      "domain": "personal.family",
+      "category": "children",
+      "tags": ["child", "son", "andrew"],
+      "salience": 5,
+      "status": "active",
+      "created_at": "2026-02-25",
+      "summary": "Son Andrew, age 11.",
+      "embedding_text": "Chip's son Andrew is 11 years old.",
+      "aliases": ["Andrew"],
+      "provenance": ["manual_remember"]
+    },
+
+    {
+      "id": "mem_personal_child_christopher_2026-02-25",
+      "type": "fact",
+      "domain": "personal.family",
+      "category": "children",
+      "tags": ["child", "son", "christopher"],
+      "salience": 5,
+      "status": "active",
+      "created_at": "2026-02-25",
+      "summary": "Son Christopher, age 8.",
+      "embedding_text": "Chip's son Christopher is 8 years old.",
+      "aliases": ["Christopher"],
+      "provenance": ["manual_remember"]
+    },
+
+    {
+      "id": "mem_personal_child_athena_2026-02-25",
+      "type": "fact",
+      "domain": "personal.family",
+      "category": "children",
+      "tags": ["child", "daughter", "athena"],
+      "salience": 5,
+      "status": "active",
+      "created_at": "2026-02-25",
+      "summary": "Daughter Athena, age 3.",
+      "embedding_text": "Chip's daughter Athena is 3 years old.",
+      "aliases": ["Athena"],
+      "provenance": ["manual_remember"]
+    },
+
+    {
+      "id": "mem_personal_family_time_2024-12-21",
+      "type": "plan",
+      "domain": "personal.family",
+      "category": "priorities",
+      "tags": ["family", "time", "workload"],
+      "salience": 3,
+      "status": "active",
+      "created_at": "2024-12-21",
+      "summary": "Plans to spend more time with family due to decreased workload.",
+      "embedding_text": "Chip plans to spend more time with his family now that his workload has decreased.",
+      "aliases": ["More family time due to reduced workload"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_personal_moved_2024-11-25",
+      "type": "fact",
+      "domain": "personal.housing",
+      "category": "move",
+      "tags": ["moved", "home"],
+      "salience": 2,
+      "status": "active",
+      "created_at": "2024-11-25",
+      "summary": "Moved to a new place.",
+      "embedding_text": "Chip has moved to a new place.",
+      "aliases": ["Moved recently"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_home_layout_long_wiring_runs_2025-10-23",
+      "type": "fact",
+      "domain": "personal.housing",
+      "category": "building_layout",
+      "tags": ["building", "basement", "second_floor", "wiring"],
+      "salience": 2,
+      "status": "active",
+      "created_at": "2025-10-23",
+      "summary": "Lives in a building with a basement and a 2nd-floor apartment; long wiring runs.",
+      "embedding_text": "Chip lives in a building with a basement and a 2nd-floor apartment, with long wiring runs.",
+      "aliases": ["Long wiring runs; basement to 2nd floor"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_finance_roth_ira_vanguard_2024-11-06",
+      "type": "plan",
+      "domain": "finance.retirement",
+      "category": "roth_ira",
+      "tags": ["finance", "investing", "retirement", "roth_ira", "vanguard"],
+      "salience": 3,
+      "status": "active",
+      "created_at": "2024-11-06",
+      "summary": "Plans to open a Roth IRA with Vanguard.",
+      "embedding_text": "Chip plans to open a Roth IRA with Vanguard.",
+      "aliases": ["Open Vanguard Roth IRA"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_business_affiliate_moms_company_2025-01-26",
+      "type": "plan",
+      "domain": "business.surgical_supply",
+      "category": "affiliation",
+      "tags": ["business", "surgical_supply", "affiliation"],
+      "salience": 3,
+      "status": "active",
+      "created_at": "2025-01-26",
+      "summary": "Considering affiliating surgical supply business with mom's company.",
+      "embedding_text": "Chip is considering affiliating with his mom's company for his surgical supply business.",
+      "aliases": ["Affiliate with mom's company"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_business_home_healthcare_focus_2025-01-30",
+      "type": "plan",
+      "domain": "business.surgical_supply",
+      "category": "market_focus",
+      "tags": ["business", "home_healthcare", "medicaid", "warehouse", "distribution"],
+      "salience": 4,
+      "status": "active",
+      "created_at": "2025-01-30",
+      "summary": "Focusing surgical supply business on home healthcare; pursuing Medicaid supplier approval; needs warehouse space.",
+      "embedding_text": "Chip wants to focus his surgical supply business on home healthcare, is willing to obtain Medicaid supplier approval, and is looking for warehouse space for storage and distribution.",
+      "aliases": ["Home healthcare focus", "Medicaid supplier approval", "Warehouse for distribution"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_dev_pref_pytorch_first_2024-11-17",
+      "type": "preference",
+      "domain": "development_ai.learning",
+      "category": "learning_path",
+      "tags": ["ai", "pytorch", "pyspark", "learning"],
+      "salience": 3,
+      "status": "active",
+      "created_at": "2024-11-17",
+      "summary": "Prefers PyTorch first for AI learning; PySpark later.",
+      "embedding_text": "Chip prefers to set up PyTorch first for AI learning tasks and will explore PySpark later.",
+      "aliases": ["PyTorch first, PySpark later"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_dev_asset_gpu_1080_2024-11-17",
+      "type": "asset",
+      "domain": "development_ai.learning",
+      "category": "hardware",
+      "tags": ["gpu", "nvidia", "1080"],
+      "salience": 2,
+      "status": "active",
+      "created_at": "2024-11-17",
+      "summary": "Has an NVIDIA 1080 GPU.",
+      "embedding_text": "Chip has an NVIDIA 1080 GPU.",
+      "aliases": ["NVIDIA GTX 1080"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_dev_learn_postman_2025-02-11",
+      "type": "plan",
+      "domain": "development_ai.learning",
+      "category": "tools",
+      "tags": ["postman", "api_testing", "learning"],
+      "salience": 2,
+      "status": "active",
+      "created_at": "2025-02-11",
+      "summary": "Wants to learn Postman from the basics.",
+      "embedding_text": "Chip wants to learn how to use Postman from the basics as part of his coding journey.",
+      "aliases": ["Learn Postman basics"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_project_gathertown_2025-02-13",
+      "type": "project",
+      "domain": "development_ai.projects",
+      "category": "web_app",
+      "tags": ["gathertown", "axios", "frontend", "backend", "api"],
+      "salience": 3,
+      "status": "active",
+      "created_at": "2025-02-13",
+      "summary": "Continuing GatherTown project; backend works; frontend uses Axios; testing with Postman/cURL.",
+      "embedding_text": "Chip is continuing the GatherTown project where the backend works and the frontend can send API requests using Axios; he learned to use Postman and cURL to test Axios and plans to continue building and fixing the frontend.",
+      "aliases": ["GatherTown app project", "Axios tested with Postman/cURL"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_project_school_final_recovery_2025-07-29",
+      "type": "project",
+      "domain": "development_ai.projects",
+      "category": "project_recovery",
+      "tags": ["school", "project", "zorin", "fedora", "github"],
+      "salience": 3,
+      "status": "active",
+      "created_at": "2025-07-29",
+      "summary": "School final project partially on old Zorin NVMe; Fedora drive lost most; GitHub exists; redo frontend.",
+      "embedding_text": "Chip's school final project was partially saved on an old Zorin NVMe drive (backend + some frontend). The new Fedora drive lost most of the project. The project exists on GitHub and he aims to redo the frontend.",
+      "aliases": ["Recover final project from Zorin NVMe", "Frontend redo from GitHub"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_project_luci_ai_agent_2026-02-25",
+      "type": "project",
+      "domain": "development_ai.projects",
+      "category": "ai_agent",
+      "tags": ["luci", "lucid_luci", "ollama", "telegram", "jarvis", "memory", "local_ai"],
+      "salience": 5,
+      "status": "active",
+      "created_at": "2026-02-25",
+      "summary": "Building LUCI (Lucid Luci) — a local Jarvis-style AI agent with Telegram, web UI, voice, email/calendar, memory, and multi-model routing. GitHub: equansa00/lucid-luci.",
+      "embedding_text": "Chip is building LUCI (Lucid Luci), a fully local personal AI agent running on his Fedora Threadripper. Features: Telegram bot, FastAPI web UI on port 7860, Piper TTS, Whisper STT, openwakeword wake word, Gmail/Calendar integration, persistent memory (beast_memory.json), and multi-model Ollama routing (chat/code/reasoning/deep/agent).",
+      "aliases": ["luci", "LUCI agent", "Lucid Luci", "Jarvis project", "lucid-luci"],
+      "provenance": ["manual_remember"]
+    },
+
+    {
+      "id": "mem_project_luci_github_integration_2026-02-25",
+      "type": "project",
+      "domain": "development_ai.projects",
+      "category": "ai_agent",
+      "tags": ["luci", "github", "code_review", "autonomous_fix", "pr_pipeline"],
+      "salience": 5,
+      "status": "active",
+      "created_at": "2026-02-25",
+      "summary": "Adding GitHub integration to LUCI — auto-scan all 30+ repos, LLM code review, autonomous fixes, PR pipeline.",
+      "embedding_text": "Chip is adding GitHub integration to LUCI that scans all his GitHub repos (30+, mix of React/Next.js web apps, Python backends, personal projects), generates LLM code reviews using qwen2.5-coder:7b, and autonomously opens PRs with fixes via a beast/fixes branch.",
+      "aliases": ["luci_github", "GitHub agent", "repo scanner", "luci_github.py"],
+      "provenance": ["manual_remember"]
+    },
+
+    {
+      "id": "mem_infra_luci_services_2026-02-25",
+      "type": "asset",
+      "domain": "infra.platform_defaults",
+      "category": "running_services",
+      "tags": ["luci", "systemd", "services", "fedora", "threadripper"],
+      "salience": 4,
+      "status": "active",
+      "created_at": "2026-02-25",
+      "summary": "LUCI runs as 4 systemd user services: luci (Telegram bot), luci-web (FastAPI :7860), luci-briefing (8am daily), luci-wake (wake word).",
+      "embedding_text": "Chip's LUCI agent runs as systemd user services on his Fedora Threadripper: luci.service (Telegram bot), luci-web.service (FastAPI web UI on port 7860, LAN IP 172.16.28.207), luci-briefing.timer (daily 8am briefing), luci-wake.service (openwakeword daemon).",
+      "aliases": ["LUCI systemd services", "luci.service", "luci-web port 7860"],
+      "provenance": ["manual_remember"]
+    },
+
+    {
+      "id": "mem_infra_luci_voice_stack_2026-02-25",
+      "type": "asset",
+      "domain": "infra.platform_defaults",
+      "category": "voice_stack",
+      "tags": ["piper", "whisper", "openwakeword", "tts", "stt"],
+      "salience": 4,
+      "status": "active",
+      "created_at": "2026-02-25",
+      "summary": "LUCI voice stack: Piper TTS (en_US-lessac-medium), Whisper STT (base.en), openwakeword (hey_jarvis model mapped to Hey LUCI).",
+      "embedding_text": "LUCI's voice stack uses Piper TTS with the en_US-lessac-medium model for speech output, OpenAI Whisper base.en for speech-to-text transcription, and openwakeword with the hey_jarvis_v0.1 model mapped to the Hey LUCI wake phrase. Custom Hey LUCI model training is planned.",
+      "aliases": ["Piper TTS", "Whisper STT", "openwakeword hey luci"],
+      "provenance": ["manual_remember"]
+    },
+
+    {
+      "id": "mem_infra_luci_model_routing_2026-02-25",
+      "type": "asset",
+      "domain": "infra.platform_defaults",
+      "category": "model_routing",
+      "tags": ["ollama", "routing", "qwen", "deepseek", "llama"],
+      "salience": 4,
+      "status": "active",
+      "created_at": "2026-02-25",
+      "summary": "LUCI auto-routes to best model: chat→llama3.1:8b, code→qwen2.5-coder:7b, reasoning→deepseek-r1:8b, deep→beast70b:latest, agent→llama3.1:70b.",
+      "embedding_text": "LUCI uses keyword-based model routing: chat and summaries go to llama3.1:8b, code tasks to qwen2.5-coder:7b, reasoning questions to deepseek-r1:8b, deep architectural tasks to beast70b:latest, and agent loop tasks always use llama3.1:70b.",
+      "aliases": ["LUCI model router", "multi-model routing", "route_model()"],
+      "provenance": ["manual_remember"]
+    },
+
+    {
+      "id": "mem_infra_pref_fedora_docker_default_2026-01-02",
+      "type": "preference",
+      "domain": "infra.platform_defaults",
+      "category": "server_stack",
+      "tags": ["fedora", "docker", "threadripper", "default"],
+      "salience": 4,
+      "status": "active",
+      "created_at": "2026-01-02",
+      "summary": "Threadripper AI server runs Fedora; prefers Docker as the default going forward.",
+      "embedding_text": "Chip's Threadripper AI server runs Fedora and he prefers using Docker; treat this as the default going forward.",
+      "aliases": ["Fedora + Docker default for AI server"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_home_unifi_cameras_2024-11-04",
+      "type": "plan",
+      "domain": "home_networking.core",
+      "category": "unifi",
+      "tags": ["home", "network", "unifi", "cameras"],
+      "salience": 4,
+      "status": "active",
+      "created_at": "2024-11-04",
+      "summary": "Plans to add UniFi cameras to the network in the new house.",
+      "embedding_text": "Chip plans to add UniFi cameras to the network in his new house.",
+      "aliases": ["Install UniFi cameras at home", "Add UniFi cameras in new house"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_home_network_opnsense_unifi_fiber_2025-10-23",
+      "type": "fact",
+      "domain": "home_networking.core",
+      "category": "network_architecture",
+      "tags": ["unifi", "opnsense", "fiber_runs", "home_network"],
+      "salience": 4,
+      "status": "active",
+      "created_at": "2025-10-23",
+      "summary": "Extensive UniFi behind high-end OPNsense; planning fiber runs.",
+      "embedding_text": "Chip runs extensive UniFi networking behind a high-end OPNsense router and is planning fiber runs.",
+      "aliases": ["UniFi + OPNsense core router", "Plan fiber runs at home"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_home_rack_basement_moisture_2024-11-04",
+      "type": "plan",
+      "domain": "home_networking.rack",
+      "category": "rack_requirements",
+      "tags": ["home", "basement", "rack", "ventilation", "moisture"],
+      "salience": 3,
+      "status": "active",
+      "created_at": "2024-11-04",
+      "summary": "Considering a moisture-proof, ventilated network rack for basement placement.",
+      "embedding_text": "Chip is considering a moisture-proof network rack with adequate ventilation for equipment placed in the basement.",
+      "aliases": ["Moisture-proof rack for basement", "Ventilated rack in basement"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_home_asset_midatlantic_rack_2024-11-25",
+      "type": "asset",
+      "domain": "home_networking.rack",
+      "category": "rack_asset",
+      "tags": ["rack", "mid_atlantic", "22u", "24u"],
+      "salience": 2,
+      "status": "active",
+      "created_at": "2024-11-25",
+      "summary": "Has a Mid Atlantic 22-24U rack.",
+      "embedding_text": "Chip has a Mid Atlantic 22-24U rack.",
+      "aliases": ["Mid Atlantic 22U/24U rack"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_home_unifi_access_door_2024-12-14",
+      "type": "asset",
+      "domain": "home_networking.core",
+      "category": "access_control",
+      "tags": ["unifi", "access", "door"],
+      "salience": 2,
+      "status": "active",
+      "created_at": "2024-12-14",
+      "summary": "Purchased UniFi Access Door hardware.",
+      "embedding_text": "Chip purchased the UniFi Access Door as part of his UniFi network setup.",
+      "aliases": ["UniFi Access Door hardware"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_home_intercom_wiring_2025-01-23",
+      "type": "plan",
+      "domain": "home_networking.intercom",
+      "category": "intercom",
+      "tags": ["intercom", "wiring", "camera", "three_family"],
+      "salience": 3,
+      "status": "active",
+      "created_at": "2025-01-23",
+      "summary": "Exploring budget-friendly camera intercom options; wiring work needed across three units.",
+      "embedding_text": "Chip is exploring budget-friendly camera intercom options for a three-family property; one intercom wiring run exists but needs the unit replaced, and two other runs need wiring fished out.",
+      "aliases": ["3-family intercom camera options", "Intercom wiring needs fishing"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_home_smart_home_ecobee_unifi_floodlight_2025-02-28",
+      "type": "plan",
+      "domain": "home.smart_home",
+      "category": "devices",
+      "tags": ["smart_home", "ecobee", "unifi", "floodlight"],
+      "salience": 3,
+      "status": "active",
+      "created_at": "2025-02-28",
+      "summary": "Building smart home; has Ecobee; wants UniFi-compatible floodlight.",
+      "embedding_text": "Chip wants to turn his house into a smart home and already has an Ecobee thermostat; he is looking for a floodlight compatible with UniFi systems.",
+      "aliases": ["Smart home buildout", "UniFi-compatible floodlight"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_home_basement_home_theater_2025-03-04",
+      "type": "plan",
+      "domain": "home.basement",
+      "category": "remodel",
+      "tags": ["basement", "home_theater", "kids", "laundry", "storage", "in_laws"],
+      "salience": 3,
+      "status": "active",
+      "created_at": "2025-03-04",
+      "summary": "Planning basement home theater + kids area while keeping laundry/storage; in-laws moving in.",
+      "embedding_text": "Chip plans to convert the basement into a home theater and play area for the kids while maintaining laundry and storage, especially since his in-laws will be moving in and taking up additional space.",
+      "aliases": ["Basement home theater plan", "Keep laundry/storage while adding play area"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_security_wireguard_mullvad_2025-05-30",
+      "type": "fact",
+      "domain": "privacy_security.vpn",
+      "category": "vpn",
+      "tags": ["wireguard", "mullvad", "vpn"],
+      "salience": 2,
+      "status": "active",
+      "created_at": "2025-05-30",
+      "summary": "Uses WireGuard with Mullvad.",
+      "embedding_text": "Chip uses WireGuard with Mullvad VPN.",
+      "aliases": ["WireGuard Mullvad setup"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_security_grapheneos_forensic_reflash_2025-06-01",
+      "type": "plan",
+      "domain": "privacy_security.grapheneos",
+      "category": "reflash",
+      "tags": ["grapheneos", "reflash", "forensics", "esim"],
+      "salience": 4,
+      "status": "active",
+      "created_at": "2025-06-01",
+      "summary": "Wants a forensic-level purge by reflashing GrapheneOS (eSIM risk noted).",
+      "embedding_text": "Chip wants to perform a full forensic-level purge by reflashing GrapheneOS using Brave and is aware that this may result in loss of eSIM access.",
+      "aliases": ["Forensic reflash GrapheneOS", "Reflash via Brave; eSIM risk"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_security_pixel_grapheneos_profiles_2025-06-01",
+      "type": "asset",
+      "domain": "privacy_security.grapheneos",
+      "category": "mobile_device",
+      "tags": ["pixel", "grapheneos", "profiles"],
+      "salience": 3,
+      "status": "active",
+      "created_at": "2025-06-01",
+      "summary": "Uses Pixel PXL Pro with GrapheneOS (two user profiles).",
+      "embedding_text": "Chip is using a Pixel PXL Pro with GrapheneOS and has two user profiles set up.",
+      "aliases": ["Pixel + GrapheneOS two profiles"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_security_chatgpt_on_grapheneos_2025-08-08",
+      "type": "fact",
+      "domain": "privacy_security.grapheneos",
+      "category": "apps",
+      "tags": ["grapheneos", "chatgpt"],
+      "salience": 2,
+      "status": "active",
+      "created_at": "2025-08-08",
+      "summary": "Using ChatGPT on GrapheneOS successfully.",
+      "embedding_text": "Chip is using GrapheneOS with ChatGPT and it is working well for him.",
+      "aliases": ["ChatGPT works on GrapheneOS"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_security_bitwarden_recovery_gpg_veracrypt_2025-06-10",
+      "type": "plan",
+      "domain": "backup.security",
+      "category": "bitwarden",
+      "tags": ["bitwarden", "gpg", "veracrypt", "recovery", "backup", "security"],
+      "salience": 3,
+      "status": "resolved",
+      "created_at": "2025-06-10",
+      "summary": "Bitwarden recovery resolved. Had documented export + GPG + VeraCrypt workflow.",
+      "embedding_text": "Chip resolved his Bitwarden recovery situation. He had a workflow for export, encryption, and storage using GPG and VeraCrypt.",
+      "aliases": ["Bitwarden export + GPG + VeraCrypt workflow"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_security_xperia_degoogle_lineage_microg_2025-06-14",
+      "type": "plan",
+      "domain": "privacy_security.android_rom",
+      "category": "xperia_5_iii",
+      "tags": ["xperia_5_iii", "lineageos", "microg", "degoogled", "calyxos"],
+      "salience": 4,
+      "status": "active",
+      "created_at": "2025-06-14",
+      "summary": "Wants step-by-step plan for deGoogled ROM on Xperia 5 III (LineageOS+microG preferred).",
+      "embedding_text": "Chip wants a step-by-step install plan for a deGoogled Android OS on the Sony Xperia 5 III, ideally LineageOS + microG or CalyxOS if available.",
+      "aliases": ["DeGoogle Xperia 5 III", "LineageOS microG plan", "CalyxOS if possible"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_security_xperia_stock_then_lineage_2025-06-18",
+      "type": "plan",
+      "domain": "privacy_security.android_rom",
+      "category": "xperia_5_iii",
+      "tags": ["xperia_5_iii", "stock_rom", "backup", "lineageos", "microg"],
+      "salience": 3,
+      "status": "active",
+      "created_at": "2025-06-18",
+      "summary": "Plans to test Xperia 5 III stock ROM first, then backup and install LineageOS+microG.",
+      "embedding_text": "Chip plans to test the Sony Xperia 5 III with the stock ROM first, then back up and install LineageOS with microG.",
+      "aliases": ["Test stock first then LineageOS microG"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_security_s24ultra_adb_debloat_2025-06-18",
+      "type": "plan",
+      "domain": "privacy_security.android_rom",
+      "category": "device_maintenance",
+      "tags": ["s24_ultra", "adb", "debloat", "samsung", "google"],
+      "salience": 3,
+      "status": "active",
+      "created_at": "2025-06-18",
+      "summary": "Wants to debloat S24 Ultra by removing Google + Samsung bloatware via ADB.",
+      "embedding_text": "Chip is using a Samsung Galaxy S24 Ultra (global model) and wants to debloat it by removing both Google and Samsung bloatware using ADB.",
+      "aliases": ["S24 Ultra ADB debloat"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_project_custom_rom_hidden_spaces_2025-10-23",
+      "type": "project",
+      "domain": "privacy_security.custom_rom",
+      "category": "project_focus",
+      "tags": ["aosp", "custom_rom", "privacy", "hidden_spaces", "cuttlefish"],
+      "salience": 5,
+      "status": "active",
+      "created_at": "2025-10-23",
+      "summary": "Building privacy-first Android OS as custom ROM with Hidden Spaces; wants AOSP + headless Cuttlefish first.",
+      "embedding_text": "Chip is building a privacy-first Android OS as a custom ROM with Hidden Spaces (non-enumerable profiles and discovery unlock). He wants step-by-step setup for AOSP builds and a headless Cuttlefish emulator first, then device builds.",
+      "aliases": ["Privacy-first AOSP ROM", "Hidden Spaces", "Cuttlefish headless first"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_backup_storage_targets_2025-07-29",
+      "type": "asset",
+      "domain": "backup.storage",
+      "category": "targets",
+      "tags": ["mega", "intranxt", "truenas_scale", "24tb", "backups"],
+      "salience": 4,
+      "status": "active",
+      "created_at": "2025-07-29",
+      "summary": "Has Mega.nz, Intranxt, unstable TrueNAS Scale, and 24TB HDD for backups.",
+      "embedding_text": "Chip has Mega.nz, Intranxt, a barely working TrueNAS Scale, and a 24TB HDD for backups.",
+      "aliases": ["Backup targets: Mega/Intranxt/TrueNAS/24TB"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_backup_encrypted_system_backup_2025-08-04",
+      "type": "plan",
+      "domain": "backup.encrypted_backup",
+      "category": "fedora_backups",
+      "tags": ["fedora", "mega", "24tb", "encryption", "system_backup"],
+      "salience": 4,
+      "status": "active",
+      "created_at": "2025-08-04",
+      "summary": "Wants full encrypted system backup; redownload old Fedora files from Mega; backup current Fedora to Mega + 24TB.",
+      "embedding_text": "Chip wants a full encrypted system backup, to redownload his original Fedora files from Mega.nz, and to back up his current Fedora system to Mega.nz and a 24TB HDD.",
+      "aliases": ["Encrypted Fedora backup to Mega and 24TB"],
+      "provenance": ["chat_memory"]
+    },
+
+    {
+      "id": "mem_travel_nigeria_starlink_2025-07-31",
+      "type": "fact",
+      "domain": "travel.trips",
+      "category": "nigeria",
+      "tags": ["travel", "nigeria", "starlink", "family"],
+      "salience": 2,
+      "status": "active",
+      "created_at": "2025-07-31",
+      "summary": "Traveled to Nigeria for 2 weeks with wife and 3 kids; planned Starlink unlimited for one month.",
+      "embedding_text": "Chip traveled to Nigeria for two weeks with his wife and three kids and planned to get unlimited data Starlink for one month to stay connected while moving around.",
+      "aliases": ["Nigeria travel + Starlink unlimited data"],
+      "provenance": ["chat_memory"]
+    }
+
+  ]
+}
