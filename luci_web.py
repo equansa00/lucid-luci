@@ -20,9 +20,10 @@ WEB_HOST = os.getenv("LUCI_WEB_HOST", "0.0.0.0")
 WEB_PORT = int(os.getenv("LUCI_WEB_PORT", "7860"))
 WEB_SECRET = os.getenv("LUCI_WEB_SECRET", "")
 
-WORKSPACE  = Path.home() / "beast" / "workspace"
-STATIC_DIR = WORKSPACE / "static"
-FACES_DIR  = STATIC_DIR / "faces"
+WORKSPACE      = Path.home() / "beast" / "workspace"
+STATIC_DIR     = WORKSPACE / "static"
+FACES_DIR      = STATIC_DIR / "faces"
+WHISPER_SERVER = f"http://127.0.0.1:{os.getenv('LUCI_WHISPER_PORT', '8765')}"
 
 # ---------------------------------------------------------------------------
 # Imports from luci
@@ -42,6 +43,43 @@ from luci import (  # noqa: E402
     tts_to_file,
     stt_transcribe,
 )
+
+# ---------------------------------------------------------------------------
+# Persistent Whisper server client
+# ---------------------------------------------------------------------------
+import urllib.request as _ureq
+import urllib.error as _uerr
+
+
+def stt_transcribe_fast(audio_path: Path) -> str:
+    """POST audio to the persistent Whisper GPU server (~300ms).
+    Falls back to direct in-process Whisper if the server is not up.
+    """
+    try:
+        with open(audio_path, "rb") as fh:
+            audio_data = fh.read()
+        boundary = b"----LUCIWhisperBoundary"
+        suffix = audio_path.suffix or ".webm"
+        body = (
+            b"--" + boundary + b"\r\n"
+            b'Content-Disposition: form-data; name="audio"; filename="audio' + suffix.encode() + b'"\r\n'
+            b"Content-Type: application/octet-stream\r\n\r\n"
+            + audio_data
+            + b"\r\n--" + boundary + b"--\r\n"
+        )
+        req = _ureq.Request(
+            f"{WHISPER_SERVER}/transcribe",
+            data=body,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary.decode()}"},
+            method="POST",
+        )
+        with _ureq.urlopen(req, timeout=30) as resp:
+            import json as _json
+            return _json.loads(resp.read()).get("text", "")
+    except Exception as exc:
+        print(f"[web] Whisper server unavailable ({exc}), falling back to direct", flush=True)
+        return stt_transcribe(audio_path)
+
 
 # ---------------------------------------------------------------------------
 # FastAPI setup
@@ -929,7 +967,7 @@ async def voice_upload(request: Request, audio: UploadFile = File(...)):
     # ---- Whisper ----
     await broadcast_state("listening")
     loop = asyncio.get_running_loop()
-    text: str = await loop.run_in_executor(None, lambda: stt_transcribe(upload_path))
+    text: str = await loop.run_in_executor(None, lambda: stt_transcribe_fast(upload_path))
     if not text:
         upload_path.unlink(missing_ok=True)
         await broadcast_state("idle")
