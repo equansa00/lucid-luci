@@ -251,9 +251,9 @@ _HTML = r"""<!DOCTYPE html>
     color: rgba(212,175,55,0.45);
   }
 
-  /* === Wake indicator — top right === */
+  /* === Wake indicator — offset from mode-toggle === */
   #wake-indicator {
-    position: fixed; top: 20px; right: 24px;
+    position: fixed; top: 20px; right: 72px;
     font-size: 11px; font-weight: 600; letter-spacing: 0.14em;
     color: var(--gold); opacity: 0;
     transition: opacity 0.35s;
@@ -467,47 +467,6 @@ _HTML = r"""<!DOCTYPE html>
     transition: opacity 0.5s;
   }
 
-  /* === Auth modal === */
-  #auth-modal {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.88);
-    display: none; align-items: center; justify-content: center;
-    z-index: 100;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-  }
-  #auth-box {
-    background: var(--surface);
-    border: 1px solid rgba(212,175,55,0.28);
-    border-radius: 20px; padding: 40px 32px;
-    width: min(360px, 90vw);
-    display: flex; flex-direction: column; gap: 20px;
-    box-shadow: 0 0 70px rgba(212,175,55,0.12);
-    pointer-events: all;
-  }
-  #auth-box h2 {
-    font-size: 22px; font-weight: 700;
-    letter-spacing: 0.12em; color: var(--gold);
-    text-shadow: 0 0 20px rgba(212,175,55,0.4);
-  }
-  #auth-box p  { font-size: 14px; color: rgba(245,230,200,0.55); }
-  #auth-input {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(212,175,55,0.28);
-    color: var(--warm); padding: 12px 16px;
-    border-radius: 10px; font-size: 15px; outline: none; width: 100%;
-    transition: border-color 0.2s;
-  }
-  #auth-input:focus { border-color: var(--gold); }
-  #auth-btn {
-    background: var(--gold); color: #0a0705;
-    border: none; border-radius: 10px; padding: 13px 20px;
-    font-size: 15px; font-weight: 700; letter-spacing: 0.08em;
-    cursor: pointer; transition: opacity 0.2s;
-  }
-  #auth-btn:hover { opacity: 0.85; }
-  #auth-error { color: #dc2626; font-size: 13px; display: none; }
-
   /* === Debug overlay === */
   #debug-overlay {
     position: fixed;
@@ -522,6 +481,221 @@ _HTML = r"""<!DOCTYPE html>
     max-width: 280px;
   }
 
+  /* === Mode toggle button === */
+  #mode-toggle {
+    position: fixed; top: 16px; right: 20px;
+    z-index: 200;
+    background: rgba(12,9,6,0.7);
+    border: 1px solid rgba(212,175,55,0.35);
+    color: #D4AF37;
+    font-size: 18px;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: all 0.2s;
+  }
+  #mode-toggle:hover {
+    background: rgba(212,175,55,0.15);
+    border-color: rgba(212,175,55,0.7);
+  }
+
+  /* ============================================================
+     CHAT MODE
+  ============================================================ */
+  #chat-mode {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: row;
+    background: #0a0705;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+
+  /* History sidebar */
+  #history-panel {
+    width: 220px; flex-shrink: 0;
+    background: rgba(10,7,5,0.82);
+    border-right: 1px solid rgba(212,175,55,0.15);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    display: flex; flex-direction: column;
+    overflow: hidden; z-index: 10;
+  }
+  #history-header {
+    padding: 20px 16px 12px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid rgba(212,175,55,0.12);
+    flex-shrink: 0;
+  }
+  #history-header span {
+    font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: rgba(212,175,55,0.55);
+  }
+  #new-chat-btn {
+    background: none; border: 1px solid rgba(212,175,55,0.3);
+    color: #D4AF37; width: 26px; height: 26px;
+    border-radius: 6px; cursor: pointer; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  #new-chat-btn:hover { background: rgba(212,175,55,0.12); }
+  #history-list { flex: 1; overflow-y: auto; padding: 8px; }
+  #history-list::-webkit-scrollbar { width: 3px; }
+  #history-list::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.2); border-radius: 2px; }
+  .history-group-label {
+    font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: rgba(212,175,55,0.3); padding: 10px 8px 4px;
+  }
+  .history-item {
+    padding: 9px 10px; border-radius: 8px; cursor: pointer;
+    font-size: 13px; color: rgba(245,230,200,0.65);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    transition: all 0.15s; margin-bottom: 2px;
+    border: 1px solid transparent;
+  }
+  .history-item:hover { background: rgba(212,175,55,0.08); color: rgba(245,230,200,0.9); }
+  .history-item.active {
+    background: rgba(212,175,55,0.12);
+    border-color: rgba(212,175,55,0.25);
+    color: #F5E6C8;
+  }
+
+  /* Chat panel */
+  #chat-panel {
+    flex: 1; min-width: 0;
+    display: flex; flex-direction: column;
+    position: relative;
+    border-right: 1px solid rgba(212,175,55,0.1);
+  }
+  #messages-container {
+    flex: 1; overflow-y: auto; padding: 24px 20px 12px;
+    scroll-behavior: smooth;
+  }
+  #messages-container::-webkit-scrollbar { width: 3px; }
+  #messages-container::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.15); border-radius: 2px; }
+
+  /* Message bubbles */
+  .msg-row { display: flex; margin-bottom: 16px; gap: 10px; }
+  .msg-row.user { justify-content: flex-end; }
+  .msg-row.luci { justify-content: flex-start; }
+  .msg-bubble {
+    max-width: 72%; padding: 11px 15px;
+    border-radius: 16px; line-height: 1.6;
+    font-size: 14px; white-space: pre-wrap; word-break: break-word;
+  }
+  .msg-row.user .msg-bubble {
+    background: rgba(212,175,55,0.14);
+    border: 1px solid rgba(212,175,55,0.25);
+    color: #F5E6C8; border-bottom-right-radius: 4px;
+  }
+  .msg-row.luci .msg-bubble {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: rgba(245,230,200,0.88); border-bottom-left-radius: 4px;
+  }
+  .mem-tag {
+    display: inline-block; margin-top: 6px;
+    font-size: 10px; letter-spacing: 0.08em;
+    color: rgba(212,175,55,0.7);
+    border: 1px solid rgba(212,175,55,0.25);
+    border-radius: 4px; padding: 2px 6px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .mem-tag:hover { background: rgba(212,175,55,0.12); color: #D4AF37; }
+  .typing-dots span {
+    display: inline-block; width: 5px; height: 5px;
+    border-radius: 50%; background: rgba(212,175,55,0.5);
+    margin: 0 2px; animation: typingDot 1.2s infinite;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typingDot {
+    0%,60%,100% { transform: translateY(0); opacity: 0.4; }
+    30%          { transform: translateY(-5px); opacity: 1; }
+  }
+  .model-tag { font-size: 10px; color: rgba(212,175,55,0.4); margin-top: 4px; display: block; }
+
+  /* Input bar */
+  #input-bar {
+    padding: 12px 16px;
+    background: rgba(10,7,5,0.9);
+    border-top: 1px solid rgba(212,175,55,0.12);
+    display: flex; gap: 8px; align-items: flex-end;
+    flex-shrink: 0;
+  }
+  #chat-input {
+    flex: 1; resize: none; min-height: 40px; max-height: 120px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(212,175,55,0.2);
+    border-radius: 10px; color: #F5E6C8;
+    padding: 10px 14px; font-size: 14px; outline: none;
+    font-family: inherit; line-height: 1.4;
+    transition: border-color 0.2s; user-select: text;
+  }
+  #chat-input:focus { border-color: rgba(212,175,55,0.5); }
+  #chat-input::placeholder { color: rgba(245,230,200,0.25); }
+  #voice-btn, #send-btn {
+    height: 40px; border-radius: 10px; border: none;
+    cursor: pointer; font-size: 15px; flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  #voice-btn {
+    width: 40px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(212,175,55,0.2);
+    color: #D4AF37;
+  }
+  #voice-btn:hover { background: rgba(212,175,55,0.12); }
+  #voice-btn.recording {
+    background: rgba(220,38,38,0.2);
+    border-color: rgba(220,38,38,0.5);
+    color: #ef4444;
+    animation: recPulse 1s infinite;
+  }
+  @keyframes recPulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(220,38,38,0.3); }
+    50%     { box-shadow: 0 0 0 6px rgba(220,38,38,0); }
+  }
+  #send-btn { width: 40px; background: rgba(212,175,55,0.85); color: #0a0705; font-weight: 700; }
+  #send-btn:hover { background: #D4AF37; }
+
+  /* Face panel */
+  #face-panel {
+    width: 320px; flex-shrink: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    position: relative; overflow: hidden; gap: 12px;
+  }
+  #chat-particles { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+  #chat-face-container {
+    position: relative; width: 240px; height: 240px;
+    border-radius: 50%; overflow: hidden; z-index: 1;
+  }
+  #chat-face-container.state-idle      { animation: ringIdle      4.0s ease-in-out infinite; }
+  #chat-face-container.state-listening { animation: ringListening  1.6s ease-in-out infinite; }
+  #chat-face-container.state-thinking  { animation: ringThinking   1.1s ease-in-out infinite; }
+  #chat-face-container.state-speaking  { animation: ringSpeaking   3.0s ease-in-out infinite; }
+  #chat-face-img {
+    width: 100%; height: 100%; object-fit: cover;
+    filter: contrast(1.08) brightness(0.94) sepia(0.14);
+    transition: opacity 0.42s;
+  }
+  .face-ripple {
+    position: absolute; inset: -10px; border-radius: 50%;
+    border: 1px solid rgba(212,175,55,0.18);
+    animation: ripple 3.5s ease-in-out infinite; pointer-events: none;
+  }
+  .face-ripple-2 {
+    position: absolute; inset: -22px; border-radius: 50%;
+    border: 1px solid rgba(212,175,55,0.08);
+    animation: ripple 3.5s ease-in-out infinite 1.2s; pointer-events: none;
+  }
+  #chat-waveform { width: 220px; height: 40px; z-index: 1; pointer-events: none; }
+  #chat-status-text {
+    font-size: 11px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: rgba(212,175,55,0.4); z-index: 1;
+  }
+
   /* === Mobile === */
   @media (max-width: 480px) {
     #face-container { width: 286px; height: 286px; }
@@ -531,9 +705,29 @@ _HTML = r"""<!DOCTYPE html>
     #face-container { width: 240px; height: 240px; }
     #waveform { height: 40px; margin-top: 14px; }
   }
+  @media (max-width: 768px) {
+    #chat-mode { flex-direction: column; }
+    #history-panel { width: 100%; height: 48px; flex-direction: row; border-right: none; border-bottom: 1px solid rgba(212,175,55,0.15); overflow-x: auto; }
+    #history-list { display: flex; flex-direction: row; padding: 4px; overflow-x: auto; overflow-y: hidden; }
+    .history-item { white-space: nowrap; flex-shrink: 0; }
+    .history-group-label { display: none; }
+    #history-header { padding: 10px 12px; }
+    #face-panel { width: 100%; height: 200px; flex-direction: row; justify-content: center; gap: 20px; }
+    #chat-face-container { width: 140px; height: 140px; }
+    #chat-particles { display: none; }
+    #chat-panel { flex: 1; min-height: 0; }
+  }
 </style>
 </head>
 <body>
+
+<!-- Mode toggle — always visible in both modes -->
+<button id="mode-toggle" title="Switch mode">&#x1F4AC;</button>
+
+<!-- ============================================================
+     AMBIENT MODE
+============================================================ -->
+<div id="ambient-mode">
 
 <!-- Background particle field -->
 <canvas id="particles"></canvas>
@@ -569,32 +763,60 @@ _HTML = r"""<!DOCTYPE html>
   <div id="debug-lines"></div>
 </div>
 
-<!-- Auth modal -->
-<div id="auth-modal">
-  <div id="auth-box">
-    <h2>LUCI</h2>
-    <p>Enter access key to connect.</p>
-    <input type="password" id="auth-input" placeholder="Access key"
-           autocomplete="current-password">
-    <button id="auth-btn">Connect</button>
-    <span id="auth-error">Wrong key &mdash; try again.</span>
+</div><!-- end #ambient-mode -->
+
+<!-- ============================================================
+     CHAT MODE
+============================================================ -->
+<div id="chat-mode" style="display:none">
+
+  <!-- Left: history sidebar -->
+  <div id="history-panel">
+    <div id="history-header">
+      <span>Conversations</span>
+      <button id="new-chat-btn" title="New conversation">&#xFF0B;</button>
+    </div>
+    <div id="history-list"></div>
   </div>
-</div>
+
+  <!-- Center: chat panel -->
+  <div id="chat-panel">
+    <div id="messages-container">
+      <div id="messages"></div>
+    </div>
+    <div id="input-bar">
+      <textarea id="chat-input" placeholder="Message LUCI..." rows="1"></textarea>
+      <button id="voice-btn" title="Voice input">&#x1F3A4;</button>
+      <button id="send-btn">&#x27A4;</button>
+    </div>
+  </div>
+
+  <!-- Right: LUCI face panel -->
+  <div id="face-panel">
+    <canvas id="chat-particles"></canvas>
+    <div id="chat-face-container" class="state-idle">
+      <div class="face-hologram">
+        <img id="chat-face-img" src="/faces/luci_neutral.png" alt="LUCI">
+      </div>
+      <div class="face-ripple"></div>
+      <div class="face-ripple-2"></div>
+    </div>
+    <canvas id="chat-waveform"></canvas>
+    <div id="chat-status-text">Ready</div>
+  </div>
+
+</div><!-- end #chat-mode -->
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 'use strict';
 
-// injected by server
-const SECRET = __SECRET__;
-
 // =========================================================================
-// State
+// Ambient state
 // =========================================================================
 let currentState  = 'idle';
 let ws            = null;
 let wsReady       = false;
-let storedSecret  = SECRET;
 
 let micStream     = null;
 let analyser      = null;
@@ -618,10 +840,6 @@ const subtitleEl    = document.getElementById('subtitle');
 const wakeIndicator = document.getElementById('wake-indicator');
 const tapHint       = document.getElementById('tap-hint');
 const audioUnlockEl = document.getElementById('audio-unlock');
-const authModal     = document.getElementById('auth-modal');
-const authInput     = document.getElementById('auth-input');
-const authBtn       = document.getElementById('auth-btn');
-const authError     = document.getElementById('auth-error');
 
 const FACES = {
   idle:      '/faces/luci_neutral.png',
@@ -692,9 +910,7 @@ function connectWS() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(proto + '://' + location.host + '/ws');
 
-  ws.onopen = () => {
-    if (storedSecret) ws.send(JSON.stringify({type: 'auth', secret: storedSecret}));
-  };
+  ws.onopen = () => {};
 
   ws.onmessage = (ev) => {
     let d; try { d = JSON.parse(ev.data); } catch { return; }
@@ -702,7 +918,6 @@ function connectWS() {
 
     if (d.type === 'status') {
       wsReady = true;
-      hideAuthModal();
       showSubtitle('LUCI online', true);
       setTimeout(() => subtitleEl.classList.remove('visible', 'response'), 2800);
 
@@ -723,22 +938,12 @@ function connectWS() {
         setState('idle');
         dbg('\uD83D\uDD0A playback finished');
       });
-
-    } else if (d.type === 'auth_failed') {
-      dbg('\u274c auth failed');
-      authError.style.display = 'block';
-      ws.close();
     }
   };
 
   ws.onerror = () => {};
   ws.onclose = () => { wsReady = false; setTimeout(connectWS, 3000); };
 }
-
-// =========================================================================
-// Auth modal
-// =========================================================================
-function hideAuthModal() { authModal.style.display = 'none'; }
 
 // =========================================================================
 // Audio unlock (browsers require user gesture before playing audio)
@@ -786,20 +991,8 @@ function playWavBase64(b64, onEnded) {
   }
 }
 
-if (SECRET) {
-  authModal.style.display = 'flex';
-  authBtn.addEventListener('click', () => {
-    const pw = authInput.value.trim();
-    if (!pw) return;
-    storedSecret = pw;
-    authError.style.display = 'none';
-    connectWS();
-  });
-  authInput.addEventListener('keydown', e => { if (e.key === 'Enter') authBtn.click(); });
-  authInput.focus();
-} else {
-  connectWS();
-}
+// Connect immediately — tunnel handles security
+connectWS();
 
 // =========================================================================
 // Microphone init
@@ -912,11 +1105,10 @@ async function sendVoice() {
   const blob = new Blob(audioChunks, {type: mime});
   const form = new FormData();
   form.append('audio', blob, 'voice.webm');
-  const headers = storedSecret ? {'X-LUCI-SECRET': storedSecret} : {};
   dbg('\uD83D\uDCE4 uploading ' + (blob.size / 1024).toFixed(1) + 'kb...');
 
   try {
-    const resp = await fetch('/voice', {method: 'POST', headers, body: form});
+    const resp = await fetch('/voice', {method: 'POST', body: form});
     const data = await resp.json();
 
     if (data.error) {
@@ -1090,6 +1282,338 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
 }
+
+// =========================================================================
+// MODE TOGGLE
+// =========================================================================
+let mode = localStorage.getItem('luci-mode') || 'ambient';
+
+function setMode(m) {
+  mode = m;
+  localStorage.setItem('luci-mode', m);
+  document.getElementById('ambient-mode').style.display = m === 'ambient' ? 'block' : 'none';
+  document.getElementById('chat-mode').style.display    = m === 'chat'    ? 'flex'  : 'none';
+  document.getElementById('mode-toggle').textContent    = m === 'ambient' ? '\uD83D\uDCAC' : '\u2726';
+}
+document.getElementById('mode-toggle').addEventListener('click', () => {
+  setMode(mode === 'ambient' ? 'chat' : 'ambient');
+});
+setMode(mode);
+
+// =========================================================================
+// CHAT MODE — Conversation storage (localStorage)
+// =========================================================================
+const STORAGE_KEY = 'luci-conversations';
+
+function loadConversations() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+  catch { return []; }
+}
+function saveConversations(convos) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(convos));
+}
+
+let conversations = loadConversations();
+let activeConvoId = null;
+
+function newConversation() {
+  const id = 'conv-' + Date.now();
+  const convo = { id, title: 'New conversation', createdAt: Date.now(), updatedAt: Date.now(), messages: [], memoryTags: [] };
+  conversations.unshift(convo);
+  saveConversations(conversations);
+  setActiveConvo(id);
+  renderHistoryList();
+  return convo;
+}
+
+function setActiveConvo(id) {
+  activeConvoId = id;
+  renderHistoryList();
+  renderMessages();
+}
+
+function getActiveConvo() {
+  return conversations.find(c => c.id === activeConvoId);
+}
+
+// =========================================================================
+// CHAT MODE — History list
+// =========================================================================
+function renderHistoryList() {
+  const list = document.getElementById('history-list');
+  if (!list) return;
+  if (conversations.length === 0) {
+    list.innerHTML = '<div style="padding:20px 8px;font-size:12px;color:rgba(245,230,200,0.25);text-align:center">No conversations yet</div>';
+    return;
+  }
+  const today     = new Date().toDateString();
+  const yesterday = new Date(Date.now() - 86400000).toDateString();
+  const groups = {};
+  conversations.forEach(c => {
+    const d = new Date(c.updatedAt).toDateString();
+    const label = d === today ? 'Today' : d === yesterday ? 'Yesterday'
+      : new Date(c.updatedAt).toLocaleDateString('en', {month:'short', day:'numeric'});
+    if (!groups[label]) groups[label] = [];
+    groups[label].push(c);
+  });
+  list.innerHTML = Object.entries(groups).map(([label, items]) =>
+    '<div class="history-group-label">' + label + '</div>' +
+    items.map(c =>
+      '<div class="history-item ' + (c.id === activeConvoId ? 'active' : '') + '" onclick="setActiveConvo(\'' + c.id + '\')" data-id="' + c.id + '">' + escHtml(c.title) + '</div>'
+    ).join('')
+  ).join('');
+}
+
+// =========================================================================
+// CHAT MODE — Messages
+// =========================================================================
+function renderMessages() {
+  const el = document.getElementById('messages');
+  if (!el) return;
+  const convo = getActiveConvo();
+  if (!convo) { el.innerHTML = ''; return; }
+  el.innerHTML = convo.messages.map(m => {
+    const memBadge = m.memoryKey
+      ? '<span class="mem-tag">\uD83C\uDFF7 ' + escHtml(m.memoryKey.replace('mem_','').replace(/_/g,' ')) + '</span>'
+      : '';
+    const modelBadge = m.model ? '<span class="model-tag">' + escHtml(m.model) + '</span>' : '';
+    return '<div class="msg-row ' + m.role + '"><div class="msg-bubble">' + escHtml(m.text) + memBadge + modelBadge + '</div></div>';
+  }).join('');
+  const cont = document.getElementById('messages-container');
+  if (cont) cont.scrollTop = cont.scrollHeight;
+}
+
+function addMessage(role, text, extras) {
+  const convo = getActiveConvo();
+  if (!convo) return;
+  convo.messages.push(Object.assign({role, text, ts: Date.now()}, extras || {}));
+  convo.updatedAt = Date.now();
+  saveConversations(conversations);
+  renderMessages();
+}
+
+// =========================================================================
+// CHAT MODE — Auto-title
+// =========================================================================
+async function autoTitleConvo(convoId, firstMessage) {
+  try {
+    const resp = await fetch('/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        text: 'Give this conversation a title of 4 words or less, no punctuation, no quotes: "' + firstMessage.slice(0,100) + '"',
+        system: 'You are a conversation title generator. Reply with ONLY the title, 4 words max, no punctuation.'
+      })
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      const title = (data.response || '').trim().slice(0, 40) || firstMessage.slice(0, 30);
+      const convo = conversations.find(c => c.id === convoId);
+      if (convo) { convo.title = title; saveConversations(conversations); renderHistoryList(); }
+    }
+  } catch {}
+}
+
+// =========================================================================
+// CHAT MODE — Send message
+// =========================================================================
+async function sendChatMessage(text) {
+  text = text.trim();
+  if (!text) return;
+  if (!activeConvoId || !getActiveConvo()) newConversation();
+  const convoId = activeConvoId;
+  const isFirst = getActiveConvo().messages.length === 0;
+  addMessage('user', text);
+  if (isFirst) autoTitleConvo(convoId, text);
+
+  const msgEl   = document.getElementById('messages');
+  const typingId = 'typing-' + Date.now();
+  msgEl.insertAdjacentHTML('beforeend',
+    '<div id="' + typingId + '" class="msg-row luci"><div class="msg-bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div></div>'
+  );
+  const cont = document.getElementById('messages-container');
+  if (cont) cont.scrollTop = 999999;
+  setChatFaceState('thinking');
+
+  try {
+    const resp = await fetch('/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text})
+    });
+    const data = await resp.json();
+    document.getElementById(typingId)?.remove();
+    if (data.error) {
+      addMessage('luci', '\u274c ' + data.error);
+    } else {
+      addMessage('luci', data.response, {model: data.model || '', memoryKey: data.memory_key || null});
+      if (data.audio_url) {
+        setChatFaceState('speaking');
+        const audio = new Audio(data.audio_url);
+        audio.onended = () => setChatFaceState('idle');
+        audio.onerror = () => setChatFaceState('idle');
+        audio.play().catch(() => setChatFaceState('idle'));
+      } else {
+        setChatFaceState('idle');
+      }
+    }
+  } catch (err) {
+    document.getElementById(typingId)?.remove();
+    addMessage('luci', '\u274c Request failed: ' + err.message);
+    setChatFaceState('idle');
+  }
+}
+
+// =========================================================================
+// CHAT MODE — Chat face state
+// =========================================================================
+function setChatFaceState(state) {
+  const fc = document.getElementById('chat-face-container');
+  const fi = document.getElementById('chat-face-img');
+  const st = document.getElementById('chat-status-text');
+  if (!fc) return;
+  const CF = { idle:'/faces/luci_neutral.png', thinking:'/faces/luci_neutral.png', listening:'/faces/luci_listening.png', speaking:'/faces/luci_speaking.png' };
+  const LABELS = { idle:'Ready', thinking:'Thinking...', listening:'Listening...', speaking:'Speaking' };
+  fc.className = 'state-' + state;
+  if (fi) { fi.style.opacity = '0'; setTimeout(() => { fi.src = CF[state] || CF.idle; fi.style.opacity = '1'; }, 220); }
+  if (st) st.textContent = LABELS[state] || '';
+}
+
+// =========================================================================
+// CHAT MODE — Input handlers
+// =========================================================================
+const chatInput = document.getElementById('chat-input');
+const sendBtn   = document.getElementById('send-btn');
+const voiceBtn  = document.getElementById('voice-btn');
+
+if (chatInput) {
+  chatInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const txt = chatInput.value; chatInput.value = ''; chatInput.style.height = 'auto';
+      sendChatMessage(txt);
+    }
+  });
+  chatInput.addEventListener('input', () => {
+    chatInput.style.height = 'auto';
+    chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+  });
+}
+if (sendBtn) {
+  sendBtn.addEventListener('click', () => {
+    const txt = chatInput.value; chatInput.value = ''; chatInput.style.height = 'auto';
+    sendChatMessage(txt);
+  });
+}
+
+// Voice button in chat mode
+let chatRecording = false;
+if (voiceBtn) {
+  voiceBtn.addEventListener('click', async () => {
+    if (!micStream) { const ok = await initMic(); if (!ok) return; }
+    if (!chatRecording) {
+      chatRecording = true;
+      voiceBtn.classList.add('recording');
+      setChatFaceState('listening');
+      audioChunks = [];
+      let chatMR;
+      try { chatMR = new MediaRecorder(micStream, {}); } catch { chatMR = new MediaRecorder(micStream); }
+      voiceBtn._recorder = chatMR;
+      chatMR.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+      chatMR.onstop = async () => {
+        chatRecording = false;
+        voiceBtn.classList.remove('recording');
+        setChatFaceState('thinking');
+        const blob = new Blob(audioChunks, {type: 'audio/webm'});
+        const form = new FormData();
+        form.append('audio', blob, 'voice.webm');
+        try {
+          const resp = await fetch('/voice', {method: 'POST', body: form});
+          const data = await resp.json();
+          if (data.transcription) {
+            if (!activeConvoId || !getActiveConvo()) newConversation();
+            const isFirst = getActiveConvo().messages.length === 0;
+            addMessage('user', '\uD83C\uDF99 ' + data.transcription);
+            if (isFirst) autoTitleConvo(activeConvoId, data.transcription);
+          }
+          if (data.response) addMessage('luci', data.response, {model: data.model || ''});
+          if (data.audio_url) {
+            setChatFaceState('speaking');
+            const audio = new Audio(data.audio_url);
+            audio.onended = () => setChatFaceState('idle');
+            audio.onerror = () => setChatFaceState('idle');
+            audio.play().catch(() => setChatFaceState('idle'));
+          } else { setChatFaceState('idle'); }
+        } catch { setChatFaceState('idle'); }
+      };
+      chatMR.start(100);
+      // Auto-stop on silence
+      let silMs2 = 0, lastSp2 = Date.now();
+      const silT2 = setInterval(() => {
+        if (!analyser || !chatRecording) { clearInterval(silT2); return; }
+        const d2 = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(d2);
+        const rms2 = d2.reduce((s,v) => s+v, 0) / d2.length;
+        if (rms2 >= 8) { lastSp2 = Date.now(); silMs2 = 0; }
+        else { silMs2 = Date.now() - lastSp2; if (silMs2 >= 1500 && chatRecording) { clearInterval(silT2); if (chatMR.state !== 'inactive') chatMR.stop(); } }
+      }, 150);
+    } else {
+      chatRecording = false;
+      voiceBtn.classList.remove('recording');
+      if (voiceBtn._recorder && voiceBtn._recorder.state !== 'inactive') voiceBtn._recorder.stop();
+    }
+  });
+}
+
+document.getElementById('new-chat-btn')?.addEventListener('click', () => { newConversation(); });
+
+// =========================================================================
+// CHAT MODE — Mini particle field (face panel)
+// =========================================================================
+(function initChatParticles() {
+  if (typeof THREE === 'undefined') return;
+  const canvas = document.getElementById('chat-particles');
+  if (!canvas) return;
+  const W = 320, H = window.innerHeight;
+  const renderer = new THREE.WebGLRenderer({canvas, alpha: true, antialias: false});
+  renderer.setSize(W, H); renderer.setClearColor(0x000000, 0);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(75, W/H, 0.1, 100);
+  camera.position.z = 5;
+  const N = 80, pos = new Float32Array(N*3), vel = new Float32Array(N*2);
+  for (let i = 0; i < N; i++) {
+    pos[i*3]=(Math.random()-0.5)*6; pos[i*3+1]=(Math.random()-0.5)*10; pos[i*3+2]=(Math.random()-0.5)*2;
+    vel[i*2]=(Math.random()-0.5)*0.006; vel[i*2+1]=(Math.random()-0.5)*0.006;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({color:0xD4AF37, size:1.5, sizeAttenuation:false, transparent:true, opacity:0.5});
+  scene.add(new THREE.Points(geo, mat));
+  function tick() {
+    requestAnimationFrame(tick);
+    const p = geo.attributes.position;
+    for (let i = 0; i < N; i++) {
+      let nx = p.getX(i)+vel[i*2], ny = p.getY(i)+vel[i*2+1];
+      if (nx>4) nx=-4; if (nx<-4) nx=4; if (ny>6) ny=-6; if (ny<-6) ny=6;
+      p.setX(i,nx); p.setY(i,ny);
+    }
+    p.needsUpdate = true; renderer.render(scene, camera);
+  }
+  tick();
+})();
+
+// =========================================================================
+// CHAT MODE — Init
+// =========================================================================
+if (conversations.length > 0) { setActiveConvo(conversations[0].id); } else { newConversation(); }
+renderHistoryList();
+
+// =========================================================================
+// Helper
+// =========================================================================
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 </script>
 </body>
 </html>
@@ -1097,8 +1621,7 @@ if ('serviceWorker' in navigator) {
 
 
 def _build_html() -> str:
-    secret_js = '"{}"'.format(WEB_SECRET) if WEB_SECRET else '""'
-    return _HTML.replace("__SECRET__", secret_js)
+    return _HTML
 
 
 # ---------------------------------------------------------------------------
@@ -1145,7 +1668,7 @@ async def service_worker() -> PlainTextResponse:
 
 @app.get("/audio/{filename}")
 async def serve_audio(filename: str):
-    if not re.match(r"^(reply|web_reply)_\d+\.wav$", filename):
+    if not re.match(r"^(reply|web_reply|chat_reply)_\d+\.wav$", filename):
         return JSONResponse({"error": "not found"}, status_code=404)
     path = RUNS_DIR / filename
     if not path.exists():
@@ -1155,15 +1678,6 @@ async def serve_audio(filename: str):
 
 @app.post("/voice")
 async def voice_upload(request: Request, audio: UploadFile = File(...)):
-    # Auth check
-    if WEB_SECRET:
-        secret = (
-            request.headers.get("X-LUCI-SECRET")
-            or request.query_params.get("secret", "")
-        )
-        if secret != WEB_SECRET:
-            return JSONResponse({"error": "unauthorized"}, status_code=401)
-
     ts = int(time.time())
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
     upload_path = RUNS_DIR / f"web_voice_{ts}.wav"
@@ -1218,23 +1732,66 @@ async def voice_upload(request: Request, audio: UploadFile = File(...)):
     })
 
 
+@app.post("/chat")
+async def chat_endpoint(request: Request) -> JSONResponse:
+    """Text chat endpoint for the chat UI mode."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON"}, status_code=400)
+
+    text = (body.get("text") or "").strip()
+    system_override = body.get("system", "")
+    if not text:
+        return JSONResponse({"error": "no text"}, status_code=400)
+
+    loop = asyncio.get_running_loop()
+    model_name, category = route_model(text)
+    persona = load_persona()
+    messages = []
+    if system_override:
+        messages.append({"role": "system", "content": system_override})
+    elif persona:
+        messages.append({"role": "system", "content": persona})
+    messages.append({"role": "user", "content": text})
+
+    await broadcast_state("thinking")
+
+    try:
+        response_text = await loop.run_in_executor(
+            None, lambda: ollama_chat(messages, 0.4, model_name)
+        )
+    except Exception as e:
+        return JSONResponse({"error": str(e)})
+
+    tag = format_model_tag(model_name, category)
+
+    ts = int(time.time())
+    reply_path = RUNS_DIR / f"chat_reply_{ts}.wav"
+    RUNS_DIR.mkdir(parents=True, exist_ok=True)
+
+    await broadcast_state("speaking")
+    wav_ok: bool = await loop.run_in_executor(
+        None, lambda: tts_to_file(response_text, reply_path)
+    )
+    audio_url = f"/audio/{reply_path.name}" if wav_ok else None
+
+    if LUCI_AUTO_MEMORY:
+        asyncio.create_task(asyncio.to_thread(auto_extract_memory, text, response_text))
+
+    await broadcast_state("idle")
+
+    return JSONResponse({
+        "response": response_text,
+        "model": tag,
+        "audio_url": audio_url,
+    })
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     loop = asyncio.get_running_loop()
-
-    # Auth handshake
-    if WEB_SECRET:
-        try:
-            raw = await asyncio.wait_for(websocket.receive_text(), timeout=15)
-            msg = _parse_json(raw)
-            if msg.get("type") != "auth" or msg.get("secret") != WEB_SECRET:
-                await websocket.send_text('{"type":"auth_failed"}')
-                await websocket.close(code=1008)
-                return
-        except Exception:
-            await websocket.close(code=1008)
-            return
 
     _connected_ws.add(websocket)
     await websocket.send_text('{"type":"status","text":"LUCI online"}')
