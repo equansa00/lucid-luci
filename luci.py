@@ -339,6 +339,38 @@ def ollama_chat(
     return msg  # type: ignore[return-value]
 
 
+def summarize_large_output(raw: str, topic: str, model: str = "llama3.1:8b") -> tuple[str, str]:
+    """
+    If raw output exceeds 2000 chars, summarize it via Ollama.
+    Returns (summary_text, full_output_path)
+    """
+    MAX_INLINE = 2000
+    if len(raw) <= MAX_INLINE:
+        return raw, ""
+
+    # Save full output to a timestamped file
+    ts = int(time.time())
+    out_path = RUNS_DIR / f"full_output_{ts}.txt"
+    RUNS_DIR.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(raw, encoding="utf-8")
+
+    # Summarize via Ollama
+    summary_prompt = (
+        f"Summarize the following {topic} output concisely for the user. "
+        f"List the most important items (max 10). Be brief.\n\n{raw[:6000]}"
+    )
+    try:
+        summary = ollama_chat(
+            [{"role": "user", "content": summary_prompt}],
+            temperature=0.2,
+            model=model,
+        )
+    except Exception as e:
+        summary = f"(Summary failed: {e})\n\nFirst 1000 chars:\n{raw[:1000]}"
+
+    return summary, str(out_path)
+
+
 # -----------------------------
 # Tiny RAG (no DB, bounded)
 # -----------------------------

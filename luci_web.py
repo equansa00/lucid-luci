@@ -45,6 +45,7 @@ from luci import (  # noqa: E402
     LUCI_AUTO_MEMORY,
     auto_extract_memory,
     ollama_chat,
+    summarize_large_output,
     route_model,
     format_model_tag,
     load_persona,
@@ -1696,6 +1697,22 @@ function renderHistoryList() {
 // =========================================================================
 // CHAT MODE — Messages
 // =========================================================================
+function renderMsgText(text) {
+  // Escape HTML first, then convert safe markdown patterns
+  let s = escHtml(text);
+  // Markdown links [label](/output/...) → clickable anchor
+  s = s.replace(/\[([^\]]+)\]\((\/output\/[^)]+)\)/g,
+    '<a href="$2" target="_blank" style="color:#D4AF37;text-decoration:underline">$1</a>'
+  );
+  // **bold**
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // `code`
+  s = s.replace(/`([^`]+)`/g,
+    '<code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;font-size:12px">$1</code>'
+  );
+  return s;
+}
+
 function renderMessages() {
   const el = document.getElementById('messages');
   if (!el) return;
@@ -1706,7 +1723,7 @@ function renderMessages() {
       ? '<span class="mem-tag">\uD83C\uDFF7 ' + escHtml(m.memoryKey.replace('mem_','').replace(/_/g,' ')) + '</span>'
       : '';
     const modelBadge = m.model ? '<span class="model-tag">' + escHtml(m.model) + '</span>' : '';
-    return '<div class="msg-row ' + m.role + '"><div class="msg-bubble">' + escHtml(m.text) + memBadge + modelBadge + '</div></div>';
+    return '<div class="msg-row ' + m.role + '"><div class="msg-bubble">' + renderMsgText(m.text) + memBadge + modelBadge + '</div></div>';
   }).join('');
   const cont = document.getElementById('messages-container');
   if (cont) cont.scrollTop = cont.scrollHeight;
@@ -2006,6 +2023,16 @@ async def serve_audio(filename: str):
     return FileResponse(str(path), media_type="audio/wav")
 
 
+@app.get("/output/{filename}")
+async def serve_output(filename: str) -> PlainTextResponse:
+    if not re.match(r"^full_output_\d+\.txt$", filename):
+        return PlainTextResponse("not found", status_code=404)
+    path = RUNS_DIR / filename
+    if not path.exists():
+        return PlainTextResponse("not found", status_code=404)
+    return PlainTextResponse(path.read_text(encoding="utf-8"))
+
+
 @app.get("/voices")
 async def list_voices() -> JSONResponse:
     available = {k: v for k, v in PIPER_VOICE_LABELS.items() if PIPER_VOICES[k].exists()}
@@ -2098,47 +2125,86 @@ async def chat_endpoint(request: Request) -> JSONResponse:
     if not text:
         return JSONResponse({"error": "no text"}, status_code=400)
 
-    loop = asyncio.get_running_loop()
-    model_name, category = route_model(text)
-    persona = load_persona()
-    messages = []
-    if system_override:
-        messages.append({"role": "system", "content": system_override})
-    elif persona:
-        messages.append({"role": "system", "content": persona})
-    messages.append({"role": "user", "content": text})
-
-    await broadcast_state("thinking")
-
     try:
+        loop = asyncio.get_running_loop()
+        model_name, category = route_model(text)
+
+        # GitHub injection: when keywords detected, fetch real repo data from API
+        github_keywords = [
+            "github", "repo", "repository", "repositories", "my repos",
+            "list repos", "show repos", "my projects", "my code",
+        ]
+        injected_text = text
+        if any(kw in text.lower() for kw in github_keywords):
+            try:
+                from luci_github import github_list_repos
+                repos = github_list_repos()
+                repo_list = "\n".join(
+                    f"- {r['name']} ({'private' if r.get('private') else 'public'})"
+                    for r in (repos[:60] if isinstance(repos, list) else [])
+                )
+                injected_text = (
+                    f"{text}\n\n"
+                    f"[SYSTEM: Here are the user's ACTUAL GitHub repositories "
+                    f"retrieved live from the API — do NOT make up names, "
+                    f"use ONLY these:\n{repo_list}]"
+                )
+            except Exception:
+                pass  # fall through to normal LLM response
+
+        persona = load_persona()
+        messages = []
+        if system_override:
+            messages.append({"role": "system", "content": system_override})
+        elif persona:
+            messages.append({"role": "system", "content": persona})
+        messages.append({"role": "user", "content": injected_text})
+
+        await broadcast_state("thinking")
+
         response_text = await loop.run_in_executor(
             None, lambda: ollama_chat(messages, 0.4, model_name)
         )
+
+        # Auto-summarize large responses and save full output to file
+        topic = category if category else "output"
+        response_text, full_path = await loop.run_in_executor(
+            None, lambda: summarize_large_output(response_text, topic)
+        )
+        if full_path:
+            fname = Path(full_path).name
+            response_text += f"\n\n📄 [View full output](/output/{fname})"
+
+        tag = format_model_tag(model_name, category)
+
+        ts = int(time.time())
+        reply_path = RUNS_DIR / f"chat_reply_{ts}.wav"
+        RUNS_DIR.mkdir(parents=True, exist_ok=True)
+
+        await broadcast_state("speaking")
+        wav_ok: bool = await loop.run_in_executor(
+            None, lambda: tts_to_file(response_text, reply_path, voice)
+        )
+        audio_url = f"/audio/{reply_path.name}" if wav_ok else None
+
+        if LUCI_AUTO_MEMORY:
+            asyncio.create_task(asyncio.to_thread(auto_extract_memory, text, response_text))
+
+        await broadcast_state("idle")
+
+        return JSONResponse({
+            "response": response_text,
+            "model": tag,
+            "audio_url": audio_url,
+        })
+
     except Exception as e:
-        return JSONResponse({"error": str(e)})
-
-    tag = format_model_tag(model_name, category)
-
-    ts = int(time.time())
-    reply_path = RUNS_DIR / f"chat_reply_{ts}.wav"
-    RUNS_DIR.mkdir(parents=True, exist_ok=True)
-
-    await broadcast_state("speaking")
-    wav_ok: bool = await loop.run_in_executor(
-        None, lambda: tts_to_file(response_text, reply_path, voice)
-    )
-    audio_url = f"/audio/{reply_path.name}" if wav_ok else None
-
-    if LUCI_AUTO_MEMORY:
-        asyncio.create_task(asyncio.to_thread(auto_extract_memory, text, response_text))
-
-    await broadcast_state("idle")
-
-    return JSONResponse({
-        "response": response_text,
-        "model": tag,
-        "audio_url": audio_url,
-    })
+        print(f"[web] /chat error: {e}", flush=True)
+        return JSONResponse({
+            "response": f"❌ Error: {str(e)}",
+            "model": "",
+            "audio_url": None,
+        })
 
 
 @app.websocket("/ws")
