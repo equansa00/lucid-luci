@@ -1612,7 +1612,7 @@ def web_search_ddg(query: str, max_results: int = 5) -> List[Dict[str, str]]:
         return []
 
 
-def get_weather(location: str = "Naples, Florida") -> str:
+def get_weather(location: str = "The Bronx, New York") -> str:
     """Get current weather using wttr.in (free, no API key needed)."""
     import urllib.request
     import urllib.parse
@@ -3207,7 +3207,7 @@ def run_telegram_bot() -> None:
             augmented = text
             if any(kw in text.lower() for kw in _weather_kw):
                 try:
-                    _location = "Naples, Florida"
+                    _location = "The Bronx, New York"
                     import re as _re
                     _loc_m = _re.search(
                         r"in ([A-Z][a-zA-Z\s,]+?)(?:\?|$|\.|today|now|right now)",

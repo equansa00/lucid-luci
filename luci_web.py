@@ -2168,7 +2168,7 @@ async def chat_endpoint(request: Request) -> JSONResponse:
         if any(kw in text.lower() for kw in _weather_kw):
             try:
                 import re as _re
-                _location = "Naples, Florida"
+                _location = "The Bronx, New York"
                 _loc_m = _re.search(
                     r"in ([A-Z][a-zA-Z\s,]+?)(?:\?|$|\.|today|now|right now)",
                     text
