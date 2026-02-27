@@ -3037,6 +3037,37 @@ def run_telegram_bot() -> None:
             messages = []
             if persona:
                 messages.append({"role": "system", "content": persona})
+
+            # Inject structured beast_memory.json entries (salience-sorted, top 30)
+            try:
+                mem_path = WORKSPACE / "beast_memory.json"
+                if mem_path.exists():
+                    mem_data = json.loads(mem_path.read_text(encoding="utf-8"))
+                    raw_mems = mem_data.get("memories", [])
+                    active = sorted(
+                        [m for m in raw_mems if m.get("status") == "active"],
+                        key=lambda m: m.get("salience", 0),
+                        reverse=True,
+                    )
+                    if active:
+                        mem_lines = "\n".join(
+                            f"- {m['summary']}" for m in active[:30] if m.get("summary")
+                        )
+                        mem_block = (
+                            "REAL MEMORY (facts you actually know about Chip — "
+                            "do NOT invent anything beyond this list):\n"
+                            + mem_lines
+                            + "\n\nIf asked about past conversations not recorded here, "
+                            "say: \"I don't have a record of that specific conversation.\" "
+                            "Never fabricate conversation history."
+                        )
+                        if messages and messages[0]["role"] == "system":
+                            messages[0]["content"] += "\n\n" + mem_block
+                        else:
+                            messages.insert(0, {"role": "system", "content": mem_block})
+            except Exception:
+                pass
+
             messages.append({"role": "user", "content": text})
             response = ollama_chat(messages, temperature=0.4, model=routed_model)
         except Exception as e:

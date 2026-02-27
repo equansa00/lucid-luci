@@ -49,6 +49,7 @@ from luci import (  # noqa: E402
     route_model,
     format_model_tag,
     load_persona,
+    load_persona_with_memory,
     tts_to_file,
     stt_transcribe,
 )
@@ -2157,12 +2158,44 @@ async def chat_endpoint(request: Request) -> JSONResponse:
             except Exception:
                 pass  # fall through to normal LLM response
 
-        persona = load_persona()
+        # Use persona + memory.md so LUCI knows actual recorded facts
+        persona = load_persona_with_memory()
         messages = []
         if system_override:
             messages.append({"role": "system", "content": system_override})
         elif persona:
             messages.append({"role": "system", "content": persona})
+
+        # Inject structured beast_memory.json entries (salience-sorted, top 30)
+        try:
+            mem_path = Path(__file__).parent / "beast_memory.json"
+            if mem_path.exists():
+                mem_data = json.loads(mem_path.read_text(encoding="utf-8"))
+                raw_mems = mem_data.get("memories", [])
+                # active entries only, sorted by salience descending
+                active = sorted(
+                    [m for m in raw_mems if m.get("status") == "active"],
+                    key=lambda m: m.get("salience", 0),
+                    reverse=True,
+                )
+                if active:
+                    mem_lines = "\n".join(
+                        f"- {m['summary']}" for m in active[:30] if m.get("summary")
+                    )
+                    mem_block = (
+                        "REAL MEMORY (facts you actually know about Chip — "
+                        "do NOT invent anything beyond this list):\n"
+                        + mem_lines
+                        + "\n\nIf asked about past conversations not recorded here, "
+                        "say: \"I don't have a record of that specific conversation.\" "
+                        "Never fabricate conversation history."
+                    )
+                    if messages and messages[0]["role"] == "system":
+                        messages[0]["content"] += "\n\n" + mem_block
+                    else:
+                        messages.insert(0, {"role": "system", "content": mem_block})
+        except Exception:
+            pass
 
         # Inject last 6 turns of conversation history for in-session memory
         for h in history[-6:]:
