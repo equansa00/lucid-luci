@@ -118,6 +118,7 @@ def print_help():
         "  [bold]/diff[/]          Show git diff\n"
         "  [bold]/log[/]           Show git log\n"
         "  [bold]/verbose[/]       Toggle verbose tool output\n"
+        "  [bold]/benchmark[/]     Measure model speed (TTFT + tokens/sec)\n"
         "  [bold]/exit[/]          Exit\n\n"
         "Just type your request naturally:\n"
         "  [luci.dim]add error handling to auth.py[/]\n"

@@ -2133,6 +2133,7 @@ CODE_KEYWORDS = {
     "code", "python", "bash", "javascript", "typescript", "html", "css",
     "sql", "regex", "algorithm", "implement", "unittest", "pytest",
     "fix this", "what's wrong", "why doesn't", "how do i write",
+    "git", "dockerfile", "docker", "yaml", "json schema", "api", "endpoint",
 }
 
 REASON_KEYWORDS = {
@@ -2143,6 +2144,9 @@ REASON_KEYWORDS = {
     "logic", "logical", "deduce", "derive", "infer",
     "algorithm", "math", "equation", "formula", "solve",
     "reasoning", "step-by-step",
+    "explain why", "explain how", "why does", "how does",
+    "compare", "pros and cons", "best approach", "should i",
+    "analyze", "analyse",
 }
 
 DEEP_KEYWORDS = {
@@ -2153,39 +2157,90 @@ DEEP_KEYWORDS = {
     "enterprise", "end to end", "end-to-end",
 }
 
+# Tier 4 opt-in triggers — beast70b only when explicitly requested
+DEEP_OPTIN_KEYWORDS = {
+    "think deeply", "use your full power", "complex analysis",
+    "beast mode", "use beast", "full analysis", "deep dive",
+    "exhaustive", "no shortcuts",
+}
+
+# Tier 1 fast-path: casual / trivial — always use default model
+FAST_KEYWORDS = {
+    "hey", "hi ", "hello", "thanks", "thank you", "thx",
+    "what time", "what's up", "how are you", "good morning",
+    "good night", "lol", "haha", "nice", "cool", "ok",
+    "okay", "sure", "got it", "remind me", "what is",
+    "who is", "what was", "how old",
+}
+
 
 def route_model(text: str) -> Tuple[str, str]:
     """Classify text and return (model_name, category).
 
-    Category: "code", "reasoning", "deep", "chat".
-    Pure pattern matching — no LLM, completes in <1ms.
-    Priority order: code > reasoning > deep > chat.
+    4-tier routing — pure pattern matching, <1ms.
+    Tier 1 (fast/chat):     short or casual → ROUTER_DEFAULT_MODEL
+    Tier 2 (code):          code keywords   → ROUTER_CODE_MODEL
+    Tier 3 (reasoning):     analysis/explain → ROUTER_REASON_MODEL
+    Tier 4 (deep, opt-in):  explicit request → ROUTER_DEEP_MODEL
     """
     lower = text.lower()
+    stripped = text.strip()
 
-    # Step 1 — code keywords (any match)
-    if any(kw in lower for kw in CODE_KEYWORDS):
-        return (ROUTER_CODE_MODEL, "code")
+    # Tier 4 — beast70b only when explicitly requested OR very long + multi-system
+    if any(kw in lower for kw in DEEP_OPTIN_KEYWORDS):
+        tier = 4
+        print(f"[router] '{stripped[:40]}...' → Tier {tier} ({ROUTER_DEEP_MODEL})", flush=True)
+        return (ROUTER_DEEP_MODEL, "deep")
+    if len(text) >= 500 and any(kw in lower for kw in DEEP_KEYWORDS):
+        tier = 4
+        print(f"[router] '{stripped[:40]}...' → Tier {tier} ({ROUTER_DEEP_MODEL})", flush=True)
+        return (ROUTER_DEEP_MODEL, "deep")
 
-    # Step 1b — personal/capability questions → main model honours persona best
+    # Tier 1 fast-path — short messages or obvious casual chat
+    if len(stripped) < 100 and any(kw in lower for kw in FAST_KEYWORDS):
+        tier = 1
+        print(f"[router] '{stripped[:40]}' → Tier {tier} ({ROUTER_DEFAULT_MODEL})", flush=True)
+        return (ROUTER_DEFAULT_MODEL, "chat")
+
+    # Personal/capability questions → persona model
     _capability_kw = [
         "can you", "do you have", "are you able", "what can you",
         "do you support", "can you hear", "can you see", "can you process",
         "do you remember", "what are you", "who are you", "tell me about yourself",
     ]
     if any(kw in lower for kw in _capability_kw):
+        tier = 1
+        print(f"[router] '{stripped[:40]}' → Tier {tier} ({ROUTER_DEFAULT_MODEL})", flush=True)
         return (ROUTER_DEFAULT_MODEL, "assistant")
 
-    # Step 2 — reasoning: explicit math/logic keywords only (no "ends with ?" catch-all)
+    # Tier 2 — code keywords
+    if any(kw in lower for kw in CODE_KEYWORDS):
+        tier = 2
+        print(f"[router] '{stripped[:40]}' → Tier {tier} ({ROUTER_CODE_MODEL})", flush=True)
+        return (ROUTER_CODE_MODEL, "code")
+
+    # Tier 3 — reasoning/analysis
     reason_hits = sum(1 for kw in REASON_KEYWORDS if kw in lower)
     if reason_hits >= 1:
+        tier = 3
+        print(f"[router] '{stripped[:40]}' → Tier {tier} ({ROUTER_REASON_MODEL})", flush=True)
         return (ROUTER_REASON_MODEL, "reasoning")
 
-    # Step 3 — deep: any keyword AND message >= 40 chars
-    if len(text) >= 40 and any(kw in lower for kw in DEEP_KEYWORDS):
-        return (ROUTER_DEEP_MODEL, "deep")
+    # Tier 1 default — short messages always go fast
+    if len(stripped) < 100:
+        tier = 1
+        print(f"[router] '{stripped[:40]}' → Tier {tier} ({ROUTER_DEFAULT_MODEL})", flush=True)
+        return (ROUTER_DEFAULT_MODEL, "chat")
 
-    # Step 4 — default chat
+    # Tier 3 fallback for medium+ messages with deep keywords
+    if any(kw in lower for kw in DEEP_KEYWORDS):
+        tier = 3
+        print(f"[router] '{stripped[:40]}' → Tier {tier} ({ROUTER_REASON_MODEL})", flush=True)
+        return (ROUTER_REASON_MODEL, "reasoning")
+
+    # Default: Tier 1
+    tier = 1
+    print(f"[router] '{stripped[:40]}' → Tier {tier} ({ROUTER_DEFAULT_MODEL})", flush=True)
     return (ROUTER_DEFAULT_MODEL, "chat")
 
 

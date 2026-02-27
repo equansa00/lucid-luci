@@ -107,7 +107,58 @@ def main():
 
     # Non-interactive mode
     if args.command:
-        response = agent.chat(args.command)
+        cmd_str = args.command.strip()
+        if cmd_str == "/benchmark":
+            # Run benchmark directly without going through agent chat
+            import time, requests as _req, json as _json
+            console.print("[luci.dim]Running benchmark — measuring first token + total time...[/]")
+            test_prompt = "Count from 1 to 10 and explain why numbers matter."
+            payload = {
+                "model": current_model,
+                "messages": [
+                    {"role": "system", "content": "You are LUCI. Be concise."},
+                    {"role": "user", "content": test_prompt}
+                ],
+                "stream": True,
+                "options": {"temperature": 0.1, "num_ctx": 2048},
+            }
+            t_start = time.perf_counter()
+            t_first = None
+            total_tokens = 0
+            try:
+                resp = _req.post("http://127.0.0.1:11434/api/chat",
+                                 json=payload, stream=True, timeout=120)
+                for line in resp.iter_lines():
+                    if not line:
+                        continue
+                    data = _json.loads(line)
+                    token = data.get("message", {}).get("content", "")
+                    if token:
+                        if t_first is None:
+                            t_first = time.perf_counter()
+                        total_tokens += 1
+                    if data.get("done"):
+                        break
+                t_end = time.perf_counter()
+                ttft = (t_first - t_start) if t_first else 0
+                total = t_end - t_start
+                tps = total_tokens / total if total > 0 else 0
+                console.print(f"\n[luci.gold]Benchmark Results — {current_model}[/]")
+                console.print(f"  ⚡ First token:     [bold]{ttft:.2f}s[/]")
+                console.print(f"  ⏱  Total time:      [bold]{total:.2f}s[/]")
+                console.print(f"  🔢 Tokens:          [bold]{total_tokens}[/]")
+                console.print(f"  🚀 Tokens/sec:      [bold]{tps:.1f}[/]")
+                if ttft < 1.5:
+                    rating = "[luci.success]FAST — feels instant[/]"
+                elif ttft < 4.0:
+                    rating = "[luci.dim]ACCEPTABLE — slight delay[/]"
+                else:
+                    rating = "[luci.error]SLOW — consider smaller model[/]"
+                console.print(f"  📊 Rating:          {rating}\n")
+            except Exception as ex:
+                console.print(f"[luci.error]Benchmark failed: {ex}[/]")
+            return
+        response = agent.chat(cmd_str)
         print_response(response)
         return
 
@@ -182,6 +233,68 @@ def main():
                     console.print(r.output)
                 else:
                     console.print("[luci.error]Usage: /run <command>[/]")
+
+            elif cmd == "/benchmark":
+                import time
+                import requests as _req
+                import json as _json
+                console.print("[luci.dim]Running benchmark — measuring first token + total time...[/]")
+
+                test_prompt = "Count from 1 to 10 and explain why numbers matter."
+                payload = {
+                    "model": current_model,
+                    "messages": [
+                        {"role": "system", "content": "You are LUCI. Be concise."},
+                        {"role": "user", "content": test_prompt}
+                    ],
+                    "stream": True,
+                    "options": {"temperature": 0.1, "num_ctx": 2048},
+                }
+
+                t_start = time.perf_counter()
+                t_first = None
+                total_tokens = 0
+                output = ""
+
+                try:
+                    resp = _req.post(
+                        "http://127.0.0.1:11434/api/chat",
+                        json=payload, stream=True, timeout=120
+                    )
+                    for line in resp.iter_lines():
+                        if not line:
+                            continue
+                        data = _json.loads(line)
+                        token = data.get("message", {}).get("content", "")
+                        if token:
+                            if t_first is None:
+                                t_first = time.perf_counter()
+                            output += token
+                            total_tokens += 1
+                        if data.get("done"):
+                            break
+
+                    t_end = time.perf_counter()
+                    ttft = (t_first - t_start) if t_first else 0
+                    total = t_end - t_start
+                    tps = total_tokens / total if total > 0 else 0
+
+                    console.print(f"\n[luci.gold]Benchmark Results — {current_model}[/]")
+                    console.print(f"  ⚡ First token:     [bold]{ttft:.2f}s[/]")
+                    console.print(f"  ⏱  Total time:      [bold]{total:.2f}s[/]")
+                    console.print(f"  🔢 Tokens:          [bold]{total_tokens}[/]")
+                    console.print(f"  🚀 Tokens/sec:      [bold]{tps:.1f}[/]")
+
+                    if ttft < 1.5:
+                        rating = "[luci.success]FAST — feels instant[/]"
+                    elif ttft < 4.0:
+                        rating = "[luci.dim]ACCEPTABLE — slight delay[/]"
+                    else:
+                        rating = "[luci.error]SLOW — consider smaller model[/]"
+                    console.print(f"  📊 Rating:          {rating}\n")
+
+                except Exception as ex:
+                    console.print(f"[luci.error]Benchmark failed: {ex}[/]")
 
             else:
                 console.print(f"[luci.error]Unknown command: {cmd}[/]")
