@@ -1612,6 +1612,55 @@ def web_search_ddg(query: str, max_results: int = 5) -> List[Dict[str, str]]:
         return []
 
 
+def get_weather(location: str = "Naples, Florida") -> str:
+    """Get current weather using wttr.in (free, no API key needed)."""
+    import urllib.request
+    import urllib.parse
+    try:
+        loc = urllib.parse.quote(location)
+        url = f"https://wttr.in/{loc}?format=3"
+        req = urllib.request.Request(url, headers={"User-Agent": "curl/7.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            weather = resp.read().decode("utf-8").strip()
+        url2 = f"https://wttr.in/{loc}?format=%C+%t+%h+%w+%p"
+        req2 = urllib.request.Request(url2, headers={"User-Agent": "curl/7.0"})
+        with urllib.request.urlopen(req2, timeout=10) as resp2:
+            detail = resp2.read().decode("utf-8").strip()
+        return f"Weather for {location}:\n{weather}\nDetails: {detail}"
+    except Exception as e:
+        return f"Weather fetch failed: {e}"
+
+
+def get_time(timezone: str = "America/New_York") -> str:
+    """Get current time in the given timezone."""
+    from datetime import datetime
+    import zoneinfo
+    try:
+        tz = zoneinfo.ZoneInfo(timezone)
+        now = datetime.now(tz)
+        return f"Current time: {now.strftime('%I:%M %p %Z, %A %B %d, %Y')}"
+    except Exception:
+        from datetime import datetime, timezone as _tz
+        return f"Current time (UTC): {datetime.now(_tz.utc).strftime('%I:%M %p UTC')}"
+
+
+def web_search_simple(query: str) -> str:
+    """Simple DuckDuckGo instant-answer lookup. No API key needed."""
+    import urllib.request, urllib.parse, json as _json
+    try:
+        q = urllib.parse.quote(query)
+        url = f"https://api.duckduckgo.com/?q={q}&format=json&no_html=1&skip_disambig=1"
+        req = urllib.request.Request(url, headers={"User-Agent": "curl/7.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = _json.loads(resp.read().decode("utf-8"))
+        result = data.get("AbstractText", "") or data.get("Answer", "")
+        if not result and data.get("RelatedTopics"):
+            result = data["RelatedTopics"][0].get("Text", "")
+        return result if result else f"No instant answer found for: {query}"
+    except Exception as e:
+        return f"Search failed: {e}"
+
+
 def web_summarize(content: str, query: str = "") -> str:
     """Summarize content in 3-5 bullets using WEB_SUMMARY_MODEL."""
     if query:
@@ -3149,7 +3198,37 @@ def run_telegram_bot() -> None:
                     "running on his laptop right now."
                 )
 
-            messages.append({"role": "user", "content": text})
+            # Live data injection: weather
+            _weather_kw = [
+                "weather", "temperature", "forecast", "rain", "sunny",
+                "hot", "cold", "humidity", "wind", "outside", "climate",
+            ]
+            _time_kw = ["what time", "current time", "what's the time", "time now"]
+            augmented = text
+            if any(kw in text.lower() for kw in _weather_kw):
+                try:
+                    _location = "Naples, Florida"
+                    import re as _re
+                    _loc_m = _re.search(
+                        r"in ([A-Z][a-zA-Z\s,]+?)(?:\?|$|\.|today|now|right now)",
+                        text
+                    )
+                    if _loc_m:
+                        _location = _loc_m.group(1).strip()
+                    _wdata = get_weather(_location)
+                    augmented = (
+                        f"{text}\n\n[REAL WEATHER DATA — fetched live]:\n{_wdata}\n"
+                        f"[Report this weather to the user naturally. "
+                        f"Do NOT say you cannot get weather.]"
+                    )
+                except Exception:
+                    pass
+            if any(kw in text.lower() for kw in _time_kw):
+                try:
+                    augmented += f"\n\n[REAL TIME DATA]: {get_time('America/New_York')}"
+                except Exception:
+                    pass
+            messages.append({"role": "user", "content": augmented})
             response = ollama_chat(messages, temperature=0.4, model=routed_model)
         except Exception as e:
             response = f"❌ Ollama error: {e}"

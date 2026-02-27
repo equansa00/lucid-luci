@@ -52,6 +52,8 @@ from luci import (  # noqa: E402
     load_persona_with_memory,
     tts_to_file,
     stt_transcribe,
+    get_weather,
+    get_time,
 )
 
 # ---------------------------------------------------------------------------
@@ -2157,6 +2159,39 @@ async def chat_endpoint(request: Request) -> JSONResponse:
                 )
             except Exception:
                 pass  # fall through to normal LLM response
+
+        # Weather injection
+        _weather_kw = [
+            "weather", "temperature", "forecast", "rain", "sunny",
+            "hot", "cold", "humidity", "wind", "outside", "climate",
+        ]
+        if any(kw in text.lower() for kw in _weather_kw):
+            try:
+                import re as _re
+                _location = "Naples, Florida"
+                _loc_m = _re.search(
+                    r"in ([A-Z][a-zA-Z\s,]+?)(?:\?|$|\.|today|now|right now)",
+                    text
+                )
+                if _loc_m:
+                    _location = _loc_m.group(1).strip()
+                _wdata = get_weather(_location)
+                injected_text = (
+                    f"{injected_text}\n\n"
+                    f"[REAL WEATHER DATA — fetched live right now]:\n{_wdata}\n"
+                    f"[Report this weather to the user naturally. "
+                    f"Do NOT say you cannot get weather.]"
+                )
+            except Exception:
+                pass
+
+        # Time injection
+        _time_kw = ["what time", "current time", "what's the time", "time now"]
+        if any(kw in text.lower() for kw in _time_kw):
+            try:
+                injected_text += f"\n\n[REAL TIME DATA]: {get_time('America/New_York')}"
+            except Exception:
+                pass
 
         # Use persona + memory.md so LUCI knows actual recorded facts
         persona = load_persona_with_memory()
