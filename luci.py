@@ -829,6 +829,27 @@ def run_subprocess(argv: List[str], cwd: Path) -> Dict[str, Any]:
         }
 
 
+def run_command(cmd: str, timeout: int = 30) -> str:
+    """
+    Execute a shell command and return REAL output.
+    Never simulates or fabricates output.
+    Raises RuntimeError if command fails to execute.
+    """
+    try:
+        result = subprocess.run(
+            cmd, shell=True, capture_output=True,
+            text=True, timeout=timeout
+        )
+        output = result.stdout + result.stderr
+        if not output.strip():
+            return f"[Command ran successfully with no output. Exit code: {result.returncode}]"
+        return output.strip()
+    except subprocess.TimeoutExpired:
+        return f"[Command timed out after {timeout}s]"
+    except Exception as e:
+        raise RuntimeError(f"Shell execution failed: {e}")
+
+
 # -----------------------------
 # Agent loop
 # -----------------------------
