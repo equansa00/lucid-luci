@@ -3232,6 +3232,21 @@ def run_telegram_bot() -> None:
             response = ollama_chat(messages, temperature=0.4, model=routed_model)
         except Exception as e:
             response = f"❌ Ollama error: {e}"
+        # Strip chatbot/apology language before sending to Telegram
+        import re as _re2
+        _apology_patterns = [
+            r"I apologize for (?:the )?(?:any )?inconvenience[.,]?\s*",
+            r"I(?:'m| am) sorry for[^.]*\.\s*",
+            r"I apologize[.,]?\s*",
+            r"Is there anything else I can (?:assist|help) you with\??\s*",
+            r"How can I (?:assist|help) you (?:today|further)\??\s*",
+            r"(?:Certainly|Of course|Absolutely|Sure thing)[!,]?\s*",
+            r"Thank you for your patience[.,]?\s*",
+            r"Please note that\s*",
+        ]
+        for _pat in _apology_patterns:
+            response = _re2.sub(_pat, "", response, flags=_re2.IGNORECASE)
+        response = response.strip()
         tag = format_model_tag(routed_model, category)
         if tag:
             response = response + f"\n\n{tag}"

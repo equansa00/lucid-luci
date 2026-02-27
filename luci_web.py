@@ -2269,6 +2269,22 @@ async def chat_endpoint(request: Request) -> JSONResponse:
             fname = Path(full_path).name
             response_text += f"\n\n📄 [View full output](/output/{fname})"
 
+        # Strip chatbot/apology language before sending
+        import re as _re
+        _apology_patterns = [
+            r"I apologize for (?:the )?(?:any )?inconvenience[.,]?\s*",
+            r"I(?:'m| am) sorry for[^.]*\.\s*",
+            r"I apologize[.,]?\s*",
+            r"Is there anything else I can (?:assist|help) you with\??\s*",
+            r"How can I (?:assist|help) you (?:today|further)\??\s*",
+            r"(?:Certainly|Of course|Absolutely|Sure thing)[!,]?\s*",
+            r"Thank you for your patience[.,]?\s*",
+            r"Please note that\s*",
+        ]
+        for _pat in _apology_patterns:
+            response_text = _re.sub(_pat, "", response_text, flags=_re.IGNORECASE)
+        response_text = response_text.strip()
+
         tag = format_model_tag(model_name, category)
 
         ts = int(time.time())
