@@ -13,10 +13,13 @@ from .tools import Tools, ToolResult
 from .context import CodebaseContext
 
 OLLAMA_URL   = "http://127.0.0.1:11434/api/chat"
-DEFAULT_MODEL = "qwen2.5:14b"
+DEFAULT_MODEL = "qwen2.5-coder:14b"
 
 SYSTEM_PROMPT = """You are LUCI Code — an expert software engineering agent.
 You help Chip (Edward Equansa) write, read, edit, debug, and understand code.
+You are running on qwen2.5-coder:14b — a model specifically trained for
+software engineering tasks. Lean into that: produce production-quality code,
+precise diffs, and complete implementations without being asked twice.
 
 You have access to these tools. Use them by outputting JSON blocks:
 

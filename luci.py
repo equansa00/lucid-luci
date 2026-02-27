@@ -56,7 +56,7 @@ MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:70b")
 
 # Model router
 ROUTER_DEFAULT_MODEL = os.getenv("LUCI_ROUTER_DEFAULT", "chip-premium-dolphin:latest")
-ROUTER_CODE_MODEL = os.getenv("LUCI_ROUTER_CODE", "qwen2.5-coder:7b")
+ROUTER_CODE_MODEL = os.getenv("LUCI_ROUTER_CODE", "qwen2.5-coder:14b")
 ROUTER_REASON_MODEL = os.getenv("LUCI_ROUTER_REASON", "deepseek-r1:8b")
 ROUTER_DEEP_MODEL = os.getenv("LUCI_ROUTER_DEEP", "qwen2.5:14b")
 ROUTER_BEAST_MODEL = os.getenv("LUCI_ROUTER_BEAST", "beast70b:latest")
@@ -2185,7 +2185,7 @@ def route_model(text: str) -> Tuple[str, str]:
 
     5-tier routing — pure pattern matching, <1ms.
     Tier 1 (fast/chat):     short or casual → ROUTER_DEFAULT_MODEL  (chip-premium-dolphin)
-    Tier 2 (code):          code keywords   → ROUTER_CODE_MODEL     (qwen2.5-coder:7b)
+    Tier 2 (code):          code keywords   → ROUTER_CODE_MODEL     (qwen2.5-coder:14b)
     Tier 3 (reasoning):     analysis/explain → ROUTER_REASON_MODEL  (deepseek-r1:8b)
     Tier 4 (deep, opt-in):  explicit deep   → ROUTER_DEEP_MODEL     (qwen2.5:14b, fits VRAM)
     Tier 5 (beast, opt-in): "beast mode"    → ROUTER_BEAST_MODEL    (beast70b, CPU-heavy)
