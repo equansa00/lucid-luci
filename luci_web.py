@@ -680,6 +680,7 @@ _HTML = r"""<!DOCTYPE html>
     max-width: 72%; padding: 11px 15px;
     border-radius: 16px; line-height: 1.6;
     font-size: 14px; white-space: pre-wrap; word-break: break-word;
+    user-select: text; -webkit-user-select: text; cursor: text;
   }
   .msg-row.user .msg-bubble {
     background: rgba(212,175,55,0.14);
