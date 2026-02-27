@@ -48,6 +48,90 @@ def parse_args():
     return p.parse_args()
 
 
+def _run_single_benchmark(model: str) -> dict:
+    """Run one benchmark pass against Ollama. Returns stats dict."""
+    import time, requests as _req, json as _json
+    test_prompt = "Count from 1 to 10 and explain why numbers matter."
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": "You are LUCI. Be concise."},
+            {"role": "user", "content": test_prompt}
+        ],
+        "stream": True,
+        "options": {"temperature": 0.1, "num_ctx": 2048},
+    }
+    t_start = time.perf_counter()
+    t_first = None
+    total_tokens = 0
+    try:
+        resp = _req.post("http://127.0.0.1:11434/api/chat",
+                         json=payload, stream=True, timeout=120)
+        for line in resp.iter_lines():
+            if not line:
+                continue
+            data = _json.loads(line)
+            token = data.get("message", {}).get("content", "")
+            if token:
+                if t_first is None:
+                    t_first = time.perf_counter()
+                total_tokens += 1
+            if data.get("done"):
+                break
+        t_end = time.perf_counter()
+        if total_tokens == 0:
+            return {"ok": False, "error": "No tokens received — model may not be pulled"}
+        ttft = (t_first - t_start) if t_first else 0
+        total = t_end - t_start
+        tps = total_tokens / total if total > 0 else 0
+        return {"ok": True, "ttft": ttft, "total": total, "tokens": total_tokens, "tps": tps}
+    except Exception as ex:
+        return {"ok": False, "error": str(ex)}
+
+
+def _print_benchmark(console, model: str, stats: dict):
+    """Print benchmark results for one model."""
+    if not stats["ok"]:
+        console.print(f"  [luci.error]✗ {stats['error']}[/]")
+        return
+    ttft, total, tokens, tps = stats["ttft"], stats["total"], stats["tokens"], stats["tps"]
+    if ttft < 1.5:
+        rating = "[luci.success]FAST[/]"
+    elif ttft < 4.0:
+        rating = "[luci.dim]ACCEPTABLE[/]"
+    else:
+        rating = "[luci.error]SLOW[/]"
+    console.print(f"  ⚡ First token:  [bold]{ttft:.2f}s[/]  "
+                  f"⏱ Total: [bold]{total:.2f}s[/]  "
+                  f"🚀 [bold]{tps:.1f}[/] tok/s  📊 {rating}")
+
+
+def run_benchmark(console, models: list[str]):
+    """Run benchmark against one or more models and display comparison."""
+    from rich.panel import Panel
+    from rich import box
+    console.print("[luci.dim]Benchmarking — measuring first token latency + throughput...[/]\n")
+    results = {}
+    for model in models:
+        console.print(f"  Testing [luci.tool]{model}[/]...", end=" ")
+        import sys; sys.stdout.flush()
+        stats = _run_single_benchmark(model)
+        results[model] = stats
+        console.print("done" if stats["ok"] else "FAILED")
+
+    console.print()
+    console.print("[luci.gold]─── Benchmark Results ───────────────────────[/]")
+    for model, stats in results.items():
+        console.print(f"  [bold]{model}[/]")
+        _print_benchmark(console, model, stats)
+    if len(results) == 2:
+        vals = list(results.values())
+        if vals[0]["ok"] and vals[1]["ok"]:
+            ratio = vals[1]["ttft"] / vals[0]["ttft"] if vals[0]["ttft"] > 0 else 0
+            console.print(f"\n  [luci.dim]Speed ratio: {ratio:.1f}x difference in first-token latency[/]")
+    console.print()
+
+
 def get_input(session=None, prompt_str: str = "❯ ") -> str:
     if session and HAS_PROMPT_TOOLKIT:
         try:
@@ -105,58 +189,32 @@ def main():
     agent = make_agent()
     print_header(str(workspace), current_model)
 
+    # VRAM check
+    try:
+        import subprocess as _sp
+        vram = _sp.run(
+            "nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits",
+            shell=True, capture_output=True, text=True
+        ).stdout.strip()
+        free_mb = int(vram) if vram.isdigit() else 0
+        if free_mb and free_mb < 6000:
+            console.print(
+                f"[luci.error]⚠ Low VRAM: {free_mb}MB free. "
+                f"Large models will use CPU. Using qwen2.5:14b.[/]"
+            )
+        elif free_mb:
+            console.print(f"[luci.dim]GPU: {free_mb}MB VRAM free[/]")
+    except Exception:
+        pass
+
     # Non-interactive mode
     if args.command:
         cmd_str = args.command.strip()
         if cmd_str == "/benchmark":
-            # Run benchmark directly without going through agent chat
-            import time, requests as _req, json as _json
-            console.print("[luci.dim]Running benchmark — measuring first token + total time...[/]")
-            test_prompt = "Count from 1 to 10 and explain why numbers matter."
-            payload = {
-                "model": current_model,
-                "messages": [
-                    {"role": "system", "content": "You are LUCI. Be concise."},
-                    {"role": "user", "content": test_prompt}
-                ],
-                "stream": True,
-                "options": {"temperature": 0.1, "num_ctx": 2048},
-            }
-            t_start = time.perf_counter()
-            t_first = None
-            total_tokens = 0
-            try:
-                resp = _req.post("http://127.0.0.1:11434/api/chat",
-                                 json=payload, stream=True, timeout=120)
-                for line in resp.iter_lines():
-                    if not line:
-                        continue
-                    data = _json.loads(line)
-                    token = data.get("message", {}).get("content", "")
-                    if token:
-                        if t_first is None:
-                            t_first = time.perf_counter()
-                        total_tokens += 1
-                    if data.get("done"):
-                        break
-                t_end = time.perf_counter()
-                ttft = (t_first - t_start) if t_first else 0
-                total = t_end - t_start
-                tps = total_tokens / total if total > 0 else 0
-                console.print(f"\n[luci.gold]Benchmark Results — {current_model}[/]")
-                console.print(f"  ⚡ First token:     [bold]{ttft:.2f}s[/]")
-                console.print(f"  ⏱  Total time:      [bold]{total:.2f}s[/]")
-                console.print(f"  🔢 Tokens:          [bold]{total_tokens}[/]")
-                console.print(f"  🚀 Tokens/sec:      [bold]{tps:.1f}[/]")
-                if ttft < 1.5:
-                    rating = "[luci.success]FAST — feels instant[/]"
-                elif ttft < 4.0:
-                    rating = "[luci.dim]ACCEPTABLE — slight delay[/]"
-                else:
-                    rating = "[luci.error]SLOW — consider smaller model[/]"
-                console.print(f"  📊 Rating:          {rating}\n")
-            except Exception as ex:
-                console.print(f"[luci.error]Benchmark failed: {ex}[/]")
+            bench_models = ["chip-premium-dolphin:latest", current_model] \
+                if current_model != "chip-premium-dolphin:latest" \
+                else ["chip-premium-dolphin:latest"]
+            run_benchmark(console, bench_models)
             return
         response = agent.chat(cmd_str)
         print_response(response)
@@ -254,66 +312,10 @@ def main():
                     console.print("[luci.error]Usage: /run <command>[/]")
 
             elif cmd == "/benchmark":
-                import time
-                import requests as _req
-                import json as _json
-                console.print("[luci.dim]Running benchmark — measuring first token + total time...[/]")
-
-                test_prompt = "Count from 1 to 10 and explain why numbers matter."
-                payload = {
-                    "model": current_model,
-                    "messages": [
-                        {"role": "system", "content": "You are LUCI. Be concise."},
-                        {"role": "user", "content": test_prompt}
-                    ],
-                    "stream": True,
-                    "options": {"temperature": 0.1, "num_ctx": 2048},
-                }
-
-                t_start = time.perf_counter()
-                t_first = None
-                total_tokens = 0
-                output = ""
-
-                try:
-                    resp = _req.post(
-                        "http://127.0.0.1:11434/api/chat",
-                        json=payload, stream=True, timeout=120
-                    )
-                    for line in resp.iter_lines():
-                        if not line:
-                            continue
-                        data = _json.loads(line)
-                        token = data.get("message", {}).get("content", "")
-                        if token:
-                            if t_first is None:
-                                t_first = time.perf_counter()
-                            output += token
-                            total_tokens += 1
-                        if data.get("done"):
-                            break
-
-                    t_end = time.perf_counter()
-                    ttft = (t_first - t_start) if t_first else 0
-                    total = t_end - t_start
-                    tps = total_tokens / total if total > 0 else 0
-
-                    console.print(f"\n[luci.gold]Benchmark Results — {current_model}[/]")
-                    console.print(f"  ⚡ First token:     [bold]{ttft:.2f}s[/]")
-                    console.print(f"  ⏱  Total time:      [bold]{total:.2f}s[/]")
-                    console.print(f"  🔢 Tokens:          [bold]{total_tokens}[/]")
-                    console.print(f"  🚀 Tokens/sec:      [bold]{tps:.1f}[/]")
-
-                    if ttft < 1.5:
-                        rating = "[luci.success]FAST — feels instant[/]"
-                    elif ttft < 4.0:
-                        rating = "[luci.dim]ACCEPTABLE — slight delay[/]"
-                    else:
-                        rating = "[luci.error]SLOW — consider smaller model[/]"
-                    console.print(f"  📊 Rating:          {rating}\n")
-
-                except Exception as ex:
-                    console.print(f"[luci.error]Benchmark failed: {ex}[/]")
+                bench_models = ["chip-premium-dolphin:latest", current_model] \
+                    if current_model != "chip-premium-dolphin:latest" \
+                    else ["chip-premium-dolphin:latest"]
+                run_benchmark(console, bench_models)
 
             else:
                 console.print(f"[luci.error]Unknown command: {cmd}[/]")

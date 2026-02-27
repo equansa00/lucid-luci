@@ -58,7 +58,8 @@ MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:70b")
 ROUTER_DEFAULT_MODEL = os.getenv("LUCI_ROUTER_DEFAULT", "chip-premium-dolphin:latest")
 ROUTER_CODE_MODEL = os.getenv("LUCI_ROUTER_CODE", "qwen2.5-coder:7b")
 ROUTER_REASON_MODEL = os.getenv("LUCI_ROUTER_REASON", "deepseek-r1:8b")
-ROUTER_DEEP_MODEL = os.getenv("LUCI_ROUTER_DEEP", "beast70b:latest")
+ROUTER_DEEP_MODEL = os.getenv("LUCI_ROUTER_DEEP", "qwen2.5:14b")
+ROUTER_BEAST_MODEL = os.getenv("LUCI_ROUTER_BEAST", "beast70b:latest")
 ROUTER_AGENT_MODEL = os.getenv("LUCI_ROUTER_AGENT", "llama3.1:70b")
 ROUTER_ANNOUNCE = os.getenv("LUCI_ROUTER_ANNOUNCE", "nondefault")
 
@@ -2157,11 +2158,16 @@ DEEP_KEYWORDS = {
     "enterprise", "end to end", "end-to-end",
 }
 
-# Tier 4 opt-in triggers — beast70b only when explicitly requested
+# Beast opt-in triggers — beast70b ONLY when explicitly named
+# Everything else caps at qwen2.5:14b (fits in 8GB VRAM)
+BEAST_OPTIN_KEYWORDS = {
+    "beast mode", "use beast", "beast70b",
+}
+
+# Tier 4 (qwen2.5:14b) triggers — heavy but VRAM-safe
 DEEP_OPTIN_KEYWORDS = {
     "think deeply", "use your full power", "complex analysis",
-    "beast mode", "use beast", "full analysis", "deep dive",
-    "exhaustive", "no shortcuts",
+    "full analysis", "deep dive", "exhaustive", "no shortcuts",
 }
 
 # Tier 1 fast-path: casual / trivial — always use default model
@@ -2177,19 +2183,26 @@ FAST_KEYWORDS = {
 def route_model(text: str) -> Tuple[str, str]:
     """Classify text and return (model_name, category).
 
-    4-tier routing — pure pattern matching, <1ms.
-    Tier 1 (fast/chat):     short or casual → ROUTER_DEFAULT_MODEL
-    Tier 2 (code):          code keywords   → ROUTER_CODE_MODEL
-    Tier 3 (reasoning):     analysis/explain → ROUTER_REASON_MODEL
-    Tier 4 (deep, opt-in):  explicit request → ROUTER_DEEP_MODEL
+    5-tier routing — pure pattern matching, <1ms.
+    Tier 1 (fast/chat):     short or casual → ROUTER_DEFAULT_MODEL  (chip-premium-dolphin)
+    Tier 2 (code):          code keywords   → ROUTER_CODE_MODEL     (qwen2.5-coder:7b)
+    Tier 3 (reasoning):     analysis/explain → ROUTER_REASON_MODEL  (deepseek-r1:8b)
+    Tier 4 (deep, opt-in):  explicit deep   → ROUTER_DEEP_MODEL     (qwen2.5:14b, fits VRAM)
+    Tier 5 (beast, opt-in): "beast mode"    → ROUTER_BEAST_MODEL    (beast70b, CPU-heavy)
     """
     lower = text.lower()
     stripped = text.strip()
 
-    # Tier 4 — beast70b only when explicitly requested OR very long + multi-system
+    # Tier 5 — beast70b ONLY when user explicitly asks by name
+    if any(kw in lower for kw in BEAST_OPTIN_KEYWORDS):
+        tier = 5
+        print(f"[router] '{stripped[:40]}' → Tier {tier} ({ROUTER_BEAST_MODEL})", flush=True)
+        return (ROUTER_BEAST_MODEL, "beast")
+
+    # Tier 4 — qwen2.5:14b for explicitly deep requests or very long messages
     if any(kw in lower for kw in DEEP_OPTIN_KEYWORDS):
         tier = 4
-        print(f"[router] '{stripped[:40]}...' → Tier {tier} ({ROUTER_DEEP_MODEL})", flush=True)
+        print(f"[router] '{stripped[:40]}' → Tier {tier} ({ROUTER_DEEP_MODEL})", flush=True)
         return (ROUTER_DEEP_MODEL, "deep")
     if len(text) >= 500 and any(kw in lower for kw in DEEP_KEYWORDS):
         tier = 4
