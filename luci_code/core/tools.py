@@ -219,6 +219,23 @@ class Tools:
         except Exception as ex:
             return self._record(ToolResult("ls", False, "", str(ex)))
 
+    # ── CHANGE DIR ────────────────────────────────────────────────────────
+    def change_dir(self, path: str) -> ToolResult:
+        """Change the working directory."""
+        p = Path(path).expanduser().resolve()
+        if not p.exists():
+            return self._record(ToolResult(
+                "change_dir", False, "", f"Directory not found: {path}"
+            ))
+        if not p.is_dir():
+            return self._record(ToolResult(
+                "change_dir", False, "", f"Not a directory: {path}"
+            ))
+        self.workspace = p
+        return self._record(ToolResult(
+            "change_dir", True, f"Working directory: {p}"
+        ))
+
     # ── INTERNAL ──────────────────────────────────────────────────────────
     def _resolve(self, path: str) -> Path:
         p = Path(path)

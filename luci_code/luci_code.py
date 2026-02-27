@@ -177,11 +177,30 @@ def main():
 
     while True:
         try:
-            user_input = get_input(session, "❯ ").strip()
+            cwd_display = str(agent.tools.workspace).replace(str(Path.home()), "~")
+            user_input = get_input(session, f"{cwd_display} ❯ ").strip()
         except KeyboardInterrupt:
             continue
 
         if not user_input:
+            continue
+
+        # Handle cd as a special built-in
+        if user_input.startswith("cd ") or user_input == "cd":
+            new_path = user_input[3:].strip() if user_input.startswith("cd ") else str(Path.home())
+            new_path = str(Path(new_path).expanduser().resolve())
+            result = agent.tools.change_dir(new_path)
+            if result.success:
+                workspace = Path(new_path)
+                agent.workspace = workspace
+                agent.tools.workspace = workspace
+                from core.context import CodebaseContext
+                agent.context = CodebaseContext(workspace)
+                agent._setup_system()
+                os.chdir(workspace)
+                console.print(f"[luci.dim]→ {new_path}[/]")
+            else:
+                print_error(result.error)
             continue
 
         # Built-in commands

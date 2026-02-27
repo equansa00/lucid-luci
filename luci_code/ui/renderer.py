@@ -48,6 +48,7 @@ def print_tool_call(tool_name: str, args: dict):
         "git_push":    "🚀",
         "tree":        "🌲",
         "ls":          "📁",
+        "change_dir":  "📂",
     }
     icon = icons.get(tool_name, "🔧")
     label = {
@@ -63,6 +64,7 @@ def print_tool_call(tool_name: str, args: dict):
         "git_push":    "Git push",
         "tree":        f"Tree {args.get('path', '.')}",
         "ls":          f"ls {args.get('path', '.')}",
+        "change_dir":  f"cd {args.get('path', '.')}",
     }.get(tool_name, f"{tool_name} {args}")
     console.print(f"  {icon} [luci.tool]{label}[/]")
 
@@ -119,6 +121,7 @@ def print_help():
         "  [bold]/log[/]           Show git log\n"
         "  [bold]/verbose[/]       Toggle verbose tool output\n"
         "  [bold]/benchmark[/]     Measure model speed (TTFT + tokens/sec)\n"
+        "  [bold]cd <path>[/]      Change project directory\n"
         "  [bold]/exit[/]          Exit\n\n"
         "Just type your request naturally:\n"
         "  [luci.dim]add error handling to auth.py[/]\n"
