@@ -55,7 +55,7 @@ OLLAMA_CHAT_URL = os.getenv("OLLAMA_CHAT_URL", "http://127.0.0.1:11434/api/chat"
 MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:70b")
 
 # Model router
-ROUTER_DEFAULT_MODEL = os.getenv("LUCI_ROUTER_DEFAULT", "llama3.1:8b")
+ROUTER_DEFAULT_MODEL = os.getenv("LUCI_ROUTER_DEFAULT", "chip-premium-dolphin:latest")
 ROUTER_CODE_MODEL = os.getenv("LUCI_ROUTER_CODE", "qwen2.5-coder:7b")
 ROUTER_REASON_MODEL = os.getenv("LUCI_ROUTER_REASON", "deepseek-r1:8b")
 ROUTER_DEEP_MODEL = os.getenv("LUCI_ROUTER_DEEP", "beast70b:latest")
@@ -3054,12 +3054,16 @@ def run_telegram_bot() -> None:
                             f"- {m['summary']}" for m in active[:30] if m.get("summary")
                         )
                         mem_block = (
+                            "YOUR IDENTITY: You are LUCI (pronounced Lucy). "
+                            "You are the AI agent Chip built. Speak in first person always. "
+                            "When recalling conversations, say 'we discussed' or 'I remember' — "
+                            "never 'Chip's AI agent discussed' or 'LUCI did'.\n\n"
                             "REAL MEMORY (facts you actually know about Chip — "
                             "do NOT invent anything beyond this list):\n"
                             + mem_lines
                             + "\n\nIf asked about past conversations not recorded here, "
-                            "say: \"I don't have a record of that specific conversation.\" "
-                            "Never fabricate conversation history."
+                            "say honestly: \"I don't have that in my memory.\" "
+                            "Never fabricate history."
                         )
                         if messages and messages[0]["role"] == "system":
                             messages[0]["content"] += "\n\n" + mem_block
@@ -3067,6 +3071,15 @@ def run_telegram_bot() -> None:
                             messages.insert(0, {"role": "system", "content": mem_block})
             except Exception:
                 pass
+
+            # Final identity anchor — closest to user turn so model stays in character
+            if messages and messages[0]["role"] == "system":
+                messages[0]["content"] += (
+                    "\n\n---\nYou are LUCI. Respond entirely in first person as LUCI. "
+                    "Never say 'I am an AI language model' or describe yourself generically. "
+                    "You are not a generic AI — you are LUCI, Chip's personal agent, "
+                    "running on his laptop right now."
+                )
 
             messages.append({"role": "user", "content": text})
             response = ollama_chat(messages, temperature=0.4, model=routed_model)

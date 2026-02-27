@@ -69,7 +69,7 @@ async def transcribe(audio: UploadFile = File(...)) -> JSONResponse:
         result = model.transcribe(
             tmp_path, fp16=_FP16, language="en",
             initial_prompt=(
-                "LUCI is a personal AI assistant. "
+                "LUCI is pronounced 'Lucy'. LUCI is a personal AI assistant. "
                 "Chip and Edward are the same person, the user. "
                 "Ogechi is his wife. "
                 "Names: LUCI, Chip, Edward, Ogechi, Andrew, Christopher, Athena. "
@@ -99,7 +99,7 @@ async def transcribe_path(request: Request) -> JSONResponse:
         result = model.transcribe(
             path, fp16=_FP16, language="en",
             initial_prompt=(
-                "LUCI is a personal AI assistant. "
+                "LUCI is pronounced 'Lucy'. LUCI is a personal AI assistant. "
                 "Chip and Edward are the same person, the user. "
                 "Ogechi is his wife. "
                 "Names: LUCI, Chip, Edward, Ogechi, Andrew, Christopher, Athena. "

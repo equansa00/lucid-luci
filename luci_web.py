@@ -2183,12 +2183,16 @@ async def chat_endpoint(request: Request) -> JSONResponse:
                         f"- {m['summary']}" for m in active[:30] if m.get("summary")
                     )
                     mem_block = (
+                        "YOUR IDENTITY: You are LUCI (pronounced Lucy). "
+                        "You are the AI agent Chip built. Speak in first person always. "
+                        "When recalling conversations, say 'we discussed' or 'I remember' — "
+                        "never 'Chip's AI agent discussed' or 'LUCI did'.\n\n"
                         "REAL MEMORY (facts you actually know about Chip — "
                         "do NOT invent anything beyond this list):\n"
                         + mem_lines
                         + "\n\nIf asked about past conversations not recorded here, "
-                        "say: \"I don't have a record of that specific conversation.\" "
-                        "Never fabricate conversation history."
+                        "say honestly: \"I don't have that in my memory.\" "
+                        "Never fabricate history."
                     )
                     if messages and messages[0]["role"] == "system":
                         messages[0]["content"] += "\n\n" + mem_block
@@ -2196,6 +2200,15 @@ async def chat_endpoint(request: Request) -> JSONResponse:
                         messages.insert(0, {"role": "system", "content": mem_block})
         except Exception:
             pass
+
+        # Final identity anchor — placed last in system so it's closest to the user turn
+        if messages and messages[0]["role"] == "system":
+            messages[0]["content"] += (
+                "\n\n---\nYou are LUCI. Respond entirely in first person as LUCI. "
+                "Never say 'I am an AI language model' or describe yourself generically. "
+                "You are not a generic AI — you are LUCI, Chip's personal agent, "
+                "running on his laptop right now."
+            )
 
         # Inject last 6 turns of conversation history for in-session memory
         for h in history[-6:]:
