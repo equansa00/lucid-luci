@@ -1782,10 +1782,13 @@ async function sendChatMessage(text) {
   setChatFaceState('thinking');
 
   try {
+    const convo = getActiveConvo();
+    // Pass last 6 messages before the current one as conversation history
+    const history = convo ? convo.messages.slice(0, -1).slice(-6) : [];
     const resp = await fetch('/chat', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({text, voice: selectedVoice})
+      body: JSON.stringify({text, voice: selectedVoice, history})
     });
     const data = await resp.json();
     document.getElementById(typingId)?.remove();
@@ -2122,6 +2125,7 @@ async def chat_endpoint(request: Request) -> JSONResponse:
     text = (body.get("text") or "").strip()
     system_override = body.get("system", "")
     voice = body.get("voice") or DEFAULT_VOICE
+    history = body.get("history", [])  # list of {role, text} from client
     if not text:
         return JSONResponse({"error": "no text"}, status_code=400)
 
@@ -2158,6 +2162,14 @@ async def chat_endpoint(request: Request) -> JSONResponse:
             messages.append({"role": "system", "content": system_override})
         elif persona:
             messages.append({"role": "system", "content": persona})
+
+        # Inject last 6 turns of conversation history for in-session memory
+        for h in history[-6:]:
+            role = "user" if h.get("role") == "user" else "assistant"
+            content = (h.get("text") or "").strip()
+            if content:
+                messages.append({"role": role, "content": content})
+
         messages.append({"role": "user", "content": injected_text})
 
         await broadcast_state("thinking")

@@ -2136,14 +2136,13 @@ CODE_KEYWORDS = {
 }
 
 REASON_KEYWORDS = {
-    "why", "why does", "why is", "why are", "why would",
-    "explain", "how does", "how do", "how is",
-    "analyze", "compare", "versus", "vs ",
-    "difference", "difference between", "contrast",
-    "pros and cons", "should i", "is it better", "trade-off",
-    "step by step", "walk me through", "reason", "logic", "prove",
-    "calculate", "math", "formula", "solve", "think through",
-    "what is the", "what are the",
+    # Explicit reasoning/math/logic — NOT casual conversation
+    "prove", "proof", "calculate", "calculation",
+    "step by step", "walk me through", "think through",
+    "debug", "analyze this code", "trace through",
+    "logic", "logical", "deduce", "derive", "infer",
+    "algorithm", "math", "equation", "formula", "solve",
+    "reasoning", "step-by-step",
 }
 
 DEEP_KEYWORDS = {
@@ -2177,9 +2176,9 @@ def route_model(text: str) -> Tuple[str, str]:
     if any(kw in lower for kw in _capability_kw):
         return (ROUTER_DEFAULT_MODEL, "assistant")
 
-    # Step 2 — reasoning: 1+ keyword OR ends with "?"
+    # Step 2 — reasoning: explicit math/logic keywords only (no "ends with ?" catch-all)
     reason_hits = sum(1 for kw in REASON_KEYWORDS if kw in lower)
-    if reason_hits >= 1 or lower.rstrip().endswith("?"):
+    if reason_hits >= 1:
         return (ROUTER_REASON_MODEL, "reasoning")
 
     # Step 3 — deep: any keyword AND message >= 40 chars
