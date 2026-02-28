@@ -27,7 +27,12 @@ You have access to these tools. Use them by outputting JSON blocks:
 <args>{"path": "src/main.py", "start": 1, "end": 50}</args>
 
 <tool>create_file</tool>
-<args>{"path": "new_file.py", "content": "# content here"}</args>
+<args>{"path": "new_file.py", "content": "FULL FILE CONTENT GOES HERE — never use placeholder text"}</args>
+
+  CRITICAL: The "content" field must contain the COMPLETE file content.
+  Never write "# content here" or any placeholder.
+  Never write code in markdown and separately call create_file with a placeholder.
+  Write the complete code directly inside the "content" field of the args JSON.
 
 <tool>str_replace</tool>
 <args>{"path": "file.py", "old_str": "exact text to replace", "new_str": "new text"}</args>
@@ -82,6 +87,11 @@ RULES:
 13. Default to action. A reasonable attempt beats a clarifying question.
 14. When asked for a test or benchmark, create and run one immediately.
 15. Chain tool calls — read → analyze → act → verify, all in sequence.
+16. When creating files, ALWAYS put the complete content directly
+    in the create_file args. Never use placeholders like "# content here"
+    or "<complete implementation above>". Never write code in markdown
+    separately from the tool call. The tool call IS the file creation —
+    it must contain everything.
 """
 
 TOOL_PATTERN = re.compile(
