@@ -56,8 +56,8 @@ MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:70b")
 
 # Model router
 ROUTER_DEFAULT_MODEL = os.getenv("LUCI_ROUTER_DEFAULT", "luci-core:latest")
-ROUTER_CODE_MODEL    = os.getenv("LUCI_ROUTER_CODE",    "chip-coder:latest")
-ROUTER_REASON_MODEL  = os.getenv("LUCI_ROUTER_REASON",  "luci-reason:latest")
+ROUTER_CODE_MODEL    = os.getenv("LUCI_ROUTER_CODE",    "luci-coder:latest")
+ROUTER_REASON_MODEL  = os.getenv("LUCI_ROUTER_REASON",  "llama3.1:8b")
 ROUTER_DEEP_MODEL    = os.getenv("LUCI_ROUTER_DEEP",    "chip-assistant:latest")
 ROUTER_BEAST_MODEL   = os.getenv("LUCI_ROUTER_BEAST",   "beast70b:latest")
 ROUTER_AGENT_MODEL = os.getenv("LUCI_ROUTER_AGENT", "llama3.1:70b")
@@ -2237,8 +2237,8 @@ def route_model(text: str) -> Tuple[str, str]:
 
     5-tier routing — pure pattern matching, <1ms.
     Tier 1 (fast/chat):     short or casual → ROUTER_DEFAULT_MODEL  (luci-core:latest)
-    Tier 2 (code):          code keywords   → ROUTER_CODE_MODEL     (chip-coder:latest)
-    Tier 3 (reasoning):     analysis/explain → ROUTER_REASON_MODEL  (luci-reason:latest)
+    Tier 2 (code):          code keywords   → ROUTER_CODE_MODEL     (luci-coder:latest)
+    Tier 3 (reasoning):     analysis/explain → ROUTER_REASON_MODEL  (llama3.1:8b)
     Tier 4 (deep, opt-in):  explicit deep   → ROUTER_DEEP_MODEL     (chip-assistant:latest)
     Tier 5 (beast, opt-in): "beast mode"    → ROUTER_BEAST_MODEL    (beast70b, CPU-heavy)
     """
