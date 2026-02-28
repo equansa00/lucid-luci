@@ -55,11 +55,11 @@ OLLAMA_CHAT_URL = os.getenv("OLLAMA_CHAT_URL", "http://127.0.0.1:11434/api/chat"
 MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:70b")
 
 # Model router
-ROUTER_DEFAULT_MODEL = os.getenv("LUCI_ROUTER_DEFAULT", "chip-premium-dolphin:latest")
-ROUTER_CODE_MODEL = os.getenv("LUCI_ROUTER_CODE", "qwen2.5-coder:14b")
-ROUTER_REASON_MODEL = os.getenv("LUCI_ROUTER_REASON", "deepseek-r1:8b")
-ROUTER_DEEP_MODEL = os.getenv("LUCI_ROUTER_DEEP", "qwen2.5:14b")
-ROUTER_BEAST_MODEL = os.getenv("LUCI_ROUTER_BEAST", "beast70b:latest")
+ROUTER_DEFAULT_MODEL = os.getenv("LUCI_ROUTER_DEFAULT", "luci-core:latest")
+ROUTER_CODE_MODEL    = os.getenv("LUCI_ROUTER_CODE",    "chip-coder:latest")
+ROUTER_REASON_MODEL  = os.getenv("LUCI_ROUTER_REASON",  "luci-reason:latest")
+ROUTER_DEEP_MODEL    = os.getenv("LUCI_ROUTER_DEEP",    "chip-assistant:latest")
+ROUTER_BEAST_MODEL   = os.getenv("LUCI_ROUTER_BEAST",   "beast70b:latest")
 ROUTER_AGENT_MODEL = os.getenv("LUCI_ROUTER_AGENT", "llama3.1:70b")
 ROUTER_ANNOUNCE = os.getenv("LUCI_ROUTER_ANNOUNCE", "nondefault")
 
@@ -329,7 +329,10 @@ def ollama_chat(
         "model": model if model is not None else MODEL,
         "messages": messages,
         "stream": False,
-        "options": {"temperature": temperature},
+        "options": {
+            "temperature": temperature,
+            "num_predict": int(os.getenv("LUCI_MAX_TOKENS", "2048")),
+        },
     }
     r = requests.post(OLLAMA_CHAT_URL, json=payload, timeout=OLLAMA_TIMEOUT_SEC)
     r.raise_for_status()
@@ -2233,10 +2236,10 @@ def route_model(text: str) -> Tuple[str, str]:
     """Classify text and return (model_name, category).
 
     5-tier routing — pure pattern matching, <1ms.
-    Tier 1 (fast/chat):     short or casual → ROUTER_DEFAULT_MODEL  (chip-premium-dolphin)
-    Tier 2 (code):          code keywords   → ROUTER_CODE_MODEL     (qwen2.5-coder:14b)
-    Tier 3 (reasoning):     analysis/explain → ROUTER_REASON_MODEL  (deepseek-r1:8b)
-    Tier 4 (deep, opt-in):  explicit deep   → ROUTER_DEEP_MODEL     (qwen2.5:14b, fits VRAM)
+    Tier 1 (fast/chat):     short or casual → ROUTER_DEFAULT_MODEL  (luci-core:latest)
+    Tier 2 (code):          code keywords   → ROUTER_CODE_MODEL     (chip-coder:latest)
+    Tier 3 (reasoning):     analysis/explain → ROUTER_REASON_MODEL  (luci-reason:latest)
+    Tier 4 (deep, opt-in):  explicit deep   → ROUTER_DEEP_MODEL     (chip-assistant:latest)
     Tier 5 (beast, opt-in): "beast mode"    → ROUTER_BEAST_MODEL    (beast70b, CPU-heavy)
     """
     lower = text.lower()

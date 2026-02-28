@@ -13,7 +13,7 @@ from .tools import Tools, ToolResult
 from .context import CodebaseContext
 
 OLLAMA_URL   = "http://127.0.0.1:11434/api/chat"
-DEFAULT_MODEL = "qwen2.5-coder:14b"
+DEFAULT_MODEL = "chip-coder:latest"
 
 SYSTEM_PROMPT = """You are LUCI Code — an expert software engineering agent.
 You help Chip (Edward Equansa) write, read, edit, debug, and understand code.
