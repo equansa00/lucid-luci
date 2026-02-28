@@ -57,6 +57,27 @@ from luci import (  # noqa: E402
 )
 
 # ---------------------------------------------------------------------------
+# LUCI v2 — sandbox, search, perceive, builder
+# ---------------------------------------------------------------------------
+try:
+    from luci_sandbox import safe_path, SecurityError
+    from luci_search import search_and_summarize, should_search
+    from luci_perceive import perceive_file, perceive_url, summarize_perception
+    from luci_builder import start_build, get_build_status
+    _LUCI_V2 = True
+except ImportError as _v2_err:
+    _LUCI_V2 = False
+    print(f"[luci_web] v2 modules not available: {_v2_err}", flush=True)
+
+# Build trigger keywords
+_BUILD_TRIGGERS = [
+    "build me", "build a", "create a feature",
+    "add feature", "implement a", "develop a",
+    "give luci", "luci should", "add capability",
+    "create a system", "write a system", "make a tool",
+]
+
+# ---------------------------------------------------------------------------
 # Persistent Whisper server client
 # ---------------------------------------------------------------------------
 import urllib.request as _ureq
@@ -2193,6 +2214,31 @@ async def chat_endpoint(request: Request) -> JSONResponse:
             except Exception:
                 pass
 
+        # Web search injection (Tavily)
+        if _LUCI_V2 and should_search(text):
+            try:
+                search_ctx = search_and_summarize(text[:150])
+                injected_text = f"{injected_text}\n\n{search_ctx}"
+                print(f"[search] Injected for: {text[:50]}", flush=True)
+            except Exception as _se:
+                print(f"[search] Error: {_se}", flush=True)
+
+        # Build request detection — hand off to autonomous builder
+        if _LUCI_V2 and len(text) > 30 and any(t in text.lower() for t in _BUILD_TRIGGERS):
+            try:
+                build_id = start_build(text)
+                return JSONResponse({
+                    "response": (
+                        f"On it. Building now — ID: <b>{build_id}</b>\n\n"
+                        f"I'll send Telegram updates as I work. "
+                        f"Check progress: /build/status/{build_id}"
+                    ),
+                    "model": "luci-builder",
+                    "build_id": build_id,
+                })
+            except Exception as _be:
+                print(f"[builder] Error: {_be}", flush=True)
+
         # Use persona + memory.md so LUCI knows actual recorded facts
         persona = load_persona_with_memory()
         messages = []
@@ -2315,6 +2361,61 @@ async def chat_endpoint(request: Request) -> JSONResponse:
             "model": "",
             "audio_url": None,
         })
+
+
+@app.get("/build/status/{build_id}")
+async def build_status_endpoint(build_id: str) -> JSONResponse:
+    """Get status of an autonomous build."""
+    if not _LUCI_V2:
+        return JSONResponse({"error": "v2 modules not loaded"}, status_code=503)
+    status = get_build_status(build_id)
+    return JSONResponse(status)
+
+
+@app.post("/build")
+async def trigger_build_endpoint(request: Request) -> JSONResponse:
+    """Trigger an autonomous build via POST."""
+    if not _LUCI_V2:
+        return JSONResponse({"error": "v2 modules not loaded"}, status_code=503)
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON"}, status_code=400)
+    req_text = data.get("request", "").strip()
+    if not req_text:
+        return JSONResponse({"error": "No request"}, status_code=400)
+    build_id = start_build(req_text)
+    return JSONResponse({"build_id": build_id, "status": "started"})
+
+
+@app.post("/upload")
+async def upload_file_endpoint(request: Request) -> JSONResponse:
+    """Accept file upload, analyze with LUCI perceive."""
+    if not _LUCI_V2:
+        return JSONResponse({"error": "v2 modules not loaded"}, status_code=503)
+    from fastapi import UploadFile
+    import shutil
+    try:
+        form = await request.form()
+        upload = form.get("file")
+        if not upload:
+            return JSONResponse({"error": "No file field"}, status_code=400)
+        filename = upload.filename or "upload.bin"
+        uploads_dir = WORKSPACE / "uploads"
+        uploads_dir.mkdir(exist_ok=True)
+        save_path = uploads_dir / filename
+        with open(str(save_path), "wb") as fout:
+            content = await upload.read()
+            fout.write(content)
+        file_type, content_str = perceive_file(str(save_path))
+        summary = summarize_perception(file_type, content_str, filename)
+        return JSONResponse({
+            "filename": filename,
+            "type": file_type,
+            "content": summary[:3000],
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @app.websocket("/ws")

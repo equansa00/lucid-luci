@@ -47,6 +47,19 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import requests
 
+# LUCI v2 — optional; load gracefully so luci.py still works standalone
+try:
+    from luci_search import search_and_summarize as _search_summarize, should_search as _should_search
+    from luci_perceive import perceive_file as _perceive_file, summarize_perception as _summarize_perception
+    _LUCI_V2 = True
+except ImportError:
+    _LUCI_V2 = False
+
+_BUILD_TRIGGERS_TG = [
+    "build me", "build a", "add feature", "implement a",
+    "give you the ability", "create a system", "develop a",
+]
+
 
 # -----------------------------
 # Config
@@ -3200,6 +3213,33 @@ def run_telegram_bot() -> None:
                     "You are not a generic AI — you are LUCI, Chip's personal agent, "
                     "running on his laptop right now."
                 )
+
+            # Build request detection — hand off to autonomous builder
+            if _LUCI_V2 and len(text) > 30 and any(t in text.lower() for t in _BUILD_TRIGGERS_TG):
+                try:
+                    from luci_builder import build_sync
+                    import threading
+                    await update.message.reply_text("🔨 Starting build. I'll update you as I work.")
+
+                    def _bg_build():
+                        result = build_sync(text)
+                        import asyncio as _aio
+                        _aio.run(update.message.reply_text(f"✅ Done!\n{result[:400]}"))
+
+                    threading.Thread(target=_bg_build, daemon=True).start()
+                    return
+                except Exception as _be:
+                    print(f"[luci] Builder error: {_be}", flush=True)
+
+            # Web search injection (Tavily)
+            if _LUCI_V2:
+                try:
+                    if _should_search(text):
+                        _search_ctx = _search_summarize(text[:150])
+                        text = f"{text}\n\n{_search_ctx}"
+                        print(f"[luci] Web search injected for: {text[:40]}", flush=True)
+                except Exception as _se:
+                    print(f"[luci] Search error: {_se}", flush=True)
 
             # Live data injection: weather
             _weather_kw = [
