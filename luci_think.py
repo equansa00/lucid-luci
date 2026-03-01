@@ -71,19 +71,16 @@ CRITICAL RULES:
 10. Never write outside {WORKSPACE}.
 """
 
-CRITIQUE_PROMPT = """Review your own work critically.
-Check:
-1. Does the code actually run without errors?
-2. Does it solve the original request completely?
-3. Are there security issues?
-4. Are there edge cases not handled?
-5. Is the code clean and maintainable?
-6. Are all dependencies installed?
-7. Does it integrate with the existing LUCI codebase?
+CRITIQUE_PROMPT = """Review your own work. You MUST do the following before calling done:
 
-If everything is good, call done.
-If there are issues, fix them now.
-Be honest — don't call done if things are broken."""
+1. run_python the actual code you wrote and show me the real output
+2. If there are ANY errors — fix them completely, then run again
+3. Only call done when run_python shows clean output with no exceptions
+4. If you used any library (psutil, requests, etc) — verify it's installed in the venv first
+5. Prefer stdlib (os, platform, shutil, pathlib) over third-party packages
+6. Check: does the output actually answer the original request?
+
+DO NOT call done based on assumption. Run the code. Show the output. Then done."""
 
 
 def call_ollama(
@@ -174,6 +171,15 @@ def execute_tool(name: str, args: dict,
         if content.strip() in ("# content here", "...", "pass"):
             return "❌ PLACEHOLDER DETECTED — write real content"
         ok, msg = write_file(path, content)
+        if ok and path.endswith('.py'):
+            # Auto syntax check
+            check_ok, check_out = run_command(
+                [VENV_PYTHON, '-m', 'py_compile',
+                 str(WORKSPACE / path)],
+                timeout=10
+            )
+            if not check_ok:
+                return f"❌ Written but SYNTAX ERROR:\n{check_out}\nFix the syntax before proceeding."
         return f"{'✅' if ok else '❌'} {msg}"
 
     elif name == "read_file":
