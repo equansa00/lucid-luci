@@ -6,20 +6,62 @@ PDF, Word, CSV, Excel, images, web pages, code.
 from __future__ import annotations
 import os
 from pathlib import Path
-from typing import Optional
 from luci_sandbox import (
     safe_path, read_file, read_pdf,
     read_docx, read_csv, fetch_url,
-    SecurityError
+    VENV_PYTHON, SecurityError
 )
 
 WORKSPACE = Path("/home/equansa00/beast/workspace").resolve()
+
+
+def describe_image(path: str) -> str:
+    """
+    Describe image using llava vision model via Ollama.
+    Falls back to metadata if model unavailable.
+    Uses VENV_PYTHON for subprocess — not system python.
+    """
+    import base64, json, urllib.request
+    try:
+        with open(path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+
+        payload = json.dumps({
+            "model": "llava:latest",
+            "messages": [{
+                "role": "user",
+                "content": "Describe this image in detail. "
+                           "Include all visible text, objects, layout.",
+                "images": [b64]
+            }],
+            "stream": False,
+            "options": {"num_predict": 512}
+        }).encode()
+
+        req = urllib.request.Request(
+            "http://127.0.0.1:11434/api/chat",
+            data=payload,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read())
+            return data["message"]["content"]
+    except Exception:
+        # Fallback: basic metadata via PIL
+        try:
+            from PIL import Image
+            img = Image.open(path)
+            return (f"Image: {img.format} {img.mode} "
+                    f"{img.width}x{img.height}px")
+        except Exception as e:
+            return f"Image at {path} (could not describe: {e})"
 
 
 def perceive_file(path: str) -> tuple[str, str]:
     """
     Auto-detect file type and extract content.
     Returns (file_type, content).
+    describe_image() is defined above so it's always resolvable.
     """
     try:
         p = safe_path(path)
@@ -65,47 +107,6 @@ def perceive_file(path: str) -> tuple[str, str]:
     else:
         ok, content = read_file(path)
         return "text", content if ok else f"Read error: {content}"
-
-
-def describe_image(path: str) -> str:
-    """
-    Describe image using llava vision model via Ollama.
-    Falls back to metadata if model unavailable.
-    """
-    import base64, json, urllib.request
-    try:
-        with open(path, "rb") as f:
-            b64 = base64.b64encode(f.read()).decode()
-
-        payload = json.dumps({
-            "model": "llava:latest",
-            "messages": [{
-                "role": "user",
-                "content": "Describe this image in detail. "
-                           "Include all visible text, objects, layout.",
-                "images": [b64]
-            }],
-            "stream": False,
-            "options": {"num_predict": 512}
-        }).encode()
-
-        req = urllib.request.Request(
-            "http://127.0.0.1:11434/api/chat",
-            data=payload,
-            headers={"Content-Type": "application/json"}
-        )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read())
-            return data["message"]["content"]
-    except Exception:
-        # Fallback: basic metadata
-        try:
-            from PIL import Image
-            img = Image.open(path)
-            return (f"Image: {img.format} {img.mode} "
-                    f"{img.width}x{img.height}px")
-        except Exception as e:
-            return f"Image at {path} (could not describe: {e})"
 
 
 def perceive_url(url: str) -> tuple[str, str]:

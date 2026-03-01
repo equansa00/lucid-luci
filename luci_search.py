@@ -1,106 +1,116 @@
 #!/usr/bin/env python3
 """
-LUCI Search — Tavily-powered web search for AI agents.
-Gives LUCI ability to find current information autonomously.
+LUCI Search — Tavily web search.
+Uses venv python where needed.
 """
 from __future__ import annotations
 import os
+import sys
+import json
+import subprocess
+import tempfile
 from pathlib import Path
-from typing import Optional
 
-try:
-    from dotenv import dotenv_values
-    _env = dotenv_values(Path(__file__).parent / ".env")
-except ImportError:
-    _env = {}
-
-TAVILY_API_KEY = os.getenv("TAVILY_API_KEY") or _env.get("TAVILY_API_KEY", "")
+WORKSPACE = Path("/home/equansa00/beast/workspace")
+VENV_PYTHON = str(WORKSPACE / ".venv" / "bin" / "python")
 
 
-class SearchResult:
-    def __init__(self, title: str, url: str, content: str, score: float):
-        self.title = title
-        self.url = url
-        self.content = content
-        self.score = score
+def _load_key() -> str:
+    """Load Tavily key from env or .env file."""
+    key = os.getenv("TAVILY_API_KEY", "")
+    if key and key.startswith("tvly-") and len(key) > 20:
+        return key
+    for env_path in [
+        WORKSPACE / ".env",
+        Path(__file__).parent / ".env",
+    ]:
+        if env_path.exists():
+            for line in env_path.read_text().splitlines():
+                line = line.strip()
+                if line.startswith("TAVILY_API_KEY="):
+                    key = line.split("=", 1)[1].strip().strip('"').strip("'")
+                    if key and key.startswith("tvly-") and len(key) > 20:
+                        os.environ["TAVILY_API_KEY"] = key
+                        return key
+    return ""
 
-    def __str__(self):
-        return f"[{self.title}]\n{self.content[:500]}\nSource: {self.url}"
+
+TAVILY_API_KEY = _load_key()
 
 
-def search(
-    query: str,
-    max_results: int = 5,
-    search_depth: str = "basic",
-    include_answer: bool = True,
-    topic: str = "general"
-) -> tuple[Optional[str], list[SearchResult]]:
+def search(query: str, max_results: int = 5) -> dict:
     """
-    Search the web via Tavily.
-    Returns (direct_answer, list_of_results).
-    direct_answer is Tavily's AI-synthesized answer if available.
+    Search via Tavily. Returns raw response dict.
+    Runs in current process if venv is active,
+    otherwise spawns venv python subprocess.
     """
     if not TAVILY_API_KEY:
-        return None, []
+        return {"error": "No Tavily API key", "results": []}
 
+    # Try in current process first
     try:
         from tavily import TavilyClient
         client = TavilyClient(api_key=TAVILY_API_KEY)
-        response = client.search(
-            query=query,
-            max_results=max_results,
-            search_depth=search_depth,
-            include_answer=include_answer,
-            topic=topic
+        return client.search(query, max_results=max_results)
+    except ImportError:
+        pass
+
+    # Fallback: run in venv python subprocess
+    code = f"""
+import json, sys
+from tavily import TavilyClient
+client = TavilyClient(api_key={repr(TAVILY_API_KEY)})
+result = client.search({repr(query)}, max_results={max_results})
+print(json.dumps(result))
+"""
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.py',
+                                     dir=str(WORKSPACE / "builds"),
+                                     delete=False) as f:
+        f.write(code)
+        tmp = f.name
+    try:
+        result = subprocess.run(
+            [VENV_PYTHON, tmp],
+            capture_output=True, text=True, timeout=30
         )
-        answer = response.get("answer", "")
-        results = [
-            SearchResult(
-                title=r.get("title", ""),
-                url=r.get("url", ""),
-                content=r.get("content", ""),
-                score=r.get("score", 0)
-            )
-            for r in response.get("results", [])
-        ]
-        return answer or None, results
-    except Exception:
-        return None, []
+        if result.returncode == 0:
+            return json.loads(result.stdout.strip())
+        return {"error": result.stderr[:200], "results": []}
+    except Exception as e:
+        return {"error": str(e), "results": []}
+    finally:
+        Path(tmp).unlink(missing_ok=True)
 
 
 def search_and_summarize(query: str) -> str:
-    """
-    Search and return formatted summary for injection into LUCI's context.
-    """
-    answer, results = search(query, max_results=5)
-    if not results and not answer:
-        return f"[Search returned no results for: {query}]"
+    """Search and return formatted string for context injection."""
+    response = search(query)
+    if "error" in response and not response.get("results"):
+        return f"[Search error for '{query}': {response.get('error')}]"
 
     parts = [f"[WEB SEARCH: {query}]"]
+    answer = response.get("answer")
     if answer:
-        parts.append(f"Summary: {answer}")
-    for i, r in enumerate(results[:3], 1):
-        parts.append(f"\nSource {i}: {r.title}\n{r.content[:400]}\nURL: {r.url}")
+        parts.append(f"Answer: {answer}")
+    for i, r in enumerate(response.get("results", [])[:3], 1):
+        parts.append(
+            f"\nSource {i}: {r.get('title', '')}\n"
+            f"{r.get('content', '')[:400]}\n"
+            f"URL: {r.get('url', '')}"
+        )
     return "\n".join(parts)
 
 
 def should_search(text: str) -> bool:
-    """
-    Decide if LUCI should search the web for this query.
-    True if query needs current/external information.
-    """
-    # Don't search if no API key configured
+    """Return True if query needs live web data."""
     if not TAVILY_API_KEY:
         return False
-
-    search_triggers = [
+    triggers = [
         "what is", "who is", "latest", "current", "today",
         "now", "recent", "news", "price", "how to",
         "best", "compare", "vs", "versus", "review",
         "2024", "2025", "2026", "release", "update",
-        "documentation", "docs", "api", "library",
         "stock", "market", "weather", "search",
         "find", "look up", "what are", "tell me about",
     ]
-    text_lower = text.lower()
-    return any(t in text_lower for t in search_triggers)
+    return any(t in text.lower() for t in triggers)

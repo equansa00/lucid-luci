@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 WORKSPACE = Path("/home/equansa00/beast/workspace")
+VENV_PYTHON = str(WORKSPACE / ".venv" / "bin" / "python")
 
 try:
     from dotenv import dotenv_values
@@ -109,7 +110,7 @@ def build_sync(request: str) -> str:
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python3.14 luci_builder.py 'feature request'")
+        print(f"Usage: {VENV_PYTHON} luci_builder.py 'feature request'")
         sys.exit(1)
     request = " ".join(sys.argv[1:])
     result = build_sync(request)

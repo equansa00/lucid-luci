@@ -25,50 +25,53 @@ MAX_CRITIQUE_ROUNDS = 2
 
 TOOL_SYSTEM = f"""You are LUCI — Chip's autonomous AI agent.
 Workspace: {WORKSPACE}
+Python: {VENV_PYTHON}
 
-TOOLS (always use XML format — never markdown):
+CRITICAL: You communicate actions ONLY via XML tool tags.
+NEVER write ```bash or ```python blocks. They do nothing.
+ONLY tool tags cause real actions. Everything else is just text.
 
+ONE TOOL PER RESPONSE. Wait for result before next tool.
+
+TOOLS:
+
+Search web:
 <tool>search_web</tool>
-<args>{{"query": "your search query", "max_results": 5}}</args>
+<args>{{"query": "exact search query"}}</args>
 
+Run Python in venv (ONLY way to execute code):
 <tool>run_python</tool>
 <args>{{"code": "print('hello')", "timeout": 30}}</args>
 
-<tool>run_command</tool>
-<args>{{"argv": ["python3", "script.py"], "timeout": 60}}</args>
-
+Write complete file (NEVER use placeholders):
 <tool>write_file</tool>
-<args>{{"path": "relative/path/file.py", "content": "COMPLETE file content here"}}</args>
+<args>{{"path": "luci_trading/config.py", "content": "# full content\\nimport os\\n"}}</args>
 
+Read file:
 <tool>read_file</tool>
-<args>{{"path": "relative/path/file.py"}}</args>
+<args>{{"path": "luci_trading/config.py"}}</args>
 
+List files:
 <tool>list_files</tool>
-<args>{{"subpath": ""}}</args>
+<args>{{"subpath": "luci_trading"}}</args>
 
+Install packages into venv:
 <tool>install_packages</tool>
 <args>{{"packages": ["yfinance", "pandas"]}}</args>
 
-<tool>git</tool>
-<args>{{"args": ["status"]}}</args>
-
-<tool>fetch_url</tool>
-<args>{{"url": "https://example.com"}}</args>
-
+Signal completion (ONLY after verified working output):
 <tool>done</tool>
-<args>{{"summary": "What was built/done and how to use it"}}</args>
+<args>{{"summary": "What was built and how to use it"}}</args>
 
-CRITICAL RULES:
-1. PLAN first — think through all steps before acting.
-2. Write COMPLETE file contents — never use placeholders.
-3. After writing code, run_python to test it immediately.
-4. Fix ALL errors before calling done.
-5. Search the web when you need current information.
-6. Read existing files before modifying them.
-7. Use relative paths (e.g., "luci_trading/main.py" not full path).
-8. Call done only when everything is working and tested.
-9. Install packages before using them.
-10. Never write outside {WORKSPACE}.
+RULES:
+1. ONE tool per response. Always.
+2. Never call done without first running the code and seeing real output.
+3. Never write markdown code blocks — use run_python instead.
+4. Write complete file contents in write_file — never "# content here".
+5. After every write_file, immediately run_python to test it.
+6. Fix ALL errors before calling done.
+7. Relative paths only (e.g. "luci_trading/main.py" not full path).
+8. You have {MAX_ITERATIONS} steps — start writing files in step 2.
 """
 
 CRITIQUE_PROMPT = """Review your own work. You MUST do the following before calling done:
@@ -127,7 +130,7 @@ def call_ollama(
 
 
 def parse_tools(text: str) -> list[dict]:
-    """Parse <tool>/<args> blocks from model response."""
+    """Parse XML tool tags. Fallback: extract markdown code blocks."""
     pattern = r'<tool>(.*?)</tool>\s*<args>(.*?)</args>'
     tools = []
     for m in re.finditer(pattern, text, re.DOTALL):
@@ -137,6 +140,17 @@ def parse_tools(text: str) -> list[dict]:
         except Exception:
             args = {"raw": m.group(2).strip()}
         tools.append({"name": name, "args": args})
+
+    if not tools:
+        # Fallback: extract python code blocks and run them
+        py_blocks = re.findall(r'```python\n?(.*?)```', text, re.DOTALL)
+        for code in py_blocks:
+            if code.strip():
+                tools.append({
+                    "name": "run_python",
+                    "args": {"code": code.strip(), "timeout": 30}
+                })
+
     return tools
 
 
@@ -211,6 +225,18 @@ def execute_tool(name: str, args: dict,
 
     elif name == "done":
         summary = args.get("summary", "Task complete.")
+        # Hallucination guard: check actual files were written for known task types
+        summary_lower = summary.lower()
+        trading_dir = WORKSPACE / "luci_trading"
+        builds_dir = WORKSPACE / "builds"
+        if "trading" in summary_lower and not (
+            trading_dir.exists() and any(trading_dir.rglob("*.py"))
+        ):
+            return (
+                "BLOCKED: done called but luci_trading/ has no Python files. "
+                "You must write the files first using write_file tools. "
+                "Use write_file NOW to create luci_trading/config.py first."
+            )
         return f"DONE:{summary}"
 
     else:

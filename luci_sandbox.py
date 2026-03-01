@@ -58,12 +58,16 @@ ALLOWED_EXECUTABLES = {
     "python3", "python3.14", "python",
     "pip", "pip3",
     "git", "ls", "find", "cat", "echo",
-    "mkdir", "cp", "mv", "rm", "touch",
+    "mkdir", "touch",
     "grep", "head", "tail", "wc", "sort",
     "pytest", "black", "mypy", "ruff",
     "luci-trader", "luci-code",
-    "curl",  # read-only, no pipe to shell
+    # curl/rm/mv/cp removed — use fetch_url() for network, confirm gate for destructive ops
 }
+
+# Operations that require confirmation before executing
+CONFIRM_REQUIRED = os.getenv("LUCI_CONFIRM", "1") == "1"
+NEEDS_CONFIRM_OPS = {"rm", "mv", "cp"}
 
 BLOCKED_PATTERNS = [
     r";\s*rm\s+-rf",
@@ -137,6 +141,12 @@ def run_command(
     except SecurityError as e:
         return False, f"BLOCKED: {e}"
 
+    # Confirmation gate for destructive file operations
+    if CONFIRM_REQUIRED:
+        executable = Path(argv[0]).name
+        if executable in NEEDS_CONFIRM_OPS:
+            return False, f"NEEDS_CONFIRM: {' '.join(argv)}"
+
     try:
         result = subprocess.run(
             argv,
@@ -155,6 +165,18 @@ def run_command(
         return False, f"Timed out after {timeout}s"
     except Exception as e:
         return False, f"Run error: {e}"
+
+
+def check_venv() -> bool:
+    """Verify venv exists and has required packages."""
+    venv_py = Path(VENV_PYTHON)
+    if not venv_py.exists():
+        return False
+    ok, out = run_command(
+        [VENV_PYTHON, "-c", "import tavily, pypdf, pandas; print('OK')"],
+        timeout=10
+    )
+    return ok and "OK" in out
 
 
 def run_python(
@@ -233,10 +255,7 @@ def read_pdf(path: str) -> tuple[bool, str]:
         try:
             import pypdf
         except ImportError:
-            try:
-                import pypdf2 as pypdf
-            except ImportError:
-                return False, "pypdf not installed — run: install_packages(['pypdf'])"
+            return False, "pypdf not installed — run: install_packages(['pypdf'])"
         reader = pypdf.PdfReader(str(p))
         text = ""
         for page in reader.pages[:20]:  # Max 20 pages
