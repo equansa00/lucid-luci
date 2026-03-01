@@ -28,7 +28,7 @@ def safe_path(p: str | Path) -> Path:
     try:
         if str(p).startswith("~/"):
             p = str(p).replace("~/", str(Path.home()) + "/", 1)
-        resolved = Path(p).expanduser().resolve()
+        resolved = (WORKSPACE / p).resolve() if not Path(p).is_absolute() else Path(p).expanduser().resolve()
         if not str(resolved).startswith(str(WORKSPACE)):
             raise SecurityError(
                 f"Path '{p}' resolves to '{resolved}' "
