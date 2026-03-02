@@ -184,10 +184,19 @@ def handle_wake_activation() -> None:
     # 4. Route + respond (streaming)
     routed_model, category = route_model(text)
     persona = load_persona()
+
+    global _conversation_history, _last_interaction
+    now = time.time()
+    if now - _last_interaction > HISTORY_TIMEOUT:
+        _conversation_history = []
+    if text.lower().strip(".,!?") in RESET_PHRASES:
+        _conversation_history = []
     messages = []
     if persona:
         messages.append({"role": "system", "content": persona})
+    messages.extend(_conversation_history)
     messages.append({"role": "user", "content": text})
+
     try:
         response = _tts.speak_streaming(
             _ollama_stream(messages, routed_model),
@@ -197,6 +206,14 @@ def handle_wake_activation() -> None:
         _tts.speak(response)
 
     _tts.wait_done()
+
+    # Update history
+    _conversation_history.append({"role": "user", "content": text})
+    _conversation_history.append({"role": "assistant", "content": response})
+    max_msgs = HISTORY_MAX_TURNS * 2
+    if len(_conversation_history) > max_msgs:
+        _conversation_history = _conversation_history[-max_msgs:]
+    _last_interaction = time.time()
 
     tag = format_model_tag(routed_model, category)
 
@@ -223,6 +240,16 @@ _al_process_lock = threading.Lock()  # only one _al_process at a time
 
 # Delegate speaking state and interrupt to luci_tts player
 _al_speaking = _tts.speaking_event  # same Event object — no duplication
+
+# Persistent conversation history
+_conversation_history: list[dict] = []
+_last_interaction: float = 0.0
+HISTORY_MAX_TURNS = 10    # keep last N user/assistant turn pairs
+HISTORY_TIMEOUT   = 60.0  # seconds of silence before auto-resetting history
+RESET_PHRASES = {
+    "new conversation", "start over", "reset",
+    "forget that", "clear history", "clear the history",
+}
 
 
 def _al_interrupt() -> None:
@@ -352,15 +379,21 @@ def _do_al_process(frames: list[bytes], pa_format: int, rate: int) -> None:
     # Route + respond (streaming → speak each sentence as it arrives)
     routed_model, category = route_model(text)
     persona = load_persona()
+
+    # History-aware messages build
+    global _conversation_history, _last_interaction
+    now = time.time()
+    if now - _last_interaction > HISTORY_TIMEOUT:
+        _conversation_history = []
+        print("[al] History reset (timeout)", flush=True)
+    if text.lower().strip(".,!?") in RESET_PHRASES:
+        _conversation_history = []
+        print("[al] History cleared by user", flush=True)
     messages = []
     if persona:
         messages.append({"role": "system", "content": persona})
+    messages.extend(_conversation_history)
     messages.append({"role": "user", "content": text})
-
-    collected: list[str] = []
-
-    def _on_token(tok: str) -> None:
-        collected.append(tok)
 
     try:
         response = _tts.speak_streaming(
@@ -371,6 +404,14 @@ def _do_al_process(frames: list[bytes], pa_format: int, rate: int) -> None:
         _tts.speak(response)
 
     _tts.wait_done()
+
+    # Update history
+    _conversation_history.append({"role": "user", "content": text})
+    _conversation_history.append({"role": "assistant", "content": response})
+    max_msgs = HISTORY_MAX_TURNS * 2
+    if len(_conversation_history) > max_msgs:
+        _conversation_history = _conversation_history[-max_msgs:]
+    _last_interaction = time.time()
 
     tag = format_model_tag(routed_model, category)
     print(f"LUCI: {response}", flush=True)
