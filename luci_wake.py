@@ -56,10 +56,12 @@ from luci import (  # noqa: E402
     stt_record,
     stt_transcribe,
     RUNS_DIR,
+    OLLAMA_CHAT_URL,
     DEFAULT_VOICE,
     LUCI_AUTO_MEMORY,
     auto_extract_memory,
 )
+import luci_tts as _tts  # streaming TTS engine
 
 # ---------------------------------------------------------------------------
 # Internal wake model constants (never shown to user)
@@ -158,7 +160,8 @@ def handle_wake_activation() -> None:
     """Full pipeline: confirm wake → record → transcribe → route → respond → speak."""
 
     # 1. Activation acknowledgement
-    tts_speak("Yes?")
+    _tts.speak("Yes?")
+    _tts.wait_done()
 
     # 2. Record command
     print("🎤 Listening for your command...", flush=True)
@@ -166,17 +169,19 @@ def handle_wake_activation() -> None:
         audio_path = stt_record(LISTEN_DURATION)
     except Exception as e:
         print(f"[wake] Recording failed: {e}", file=sys.stderr)
-        tts_speak("Sorry, I couldn't record audio.")
+        _tts.speak("Sorry, I couldn't record audio.")
+        _tts.wait_done()
         return
 
     # 3. Transcribe
     text = stt_transcribe(audio_path)
     if not text:
-        tts_speak("Sorry, I didn't catch that.")
+        _tts.speak("Sorry, I didn't catch that.")
+        _tts.wait_done()
         return
     print(f"You said: {text}", flush=True)
 
-    # 4. Route + respond
+    # 4. Route + respond (streaming)
     routed_model, category = route_model(text)
     persona = load_persona()
     messages = []
@@ -184,9 +189,14 @@ def handle_wake_activation() -> None:
         messages.append({"role": "system", "content": persona})
     messages.append({"role": "user", "content": text})
     try:
-        response = ollama_chat(messages, temperature=0.4, model=routed_model)
+        response = _tts.speak_streaming(
+            _ollama_stream(messages, routed_model),
+        )
     except Exception as e:
         response = f"Error: {e}"
+        _tts.speak(response)
+
+    _tts.wait_done()
 
     tag = format_model_tag(routed_model, category)
 
@@ -195,10 +205,7 @@ def handle_wake_activation() -> None:
     if tag:
         print(tag, flush=True)
 
-    # 6. Speak (without tag)
-    tts_speak(response)
-
-    # 7. Background memory extract
+    # 6. Background memory extract
     if LUCI_AUTO_MEMORY:
         threading.Thread(
             target=auto_extract_memory,
@@ -211,39 +218,49 @@ def handle_wake_activation() -> None:
 # Always-listen loop (Phase 9 Workstream E)
 # ---------------------------------------------------------------------------
 
-# Shared state for interrupt
-_al_aplay_proc: subprocess.Popen | None = None
-_al_speaking = threading.Event()
+# Shared state for serialization
+_al_process_lock = threading.Lock()  # only one _al_process at a time
+
+# Delegate speaking state and interrupt to luci_tts player
+_al_speaking = _tts.speaking_event  # same Event object — no duplication
 
 
 def _al_interrupt() -> None:
-    """Kill any active aplay process immediately."""
-    global _al_aplay_proc
-    if _al_aplay_proc is not None:
-        try:
-            _al_aplay_proc.kill()
-        except Exception:
-            pass
-        _al_aplay_proc = None
-    _al_speaking.clear()
+    """Stop all current and queued speech via luci_tts."""
+    _tts.interrupt()
 
 
-def _al_speak_wav(wav_path: Path) -> None:
-    """Play a WAV file via aplay (blocking in this thread). Interruptible."""
-    global _al_aplay_proc
-    _al_speaking.set()
+def _ollama_stream(messages: list, model: str, temperature: float = 0.4):
+    """Yield tokens from a streaming Ollama response."""
+    import urllib.request as _ur
+    payload = json.dumps({
+        "model": model,
+        "messages": messages,
+        "stream": True,
+        "options": {"temperature": temperature,
+                    "num_predict": int(os.getenv("LUCI_MAX_TOKENS", "2048"))},
+    }).encode()
+    req = _ur.Request(
+        OLLAMA_CHAT_URL,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+    )
     try:
-        _al_aplay_proc = subprocess.Popen(
-            ["aplay", "-q", str(wav_path)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        _al_aplay_proc.wait()
+        with _ur.urlopen(req, timeout=120) as resp:
+            for line in resp:
+                if not line.strip():
+                    continue
+                try:
+                    data = json.loads(line)
+                    token = data.get("message", {}).get("content", "")
+                    if token:
+                        yield token
+                    if data.get("done"):
+                        break
+                except Exception:
+                    continue
     except Exception as e:
-        print(f"[al] aplay error: {e}", file=sys.stderr)
-    finally:
-        _al_aplay_proc = None
-        _al_speaking.clear()
+        print(f"[al] Ollama stream error: {e}", file=sys.stderr)
 
 
 def _al_transcribe_wav(wav_path: Path) -> str:
@@ -266,7 +283,24 @@ def _al_transcribe_wav(wav_path: Path) -> str:
 def _al_process(frames: list[bytes], pa_format: int, rate: int) -> None:
     """
     Background thread: save frames → WAV → Whisper → Ollama → TTS → aplay.
+    Serialized via _al_process_lock so only one runs at a time; drops new
+    requests that arrive while already processing.
     """
+    # Drop if another process job is already running
+    if not _al_process_lock.acquire(blocking=False):
+        print("[al] busy — dropping overlapping request", flush=True)
+        return
+    try:
+        _do_al_process(frames, pa_format, rate)
+    finally:
+        _al_process_lock.release()
+
+
+def _do_al_process(frames: list[bytes], pa_format: int, rate: int) -> None:
+    """Inner implementation called under _al_process_lock."""
+    # Interrupt any current speech before processing new input
+    _al_interrupt()
+
     # Write frames to temp WAV
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
         wav_path = Path(tmp.name)
@@ -315,35 +349,33 @@ def _al_process(frames: list[bytes], pa_format: int, rate: int) -> None:
 
     print(f"\nYou: {text}", flush=True)
 
-    # Route + respond
+    # Route + respond (streaming → speak each sentence as it arrives)
     routed_model, category = route_model(text)
     persona = load_persona()
     messages = []
     if persona:
         messages.append({"role": "system", "content": persona})
     messages.append({"role": "user", "content": text})
+
+    collected: list[str] = []
+
+    def _on_token(tok: str) -> None:
+        collected.append(tok)
+
     try:
-        response = ollama_chat(messages, temperature=0.4, model=routed_model)
+        response = _tts.speak_streaming(
+            _ollama_stream(messages, routed_model),
+        )
     except Exception as e:
         response = f"Error: {e}"
+        _tts.speak(response)
+
+    _tts.wait_done()
 
     tag = format_model_tag(routed_model, category)
     print(f"LUCI: {response}", flush=True)
     if tag:
         print(tag, flush=True)
-
-    # TTS → temp WAV → aplay
-    reply_path = RUNS_DIR / f"al_reply_{int(time.time())}.wav"
-    ok = tts_to_file(response, reply_path, voice=DEFAULT_VOICE)
-    if ok:
-        _al_speak_wav(reply_path)
-        try:
-            reply_path.unlink(missing_ok=True)
-        except Exception:
-            pass
-    else:
-        print("[al] TTS failed — falling back to tts_speak", flush=True)
-        tts_speak(response)
 
     # Background memory
     if LUCI_AUTO_MEMORY:

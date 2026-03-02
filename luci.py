@@ -2350,14 +2350,25 @@ def _clean_for_tts(text: str) -> str:
     text = re.sub(r'https?://\S+', '', text)
     # Collapse whitespace
     text = re.sub(r'\s+', ' ', text).strip()
-    return text[:500]
+    return text[:3000]
 
 
 def tts_speak(text: str) -> None:
-    """Speak text via Piper TTS + aplay. Never raises."""
+    """Speak text via Piper TTS + aplay. Never raises.
+    Uses luci_tts streaming engine when available (non-blocking),
+    falls back to direct subprocess on import failure.
+    """
     global _piper_warned
     if not VOICE_ENABLED or not PIPER_ENABLED:
         return
+    # Fast path — luci_tts streaming engine
+    try:
+        import luci_tts as _ltts
+        _ltts.speak(text)
+        return
+    except Exception:
+        pass
+    # Fallback — direct piper + aplay (original implementation)
     if not PIPER_BIN.exists() or not PIPER_MODEL.exists():
         if not _piper_warned:
             print(f"[voice] Piper not found at {PIPER_BIN} — TTS disabled", file=sys.stderr)
@@ -2368,7 +2379,7 @@ def tts_speak(text: str) -> None:
         return
     try:
         piper_result = subprocess.run(
-            [str(PIPER_BIN), "--model", str(PIPER_MODEL), "--output_raw"],
+            [str(PIPER_BIN), "--model", str(PIPER_MODEL), "--output-raw"],
             input=clean.encode("utf-8"),
             capture_output=True,
             timeout=30,
@@ -2377,7 +2388,7 @@ def tts_speak(text: str) -> None:
         if piper_result.returncode != 0:
             return
         subprocess.run(
-            ["aplay", "-r", "22050", "-f", "S16_LE", "-c", "1"],
+            ["aplay", "-r", "22050", "-f", "S16_LE", "-c", "1", "-q"],
             input=piper_result.stdout,
             capture_output=True,
             timeout=30,

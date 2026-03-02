@@ -5,6 +5,7 @@ This is LUCI's cognitive loop for complex tasks.
 """
 from __future__ import annotations
 import json
+import os
 import re
 import time
 from pathlib import Path
@@ -18,9 +19,9 @@ from luci_sandbox import (
 from luci_search import search_and_summarize, should_search
 
 OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
-PLAN_MODEL = "luci-core:latest"
-CODE_MODEL = "luci-coder:latest"
-MAX_ITERATIONS = 20
+PLAN_MODEL  = os.getenv("LUCI_PLAN_MODEL",  "luci-core:latest")
+CODE_MODEL  = os.getenv("LUCI_CODE_MODEL",  "llama3.1:70b")
+MAX_ITERATIONS = int(os.getenv("LUCI_MAX_ITER", "40"))
 MAX_CRITIQUE_ROUNDS = 2
 
 TOOL_SYSTEM = f"""You are LUCI — Chip's autonomous AI agent.
@@ -110,7 +111,7 @@ def call_ollama(
     )
     full = ""
     try:
-        with urllib.request.urlopen(req, timeout=180) as resp:
+        with urllib.request.urlopen(req, timeout=600) as resp:
             for line in resp:
                 if not line.strip():
                     continue
@@ -129,20 +130,57 @@ def call_ollama(
     return full.strip()
 
 
+def _recover_write_file_args(raw: str) -> dict:
+    """
+    Try to recover path + content from a non-JSON args string.
+    Handles: YAML-ish `path: foo\ncontent: |...`, plain text with
+    a filename header, or just bare content.
+    """
+    # Try: path on first line, rest is content
+    # e.g.  path: luci_trading/foo.py\ncontent: |\n  <code>
+    path_m = re.search(r'(?:path|file)[:\s]+([^\n]+)', raw)
+    # content between ```...``` code fence
+    code_m = re.search(r'```(?:\w+)?\n?([\s\S]+?)```', raw)
+    if not code_m:
+        # content after 'content:' key
+        code_m = re.search(r'content[:\s]+\|?\n([\s\S]+)', raw)
+
+    path = path_m.group(1).strip().strip('"\'') if path_m else ""
+    content = code_m.group(1) if code_m else ""
+    return {"path": path, "content": content}
+
+
 def parse_tools(text: str) -> list[dict]:
     """Parse XML tool tags. Fallback: extract markdown code blocks."""
     pattern = r'<tool>(.*?)</tool>\s*<args>(.*?)</args>'
     tools = []
     for m in re.finditer(pattern, text, re.DOTALL):
         name = m.group(1).strip()
+        raw_args = m.group(2).strip()
         try:
-            args = json.loads(m.group(2).strip())
+            args = json.loads(raw_args)
         except Exception:
-            args = {"raw": m.group(2).strip()}
+            # For write_file, try to salvage path + content from malformed args
+            if name == "write_file":
+                args = _recover_write_file_args(raw_args)
+            else:
+                args = {"raw": raw_args}
         tools.append({"name": name, "args": args})
 
     if not tools:
-        # Fallback: extract python code blocks and run them
+        # Fallback: extract annotated code blocks as write_file calls
+        # Pattern: ```python\n# path: some/file.py\n<code>```
+        for m in re.finditer(
+            r'```(?:python|py)\n#\s*(?:path|file)[:\s]+([^\n]+)\n([\s\S]+?)```',
+            text
+        ):
+            tools.append({
+                "name": "write_file",
+                "args": {"path": m.group(1).strip(), "content": m.group(2)}
+            })
+
+    if not tools:
+        # Last resort: bare python code blocks → run_python
         py_blocks = re.findall(r'```python\n?(.*?)```', text, re.DOTALL)
         for code in py_blocks:
             if code.strip():

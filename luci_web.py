@@ -164,7 +164,7 @@ def _piper_tts_to_wav_bytes(text: str) -> bytes | None:
         clean = _re.sub(r'`[^`]+`', '', clean)
         clean = _re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', clean)
         clean = _re.sub(r'https?://\S+', '', clean)
-        clean = _re.sub(r'\s+', ' ', clean).strip()[:500]
+        clean = _re.sub(r'\s+', ' ', clean).strip()[:3000]
         if not clean:
             return None
 
