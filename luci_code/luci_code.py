@@ -212,48 +212,48 @@ def main():
     currently_streaming = False
     task_start_time     = None
 
-    _token_buffer = []
-    _in_xml = False
+    _xml_buffer = ""
+    _xml_depth = 0
 
     def on_token(token: str):
-        nonlocal currently_streaming, _token_buffer, _in_xml
+        nonlocal currently_streaming, _xml_buffer, _xml_depth
         global _spinner_active
+
         if _spinner_active:
             stop_spinner()
 
-        # Buffer tokens to suppress XML tags from display
-        _token_buffer.append(token)
-        buffered = "".join(_token_buffer)
+        _xml_buffer += token
 
-        # If we are inside an XML block, keep buffering silently
-        XML_OPENS = ("<tool>", "<args>", "<plan>", "<decision>", "<tool_result")
-        XML_CLOSES = ("</args>", "</plan>", "</decision>", "</tool_result>")
+        # Process buffer char by char, printing only non-XML content
+        output = ""
+        i = 0
+        while i < len(_xml_buffer):
+            if _xml_buffer[i] == "<":
+                # Find end of tag
+                end = _xml_buffer.find(">", i)
+                if end == -1:
+                    # Incomplete tag — keep in buffer for next token
+                    _xml_buffer = _xml_buffer[i:]
+                    break
+                tag = _xml_buffer[i:end+1]
+                # Track depth
+                if tag.startswith("</"):
+                    _xml_depth = max(0, _xml_depth - 1)
+                elif not tag.endswith("/>"):
+                    _xml_depth += 1
+                i = end + 1
+                # Skip the tag itself
+            else:
+                if _xml_depth == 0:
+                    output += _xml_buffer[i]
+                i += 1
+        else:
+            _xml_buffer = ""
 
-        if any(tag in buffered for tag in XML_OPENS):
-            _in_xml = True
-
-        if _in_xml:
-            # Check if the XML block closed
-            if any(tag in buffered for tag in XML_CLOSES):
-                # Consume the buffer silently, reset
-                _token_buffer.clear()
-                _in_xml = False
-            # Don\'t print anything while in XML
-            return
-
-        # Safe to print — flush buffer
-        to_print = "".join(_token_buffer)
-        _token_buffer.clear()
-
-        # Skip lines that are purely XML artifacts
-        if to_print.strip() in ("<plan>", "</plan>", "<tool>", "</tool>",
-                                 "<args>", "</args>", "<decision>", "</decision>"):
-            return
-
-        for ch in to_print:
-            sys.stdout.write(ch)
+        if output.strip():
+            sys.stdout.write(output)
             sys.stdout.flush()
-        currently_streaming = True
+            currently_streaming = True
 
     def on_tool(name: str, tool_args: dict, result: ToolResult, elapsed: float = 0.0):
         nonlocal currently_streaming

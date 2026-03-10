@@ -1,0 +1,10 @@
+--- a/app.py
++++ b/app.py
+@@ -4,3 +4,8 @@
+ def multiply(x: int, y: int) -> int:
+     return x * y
++
++def divide(a: int, b: int) -> float:
++    if b == 0:
++        raise ValueError("division by zero")
++    return a / b

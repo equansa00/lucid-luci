@@ -1,0 +1,6 @@
+{
+  "plan": ["add multiply function to app.py"],
+  "patch_unified_diff": "diff --git a/app.py b/app.py\n--- a/app.py\n+++ b/app.py\n@@ -0,0 +1 @@\ndef multiply(a, b):\n    return a * b",
+  "commands_to_run": [],
+  "notes": "Added multiply function to app.py"
+}

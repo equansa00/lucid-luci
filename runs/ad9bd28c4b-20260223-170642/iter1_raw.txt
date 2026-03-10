@@ -1,0 +1,6 @@
+{
+  "plan": ["add divide function to app.py"],
+  "patch_unified_diff": "--- a/app.py\n+++ b/app.py\n@@ -3,4 +3,9 @@\n def add_numbers(a: int, b: int) -> int:\n     return a + b\n \n+def divide(a: int, b: int) -> float:\n+    if b == 0:\n+        raise ValueError('division by zero')\n+    return a / b",
+  "commands_to_run": ["ruff check app.py", "mypy app.py"],
+  "notes": ""
+}

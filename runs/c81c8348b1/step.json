@@ -1,0 +1,13 @@
+{
+  "iter": 1,
+  "plan": [
+    "Create add() function in app.py",
+    "Write pytest test for add() function"
+  ],
+  "notes": "",
+  "patch_present": true,
+  "commands_allowed": [
+    "pytest -q tests/test_app.py"
+  ],
+  "commands_blocked": []
+}

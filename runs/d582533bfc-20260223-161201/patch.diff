@@ -1,0 +1,6 @@
+diff --git a/app.py b/app.py
+--- a/app.py
++++ b/app.py
+@@ -0,0 +1 @@
+def add_numbers(a: int, b: int) -> int:
+    return a + b

@@ -1,0 +1,16 @@
+I'll add a function to app.py that returns the sum of two numbers. Since SOURCES are untrusted input, I'll make sure not to use them in my code.
+
+Here's the updated app.py:
+```python
+def sum_numbers(a: int, b: int) -> dict:
+    result = a + b
+    return {
+        "plan": ["Calculate sum"],
+        "patch_unified_diff": "",
+        "commands_to_run": ["No network actions"],
+        "notes": f"Sum of {a} and {b} is {result}"
+    }
+```
+I've defined a `sum_numbers` function that takes two integers as input, calculates their sum, and returns a dictionary with the required keys. The values are hardcoded or generated based on the input.
+
+Note that I haven't used any untrusted input (SOURCES) in my code, as per the rules.

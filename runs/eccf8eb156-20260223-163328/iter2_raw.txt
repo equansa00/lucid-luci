@@ -1,0 +1,12 @@
+{
+  "plan": [
+    "parse SOURCES to extract relevant information",
+    "create a new function in app.py that multiplies two numbers"
+  ],
+  "patch_unified_diff": "--- a/app.py\n+++ b/app.py\n@@ -1,3 +1,6 @@\ndef existing():\n    pass\n+def multiply(x: int, y: int) -> int:\n+    return x * y",
+  "commands_to_run": [
+    "git status",
+    "git diff"
+  ],
+  "notes": "Added a new function 'multiply' to app.py that takes two integers and returns their product."
+}

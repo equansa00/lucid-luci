@@ -1,0 +1,10 @@
+--- a/app.py
++++ b/app.py
+@@ -3,4 +3,9 @@
+ def add_numbers(a: int, b: int) -> int:
+     return a + b
+ 
++def divide(a: int, b: int) -> float:
++    if b == 0:
++        raise ValueError('division by zero')
++    return a / b
