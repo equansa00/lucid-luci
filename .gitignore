@@ -1,6 +1,18 @@
-__pycache__/
+# LUCI workspace — ignore sensitive and temp files
+*.bak
+*.bak.*
 *.pyc
-*.pyo
-runs/
-repo/
+__pycache__/
 .env
+gmail_credentials.json
+gmail_token.json
+*.db
+*.onnx
+*.onnx.json
+luci_code.bak*/
+luci_faces/
+piper/
+builds/
+tests/
+luci_trade_log.db
+luci_voice_history.db
