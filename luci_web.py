@@ -11,9 +11,11 @@ import io
 import json
 import os
 import re
+import sqlite3
 import subprocess
 import sys
 import time
+import uuid
 import wave
 from pathlib import Path
 
@@ -112,6 +114,97 @@ def stt_transcribe_fast(audio_path: Path) -> str:
     except Exception as exc:
         print(f"[web] Whisper server unavailable ({exc}), falling back to direct", flush=True)
         return stt_transcribe(audio_path)
+
+
+# ---------------------------------------------------------------------------
+# Voice conversation history — SQLite
+# ---------------------------------------------------------------------------
+VOICE_DB = WORKSPACE / "luci_voice_history.db"
+
+
+def _vhdb() -> sqlite3.Connection:
+    """Return a thread-local DB connection (creates tables if new)."""
+    conn = sqlite3.connect(str(VOICE_DB))
+    conn.row_factory = sqlite3.Row
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS vh_sessions (
+            id         TEXT PRIMARY KEY,
+            title      TEXT NOT NULL DEFAULT 'Voice session',
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS vh_messages (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL REFERENCES vh_sessions(id) ON DELETE CASCADE,
+            role       TEXT NOT NULL,
+            content    TEXT NOT NULL,
+            audio_url  TEXT,
+            ts         REAL NOT NULL
+        )
+    """)
+    conn.commit()
+    return conn
+
+
+def vh_create_session() -> str:
+    """Create a new voice session and return its ID."""
+    sid = str(uuid.uuid4())
+    now = time.time()
+    with _vhdb() as conn:
+        conn.execute(
+            "INSERT INTO vh_sessions (id, title, created_at, updated_at) VALUES (?,?,?,?)",
+            (sid, "Voice session", now, now),
+        )
+    return sid
+
+
+def vh_add_message(session_id: str, role: str, content: str, audio_url: str | None = None) -> None:
+    """Append a message to a voice session."""
+    now = time.time()
+    with _vhdb() as conn:
+        conn.execute(
+            "INSERT INTO vh_messages (session_id, role, content, audio_url, ts) VALUES (?,?,?,?,?)",
+            (session_id, role, content, audio_url, now),
+        )
+        conn.execute(
+            "UPDATE vh_sessions SET updated_at=? WHERE id=?",
+            (now, session_id),
+        )
+
+
+def vh_get_history(session_id: str, limit: int = 10) -> list[dict]:
+    """Return last `limit` messages for the session (oldest first)."""
+    conn = _vhdb()
+    rows = conn.execute(
+        """SELECT role, content FROM vh_messages
+           WHERE session_id=?
+           ORDER BY ts DESC LIMIT ?""",
+        (session_id, limit),
+    ).fetchall()
+    conn.close()
+    return [{"role": r["role"], "content": r["content"]} for r in reversed(rows)]
+
+
+def vh_set_title(session_id: str, title: str) -> None:
+    with _vhdb() as conn:
+        conn.execute("UPDATE vh_sessions SET title=? WHERE id=?", (title, session_id))
+
+
+def vh_list_sessions(limit: int = 30) -> list[dict]:
+    conn = _vhdb()
+    rows = conn.execute(
+        """SELECT s.id, s.title, s.created_at, s.updated_at,
+                  COUNT(m.id) AS msg_count
+           FROM vh_sessions s
+           LEFT JOIN vh_messages m ON m.session_id = s.id
+           GROUP BY s.id
+           ORDER BY s.updated_at DESC LIMIT ?""",
+        (limit,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 
 # ---------------------------------------------------------------------------
@@ -514,6 +607,7 @@ _HTML = r"""<!DOCTYPE html>
     position: fixed; bottom: 10%; left: 50%;
     transform: translateX(-50%);
     z-index: 30;
+    display: flex; gap: 8px; align-items: center;
   }
   #al-btn {
     background: rgba(10,7,5,0.8);
@@ -533,6 +627,18 @@ _HTML = r"""<!DOCTYPE html>
   #al-btn.interrupted {
     border-color: rgba(220,38,38,0.6);
     color: #ef4444;
+  }
+  #new-voice-session-btn {
+    background: rgba(10,7,5,0.7);
+    border: 1px solid rgba(212,175,55,0.2);
+    color: rgba(212,175,55,0.4);
+    border-radius: 20px; padding: 6px 14px;
+    font-size: 11px; letter-spacing: 0.08em;
+    cursor: pointer; transition: all 0.2s;
+  }
+  #new-voice-session-btn:hover {
+    border-color: rgba(212,175,55,0.5);
+    color: rgba(212,175,55,0.8);
   }
 
   /* === Voice settings gear button === */
@@ -681,6 +787,116 @@ _HTML = r"""<!DOCTYPE html>
     border-color: rgba(212,175,55,0.25);
     color: #F5E6C8;
   }
+  .history-item { position: relative; padding-right: 28px; }
+  .history-item .del-btn {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: rgba(212,175,55,0.0);
+    font-size: 14px; cursor: pointer; padding: 2px 4px; line-height: 1;
+    transition: color 0.15s; border-radius: 3px;
+  }
+  .history-item:hover .del-btn { color: rgba(212,175,55,0.45); }
+  .history-item .del-btn:hover { color: #ff4455 !important; background: rgba(255,68,85,0.12); }
+
+  /* Friction slide-over panel */
+  #friction-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(10,7,5,0.75); backdrop-filter: blur(6px);
+    display: none; align-items: center; justify-content: center;
+  }
+  #friction-overlay.open { display: flex; }
+  #friction-box {
+    background: #0d0f14; border: 1px solid #00e5ff;
+    border-radius: 4px; padding: 28px; width: min(600px, 92vw);
+    max-height: 88vh; overflow-y: auto;
+    font-family: 'IBM Plex Mono', 'Courier New', monospace;
+  }
+  #friction-box h2 {
+    font-size: 13px; letter-spacing: 3px; color: #00e5ff;
+    text-transform: uppercase; margin-bottom: 20px;
+  }
+  .fi-label {
+    font-size: 10px; letter-spacing: 2px; color: #4a5168;
+    text-transform: uppercase; margin-bottom: 6px;
+  }
+  .fi-input {
+    width: 100%; background: #1a1e28; border: 1px solid #2e3447;
+    color: #c8cedd; font-family: inherit; font-size: 12px;
+    padding: 10px 12px; border-radius: 2px; outline: none;
+    transition: border-color 0.15s; box-sizing: border-box; resize: vertical;
+  }
+  .fi-input:focus { border-color: #00e5ff; }
+  #fi-unblock-btn {
+    width: 100%; padding: 12px; margin-top: 4px;
+    background: rgba(0,229,255,0.1); border: 1px solid #00e5ff;
+    color: #00e5ff; font-family: inherit; font-size: 13px;
+    font-weight: 700; letter-spacing: 3px; cursor: pointer;
+    border-radius: 2px; transition: all 0.15s; text-transform: uppercase;
+  }
+  #fi-unblock-btn:hover:not(:disabled) { background: #00e5ff; color: #06070a; }
+  #fi-unblock-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  #fi-response {
+    display: none; margin-top: 16px;
+    background: #06070a; border: 1px solid #2e3447;
+    border-left: 3px solid #00e5ff; border-radius: 2px;
+    padding: 16px; font-size: 12px; line-height: 1.9;
+    white-space: pre-wrap; color: #c8cedd;
+  }
+  .fi-section-label { color: #00e5ff; font-weight: 700; }
+  #fi-close-btn {
+    float: right; background: none; border: 1px solid #2e3447;
+    color: #4a5168; font-family: inherit; font-size: 11px;
+    padding: 4px 10px; cursor: pointer; border-radius: 2px;
+    transition: all 0.15s;
+  }
+  #fi-close-btn:hover { border-color: #ff4455; color: #ff4455; }
+
+  /* Memory maintenance panel */
+  #memory-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(10,7,5,0.75); backdrop-filter: blur(6px);
+    display: none; align-items: center; justify-content: center;
+  }
+  #memory-overlay.open { display: flex; }
+  #memory-box {
+    background: #0d0f14; border: 1px solid rgba(212,175,55,0.5);
+    border-radius: 4px; padding: 28px; width: min(640px, 92vw);
+    max-height: 88vh; overflow-y: auto;
+    font-family: 'IBM Plex Mono', 'Courier New', monospace;
+  }
+  #memory-box h2 {
+    font-size: 13px; letter-spacing: 3px; color: #D4AF37;
+    text-transform: uppercase; margin-bottom: 6px;
+  }
+  #memory-box .mem-subtitle {
+    font-size: 10px; color: #4a5168; margin-bottom: 20px; line-height: 1.6;
+  }
+  .mem-entry {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 12px; background: #1a1e28;
+    border: 1px solid #2e3447; border-radius: 2px; margin-bottom: 6px;
+  }
+  .mem-entry-text { flex: 1; font-size: 11px; color: #c8cedd; line-height: 1.6; }
+  .mem-entry-key { font-size: 10px; color: #D4AF37; margin-bottom: 2px; letter-spacing: 1px; }
+  .mem-del-btn {
+    background: none; border: 1px solid transparent; color: #4a5168;
+    font-size: 13px; cursor: pointer; padding: 2px 6px; border-radius: 2px;
+    transition: all 0.15s; flex-shrink: 0; margin-top: 1px;
+  }
+  .mem-del-btn:hover { border-color: #ff4455; color: #ff4455; background: rgba(255,68,85,0.1); }
+  #mem-close-btn {
+    float: right; background: none; border: 1px solid #2e3447;
+    color: #4a5168; font-family: inherit; font-size: 11px;
+    padding: 4px 10px; cursor: pointer; border-radius: 2px; transition: all 0.15s;
+  }
+  #mem-close-btn:hover { border-color: #ff4455; color: #ff4455; }
+  #mem-search {
+    width: 100%; background: #1a1e28; border: 1px solid #2e3447;
+    color: #c8cedd; font-family: inherit; font-size: 12px;
+    padding: 8px 12px; border-radius: 2px; outline: none;
+    box-sizing: border-box; margin-bottom: 14px;
+    transition: border-color 0.15s;
+  }
+  #mem-search:focus { border-color: #D4AF37; }
 
   /* Chat panel */
   #chat-panel {
@@ -900,6 +1116,7 @@ _HTML = r"""<!DOCTYPE html>
 <!-- Always-listen toggle -->
 <div id="always-listen-toggle">
   <button id="al-btn">&#x1F442; Always Listen</button>
+  <button id="new-voice-session-btn" title="Start new voice conversation" onclick="newVoiceSession();this.textContent='\u2713 New session'">&#x1F504; New Session</button>
 </div>
 
 <!-- Debug overlay -->
@@ -918,7 +1135,23 @@ _HTML = r"""<!DOCTYPE html>
   <div id="history-panel">
     <div id="history-header">
       <span>Conversations</span>
-      <button id="new-chat-btn" title="New conversation">&#xFF0B;</button>
+      <div style="display:flex;gap:5px;align-items:center;">
+        <button id="memory-btn" title="Memory maintenance"
+          onclick="openMemory()"
+          style="background:none;border:1px solid rgba(212,175,55,0.3);color:#D4AF37;
+                 width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:13px;
+                 display:flex;align-items:center;justify-content:center;transition:all 0.15s;">
+          🧠
+        </button>
+        <button id="friction-btn" title="Friction Interceptor — get unblocked"
+          onclick="openFriction()"
+          style="background:none;border:1px solid rgba(0,229,255,0.3);color:#00e5ff;
+                 width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:13px;
+                 display:flex;align-items:center;justify-content:center;transition:all 0.15s;">
+          ⚡
+        </button>
+        <button id="new-chat-btn" title="New conversation">&#xFF0B;</button>
+      </div>
     </div>
     <div id="history-list"></div>
   </div>
@@ -974,6 +1207,17 @@ let dpr           = window.devicePixelRatio || 1;
 let _lastLevelLog = 0;
 let _audioUnlocked = false;
 let _audioCtx      = null;
+
+// Voice session tracking — persists across page loads, resets on "new session"
+let voiceSessionId = localStorage.getItem('luci-voice-session') || '';
+function newVoiceSession() {
+  voiceSessionId = '';
+  localStorage.removeItem('luci-voice-session');
+}
+function _saveVoiceSession(id) {
+  voiceSessionId = id;
+  localStorage.setItem('luci-voice-session', id);
+}
 
 // DOM refs
 const faceImg       = document.getElementById('face-img');
@@ -1252,8 +1496,11 @@ async function sendVoice() {
   dbg('\uD83D\uDCE4 uploading ' + (blob.size / 1024).toFixed(1) + 'kb...');
 
   try {
-    const resp = await fetch('/voice?voice=' + encodeURIComponent(selectedVoice), {method: 'POST', body: form});
+    let url = '/voice?voice=' + encodeURIComponent(selectedVoice);
+    if (voiceSessionId) url += '&session_id=' + encodeURIComponent(voiceSessionId);
+    const resp = await fetch(url, {method: 'POST', body: form});
     const data = await resp.json();
+    if (data.session_id) _saveVoiceSession(data.session_id);
 
     if (data.error) {
       dbg('\u274c ' + data.error);
@@ -1596,8 +1843,11 @@ async function alProcessCapture() {
   const form = new FormData();
   form.append('audio', blob, 'voice.webm');
   try {
-    const resp = await fetch('/voice?voice=' + encodeURIComponent(selectedVoice), {method:'POST', body:form});
+    let alUrl = '/voice?voice=' + encodeURIComponent(selectedVoice);
+    if (voiceSessionId) alUrl += '&session_id=' + encodeURIComponent(voiceSessionId);
+    const resp = await fetch(alUrl, {method:'POST', body:form});
     const data = await resp.json();
+    if (data.session_id) _saveVoiceSession(data.session_id);
     if (data.transcription) {
       dbg('\uD83D\uDCDD ' + data.transcription.slice(0,30));
       showSubtitle(data.transcription, false);
@@ -1714,7 +1964,10 @@ function renderHistoryList() {
   list.innerHTML = Object.entries(groups).map(([label, items]) =>
     '<div class="history-group-label">' + label + '</div>' +
     items.map(c =>
-      '<div class="history-item ' + (c.id === activeConvoId ? 'active' : '') + '" onclick="setActiveConvo(\'' + c.id + '\')" data-id="' + c.id + '">' + escHtml(c.title) + '</div>'
+      '<div class="history-item ' + (c.id === activeConvoId ? 'active' : '') + '" onclick="setActiveConvo(\'' + c.id + '\')" data-id="' + c.id + '">' +
+        escHtml(c.title) +
+        '<button class="del-btn" title="Delete conversation" onclick="event.stopPropagation();deleteConversation(\'' + c.id + '\')">✕</button>' +
+      '</div>'
     ).join('')
   ).join('');
 }
@@ -1902,8 +2155,11 @@ if (voiceBtn) {
         const form = new FormData();
         form.append('audio', blob, 'voice.webm');
         try {
-          const resp = await fetch('/voice?voice=' + encodeURIComponent(selectedVoice), {method: 'POST', body: form});
+          let cvUrl = '/voice?voice=' + encodeURIComponent(selectedVoice);
+          if (voiceSessionId) cvUrl += '&session_id=' + encodeURIComponent(voiceSessionId);
+          const resp = await fetch(cvUrl, {method: 'POST', body: form});
           const data = await resp.json();
+          if (data.session_id) _saveVoiceSession(data.session_id);
           if (data.transcription) {
             if (!activeConvoId || !getActiveConvo()) newConversation();
             const isFirst = getActiveConvo().messages.length === 0;
@@ -1989,7 +2245,197 @@ loadVoices();
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// =========================================================================
+// DELETE CONVERSATION — never touches memory
+// =========================================================================
+function deleteConversation(id) {
+  conversations = conversations.filter(c => c.id !== id);
+  saveConversations(conversations);
+  if (activeConvoId === id) {
+    if (conversations.length > 0) { setActiveConvo(conversations[0].id); }
+    else { newConversation(); }
+  } else {
+    renderHistoryList();
+  }
+}
+
+// =========================================================================
+// FRICTION INTERCEPTOR
+// =========================================================================
+function openFriction() {
+  document.getElementById('friction-overlay').classList.add('open');
+  document.getElementById('fi-what').focus();
+}
+function closeFriction() {
+  document.getElementById('friction-overlay').classList.remove('open');
+}
+async function fireFriction() {
+  const what     = document.getElementById('fi-what').value.trim();
+  const expected = document.getElementById('fi-expected').value.trim();
+  const actual   = document.getElementById('fi-actual').value.trim();
+  if (!what) { document.getElementById('fi-what').focus(); return; }
+
+  const btn  = document.getElementById('fi-unblock-btn');
+  const resp = document.getElementById('fi-response');
+  btn.disabled  = true;
+  btn.textContent = 'ANALYZING...';
+  resp.style.display = 'block';
+  resp.style.color   = '#4a5168';
+  resp.textContent   = 'LUCI is analyzing your friction point...';
+
+  try {
+    const secret = window.__luciSecret || '';
+    const r = await fetch('/friction', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-LUCI-Secret': secret },
+      body: JSON.stringify({ what, expected, actual })
+    });
+    const data = await r.json();
+    if (data.ok) {
+      // Colorize section labels
+      resp.innerHTML = data.response
+        .split('\n')
+        .map(line => {
+          if (/^(DIAGNOSIS|FIX|FALLBACK|VERIFY):/.test(line)) {
+            return '<span class="fi-section-label">' + escHtml(line) + '</span>';
+          }
+          return escHtml(line);
+        })
+        .join('\n');
+      resp.style.color = '#c8cedd';
+    } else {
+      resp.style.color   = '#ff4455';
+      resp.textContent   = 'Error: ' + (data.error || 'unknown');
+    }
+  } catch(e) {
+    resp.style.color   = '#ff4455';
+    resp.textContent   = 'Network error: ' + e.message;
+  }
+  btn.disabled    = false;
+  btn.textContent = 'UNBLOCK →';
+}
+
+// =========================================================================
+// MEMORY MAINTENANCE
+// =========================================================================
+let _memoryData = [];
+
+function openMemory() {
+  document.getElementById('memory-overlay').classList.add('open');
+  loadMemoryEntries();
+}
+function closeMemory() {
+  document.getElementById('memory-overlay').classList.remove('open');
+}
+async function loadMemoryEntries() {
+  const listEl = document.getElementById('mem-list');
+  listEl.innerHTML = '<div style="color:#4a5168;font-size:12px;padding:20px 0;">Loading memory...</div>';
+  try {
+    const secret = window.__luciSecret || '';
+    const r = await fetch('/memory/list', {
+      headers: { 'X-LUCI-Secret': secret }
+    });
+    if (!r.ok) { throw new Error('HTTP ' + r.status); }
+    const data = await r.json();
+    _memoryData = data.memories || [];
+    renderMemoryList();
+  } catch(e) {
+    listEl.innerHTML = '<div style="color:#ff4455;font-size:12px;padding:20px 0;">Error: ' + escHtml(e.message) + '</div>';
+  }
+}
+function renderMemoryList() {
+  const listEl  = document.getElementById('mem-list');
+  const query   = (document.getElementById('mem-search')?.value || '').toLowerCase().trim();
+  const entries = query
+    ? _memoryData.filter(m => (m.text || m.content || '').toLowerCase().includes(query))
+    : _memoryData;
+
+  if (entries.length === 0) {
+    listEl.innerHTML = '<div style="color:#4a5168;font-size:12px;padding:20px 0;text-align:center;">No memories found.</div>';
+    return;
+  }
+  listEl.innerHTML = entries.map((m, i) => {
+    const text    = escHtml(m.text || m.content || m.value || JSON.stringify(m));
+    const key     = escHtml(m.key || m.id || ('entry-' + i));
+    const salience = m.salience != null ? ' · salience ' + m.salience : '';
+    return (
+      '<div class="mem-entry">' +
+        '<div class="mem-entry-text">' +
+          '<div class="mem-entry-key">' + key + salience + '</div>' +
+          '<div>' + text + '</div>' +
+        '</div>' +
+        '<button class="mem-del-btn" title="Delete this memory" ' +
+          'onclick="deleteMemoryEntry(' + JSON.stringify(m.key || m.id || i) + ')">✕</button>' +
+      '</div>'
+    );
+  }).join('');
+}
+async function deleteMemoryEntry(key) {
+  if (!confirm('Delete this memory entry? This cannot be undone.')) return;
+  try {
+    const secret = window.__luciSecret || '';
+    const r = await fetch('/memory/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-LUCI-Secret': secret },
+      body: JSON.stringify({ key })
+    });
+    const data = await r.json();
+    if (data.ok) {
+      _memoryData = _memoryData.filter(m => (m.key || m.id) !== key);
+      renderMemoryList();
+    } else {
+      alert('Delete failed: ' + (data.error || 'unknown'));
+    }
+  } catch(e) {
+    alert('Network error: ' + e.message);
+  }
+}
+
 </script>
+
+  <!-- ═══ Friction Interceptor overlay ═══ -->
+  <div id="friction-overlay" onclick="if(event.target===this)closeFriction()">
+    <div id="friction-box">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h2 style="margin:0;">⚡ Friction Interceptor</h2>
+        <button id="fi-close-btn" onclick="closeFriction()">✕ close</button>
+      </div>
+      <div style="display:grid;gap:14px;">
+        <div>
+          <div class="fi-label">What were you trying to do</div>
+          <textarea id="fi-what" class="fi-input" rows="3" placeholder="e.g. Connect Alpaca API, run Docker container..."></textarea>
+        </div>
+        <div>
+          <div class="fi-label">What did you expect</div>
+          <input id="fi-expected" class="fi-input" type="text" placeholder="e.g. Server starts on port 8000" style="resize:none;" />
+        </div>
+        <div>
+          <div class="fi-label">What actually happened</div>
+          <textarea id="fi-actual" class="fi-input" rows="3" placeholder="Paste error or describe symptom"></textarea>
+        </div>
+        <button id="fi-unblock-btn" onclick="fireFriction()">UNBLOCK →</button>
+      </div>
+      <div id="fi-response"></div>
+    </div>
+  </div>
+
+  <!-- ═══ Memory Maintenance overlay ═══ -->
+  <div id="memory-overlay" onclick="if(event.target===this)closeMemory()">
+    <div id="memory-box">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <h2 style="margin:0;">🧠 Memory</h2>
+        <button id="mem-close-btn" onclick="closeMemory()">✕ close</button>
+      </div>
+      <div class="mem-subtitle">
+        LUCI's active memories — injected into every conversation.<br>
+        Deleting here removes from active memory only. Chat history is separate.
+      </div>
+      <input id="mem-search" type="text" placeholder="Search memories..." oninput="renderMemoryList()" />
+      <div id="mem-list">Loading...</div>
+    </div>
+  </div>
+
 </body>
 </html>
 """
@@ -2084,7 +2530,8 @@ async def preview_voice(voice_id: str):
 
 @app.post("/voice")
 async def voice_upload(request: Request, audio: UploadFile = File(...)):
-    voice = request.query_params.get("voice", DEFAULT_VOICE)
+    voice      = request.query_params.get("voice", DEFAULT_VOICE)
+    session_id = request.query_params.get("session_id", "")
     ts = int(time.time())
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
     upload_path = RUNS_DIR / f"web_voice_{ts}.wav"
@@ -2104,6 +2551,13 @@ async def voice_upload(request: Request, audio: UploadFile = File(...)):
 
     await broadcast_transcript(text)
 
+    # ---- Session history ----
+    is_new_session = not session_id
+    if is_new_session:
+        session_id = await loop.run_in_executor(None, vh_create_session)
+
+    history = await loop.run_in_executor(None, lambda: vh_get_history(session_id, limit=10))
+
     # ---- Ollama ----
     await broadcast_state("thinking")
     model_name, category = route_model(text)
@@ -2111,6 +2565,9 @@ async def voice_upload(request: Request, audio: UploadFile = File(...)):
     messages = []
     if persona:
         messages.append({"role": "system", "content": persona})
+    # Inject conversation history
+    for h in history:
+        messages.append({"role": h["role"], "content": h["content"]})
     messages.append({"role": "user", "content": text})
 
     response_text: str = await loop.run_in_executor(
@@ -2127,6 +2584,17 @@ async def voice_upload(request: Request, audio: UploadFile = File(...)):
 
     upload_path.unlink(missing_ok=True)
 
+    # ---- Persist messages ----
+    await loop.run_in_executor(None, lambda: vh_add_message(session_id, "user", text))
+    await loop.run_in_executor(
+        None, lambda: vh_add_message(session_id, "assistant", response_text, audio_url)
+    )
+
+    # Auto-title session after first exchange
+    if is_new_session:
+        short = text[:60].strip()
+        asyncio.create_task(asyncio.to_thread(vh_set_title, session_id, short))
+
     if LUCI_AUTO_MEMORY:
         asyncio.create_task(asyncio.to_thread(auto_extract_memory, text, response_text))
 
@@ -2136,8 +2604,198 @@ async def voice_upload(request: Request, audio: UploadFile = File(...)):
         "response": response_text,
         "model": tag,
         "audio_url": audio_url,
+        "session_id": session_id,
     })
 
+
+@app.get("/voice/sessions")
+async def voice_sessions_list() -> JSONResponse:
+    """List recent voice sessions."""
+    loop = asyncio.get_running_loop()
+    sessions = await loop.run_in_executor(None, vh_list_sessions)
+    return JSONResponse({"sessions": sessions})
+
+
+@app.get("/voice/sessions/{sid}")
+async def voice_session_get(sid: str) -> JSONResponse:
+    """Get all messages for a voice session."""
+    loop = asyncio.get_running_loop()
+    def _fetch():
+        conn = _vhdb()
+        session_row = conn.execute(
+            "SELECT id, title, created_at, updated_at FROM vh_sessions WHERE id=?", (sid,)
+        ).fetchone()
+        if not session_row:
+            return None
+        msgs = conn.execute(
+            "SELECT role, content, audio_url, ts FROM vh_messages WHERE session_id=? ORDER BY ts",
+            (sid,),
+        ).fetchall()
+        conn.close()
+        return {
+            "session": dict(session_row),
+            "messages": [dict(m) for m in msgs],
+        }
+    result = await loop.run_in_executor(None, _fetch)
+    if result is None:
+        return JSONResponse({"error": "session not found"}, status_code=404)
+    return JSONResponse(result)
+
+
+@app.delete("/voice/sessions/{sid}")
+async def voice_session_delete(sid: str) -> JSONResponse:
+    """Delete a voice session and all its messages."""
+    loop = asyncio.get_running_loop()
+    def _delete():
+        with _vhdb() as conn:
+            conn.execute("DELETE FROM vh_messages WHERE session_id=?", (sid,))
+            conn.execute("DELETE FROM vh_sessions WHERE id=?", (sid,))
+    await loop.run_in_executor(None, _delete)
+    return JSONResponse({"ok": True})
+
+
+
+# ─────────────────────────────────────────────────────────────────
+# Friction Interceptor Endpoint
+# ─────────────────────────────────────────────────────────────────
+
+FRICTION_SYSTEM = (
+    "You are LUCI, an execution engine for a senior developer named Chip. "
+    "Your ONLY job is to unblock technical friction fast. No fluff, no encouragement. "
+    "When given a friction description:\n"
+    "1. Diagnose the most likely cause in ONE sentence\n"
+    "2. Give the single most direct fix (code snippet if relevant, under 10 lines)\n"
+    "3. Give one alternative if the first does not work\n"
+    "4. State what to check to confirm it is resolved\n\n"
+    "Format your response with exactly these labels on their own lines:\n"
+    "DIAGNOSIS:\n"
+    "FIX:\n"
+    "FALLBACK:\n"
+    "VERIFY:\n\n"
+    "Be brutal and direct. Chip is technical. Treat him accordingly."
+)
+
+
+# ─────────────────────────────────────────────────────────────────
+# Memory Maintenance Endpoints
+# ─────────────────────────────────────────────────────────────────
+
+@app.get("/memory/list")
+async def memory_list(request: Request) -> JSONResponse:
+    """Return all active beast_memory.json entries for the memory UI."""
+    secret   = request.headers.get("X-LUCI-Secret", "")
+    expected = os.getenv("LUCI_WEB_SECRET", "")
+    if expected and secret != expected:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    try:
+        mem_path = Path(os.getenv("LUCI_WORKSPACE", str(Path(__file__).parent))) / "beast_memory.json"
+        if not mem_path.exists():
+            return JSONResponse({"memories": [], "source": "beast_memory.json not found"})
+        raw = json.loads(mem_path.read_text(encoding="utf-8"))
+        if isinstance(raw, list):
+            memories = raw
+        elif isinstance(raw, dict):
+            memories = (raw.get("memories")
+                        or raw.get("active")
+                        or raw.get("entries")
+                        or [{"key": k, "text": str(v)}
+                            for k, v in raw.items()
+                            if k not in ("version", "meta")])
+        else:
+            memories = []
+        return JSONResponse({"memories": memories, "count": len(memories)})
+    except Exception as e:
+        return JSONResponse({"error": str(e), "memories": []}, status_code=500)
+
+
+@app.post("/memory/delete")
+async def memory_delete(request: Request) -> JSONResponse:
+    """Delete a single memory entry by key. Never touches chat history."""
+    secret   = request.headers.get("X-LUCI-Secret", "")
+    expected = os.getenv("LUCI_WEB_SECRET", "")
+    if expected and secret != expected:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON"}, status_code=400)
+    key = str(body.get("key", "")).strip()
+    if not key:
+        return JSONResponse({"error": "no key provided"}, status_code=400)
+    try:
+        mem_path = Path(os.getenv("LUCI_WORKSPACE", str(Path(__file__).parent))) / "beast_memory.json"
+        if not mem_path.exists():
+            return JSONResponse({"error": "beast_memory.json not found"}, status_code=404)
+        raw     = json.loads(mem_path.read_text(encoding="utf-8"))
+        deleted = False
+        if isinstance(raw, list):
+            before  = len(raw)
+            raw     = [m for m in raw if str(m.get("key", m.get("id", ""))) != key]
+            deleted = len(raw) < before
+        elif isinstance(raw, dict):
+            if "memories" in raw:
+                before           = len(raw["memories"])
+                raw["memories"]  = [m for m in raw["memories"]
+                                    if str(m.get("key", m.get("id", ""))) != key]
+                deleted = len(raw["memories"]) < before
+            elif key in raw:
+                del raw[key]
+                deleted = True
+        if deleted:
+            bak = mem_path.with_suffix(".json.membak")
+            mem_path.rename(bak)
+            mem_path.write_text(
+                json.dumps(raw, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+            return JSONResponse({"ok": True, "deleted": key})
+        else:
+            return JSONResponse({"ok": False, "error": f"key not found: {key}"}, status_code=404)
+    except Exception as e:
+        return JSONResponse({"error": str(e), "ok": False}, status_code=500)
+
+
+@app.post("/friction")
+async def friction_endpoint(request: Request) -> JSONResponse:
+    """Friction Interceptor — describe a block, get unblocked."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON"}, status_code=400)
+
+    what     = (body.get("what")     or "").strip()
+    expected = (body.get("expected") or "").strip()
+    actual   = (body.get("actual")   or "").strip()
+    project  = (body.get("project")  or "").strip()
+
+    if not what:
+        return JSONResponse({"error": "no friction description"}, status_code=400)
+
+    # Verify secret header
+    secret = request.headers.get("X-LUCI-Secret", "")
+    expected_secret = os.getenv("LUCI_WEB_SECRET", "")
+    if expected_secret and secret != expected_secret:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+    user_msg = f"Project: {project or unspecified}\n"
+    user_msg += f"What I was trying to do: {what}\n"
+    if expected:
+        user_msg += f"What I expected: {expected}\n"
+    if actual:
+        user_msg += f"What actually happened: {actual}\n"
+
+    try:
+        loop = asyncio.get_running_loop()
+        messages = [
+            {"role": "system", "content": FRICTION_SYSTEM},
+            {"role": "user",   "content": user_msg},
+        ]
+        response = await loop.run_in_executor(
+            None,
+            lambda: ollama_chat(messages, temperature=0.2),
+        )
+        return JSONResponse({"response": response, "ok": True})
+    except Exception as e:
+        return JSONResponse({"error": str(e), "ok": False}, status_code=500)
 
 @app.post("/chat")
 async def chat_endpoint(request: Request) -> JSONResponse:
@@ -2214,6 +2872,75 @@ async def chat_endpoint(request: Request) -> JSONResponse:
             except Exception:
                 pass
 
+        # Email injection — fetch real unread emails when requested
+        _email_kw = [
+            "email", "emails", "inbox", "unread", "mail", "messages",
+            "get my email", "check my email", "check email", "any emails",
+            "what emails", "new emails", "my mail",
+        ]
+        if any(kw in text.lower() for kw in _email_kw):
+            try:
+                import sys as _sys
+                _sys.path.insert(0, str(Path(__file__).parent))
+                from luci import email_list_unread
+                _emails = email_list_unread(max_results=8)
+                if _emails:
+                    _email_lines = []
+                    for _i, _e in enumerate(_emails, 1):
+                        _email_lines.append(
+                            f"{_i}. From: {_e.get('sender','?')}\n"
+                            f"   Subject: {_e.get('subject','(no subject)')}\n"
+                            f"   Date: {_e.get('date','')}\n"
+                            f"   Preview: {_e.get('snippet','')[:120]}"
+                        )
+                    _email_summary = "\n".join(_email_lines)
+                    injected_text = (
+                        f"{injected_text}\n\n"
+                        f"[EMAILS — live from Gmail]:\n"
+                        f"{_email_summary}\n"
+                        f"[Report these emails to Chip directly and naturally. "
+                        f"Do NOT say you are checking or fetching — just report them. "
+                        f"Never invent emails not listed above.]"
+                    )
+                else:
+                    injected_text = (
+                        f"{injected_text}\n\n"
+                        f"[Gmail reports: no unread emails right now. "
+                        f"Tell Chip his inbox is clear.]"
+                    )
+            except Exception as _ee:
+                injected_text = (
+                    f"{injected_text}\n\n"
+                    f"[Email fetch failed: {_ee}. "
+                    f"Tell Chip honestly that email is unavailable right now.]"
+                )
+
+        # Calendar injection — fetch today's events when requested
+        _cal_kw = [
+            "calendar", "schedule", "today", "appointments", "meetings",
+            "what's on", "what do i have", "my day", "events today",
+        ]
+        if any(kw in text.lower() for kw in _cal_kw):
+            try:
+                import sys as _sys
+                _sys.path.insert(0, str(Path(__file__).parent))
+                from luci import calendar_today
+                _cal = calendar_today()
+                if _cal and _cal.strip():
+                    injected_text = (
+                        f"{injected_text}\n\n"
+                        f"[REAL CALENDAR DATA — today's events fetched live]:\n"
+                        f"{_cal}\n"
+                        f"<inst>Report these events naturally. Never invent events.</inst>"
+                    )
+                else:
+                    injected_text = (
+                        f"{injected_text}\n\n"
+                        f"[Calendar: no events scheduled for today.]"
+                    )
+            except Exception as _ce:
+                pass  # calendar unavailable — fail silently
+
         # Web search injection (Tavily)
         if _LUCI_V2 and should_search(text):
             try:
@@ -2222,6 +2949,30 @@ async def chat_endpoint(request: Request) -> JSONResponse:
                 print(f"[search] Injected for: {text[:50]}", flush=True)
             except Exception as _se:
                 print(f"[search] Error: {_se}", flush=True)
+
+
+        # Cross-capability think injection
+        _think_kw = [
+            "what should i focus", "what should i do", "prioritize",
+            "what's my priority", "think for me", "what's most important",
+            "cross-capability", "synthesize my day", "what's urgent",
+            "brief me", "give me a briefing", "morning briefing",
+        ]
+        if any(kw in text.lower() for kw in _think_kw):
+            try:
+                import sys as _sys
+                _sys.path.insert(0, str(Path(__file__).parent))
+                from luci import luci_think_across
+                _think_result = luci_think_across(deep=False)
+                injected_text = (
+                    f"{injected_text}\n\n"
+                    f"[LUCI CROSS-CAPABILITY ANALYSIS — synthesized live]:\n"
+                    f"{_think_result}\n"
+                    f"<inst>Deliver this analysis directly to Chip as your own reasoning. "
+                    f"Do not say you are retrieving or analyzing — just present it.</inst>"
+                )
+            except Exception as _te:
+                pass
 
         # Build request detection — hand off to autonomous builder
         if _LUCI_V2 and len(text) > 30 and any(t in text.lower() for t in _BUILD_TRIGGERS):
@@ -2288,7 +3039,7 @@ async def chat_endpoint(request: Request) -> JSONResponse:
                 "\n\n---\nYou are LUCI. Respond entirely in first person as LUCI. "
                 "Never say 'I am an AI language model' or describe yourself generically. "
                 "You are not a generic AI — you are LUCI, Chip's personal agent, "
-                "running on his laptop right now."
+                "running on his laptop right now.\n\nCRITICAL BEHAVIOR RULES:\n1. When real data has been injected (emails, weather, calendar), report it DIRECTLY and immediately. Never say 'let me check' or 'I will fetch' or 'let me get that' — the data is already in your context. Just report it.\n2. Never invent emails, events, names, or data. If no real data was injected, say so honestly.\n3. Be conversational and immediate. No preamble. No announcements. Just answer."
             )
 
         # Inject last 6 turns of conversation history for in-session memory

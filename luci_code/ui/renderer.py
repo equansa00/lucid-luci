@@ -34,7 +34,7 @@ def print_header(workspace: str, model: str):
     ))
 
 
-def print_tool_call(tool_name: str, args: dict):
+def print_tool_call(tool_name: str, args: dict, elapsed: float = 0.0):
     icons = {
         "read_file":   "📖",
         "create_file": "✨",
@@ -66,7 +66,8 @@ def print_tool_call(tool_name: str, args: dict):
         "ls":          f"ls {args.get('path', '.')}",
         "change_dir":  f"cd {args.get('path', '.')}",
     }.get(tool_name, f"{tool_name} {args}")
-    console.print(f"  {icon} [luci.tool]{label}[/]")
+    elapsed_str = f" [luci.dim]({elapsed:.1f}s)[/]" if elapsed > 0.1 else ""
+    console.print(f"  {icon} [luci.tool]{label}[/]{elapsed_str}")
 
 
 def print_tool_result(tool_name: str, result, verbose: bool = False):
@@ -75,6 +76,14 @@ def print_tool_result(tool_name: str, result, verbose: bool = False):
         return
     if tool_name in ("str_replace", "create_file", "git_commit", "git_push"):
         console.print(f"  [luci.success]✓ {result.output.splitlines()[0][:80]}[/]")
+    elif tool_name == "bash" and result.output and result.output.strip():
+        # Always show bash output — this is the actual program output
+        lines = result.output.strip().splitlines()
+        preview = "\n".join(f"  {l}" for l in lines[:30])
+        if len(lines) > 30:
+            preview += f"\n  ... ({len(lines)-30} more lines)"
+        style = "luci.success" if result.success else "luci.error"
+        console.print(f"  [{style}]{preview}[/]")
     elif verbose and result.output:
         lines = result.output.splitlines()
         preview = "\n".join(lines[:20])

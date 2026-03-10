@@ -948,6 +948,74 @@ Rules:
 """
 
 
+
+# ─────────────────────────────────────────
+# Agent Result Narration
+# ─────────────────────────────────────────
+
+def narrate_agent_result(result: Dict[str, Any], task: str) -> str:
+    """
+    Translate agent_loop JSON output into plain English.
+    LUCI explains what she did, what changed, and what to check.
+    Falls back to structured plain text if Ollama is unavailable.
+    """
+    status   = result.get("status", "unknown")
+    notes    = result.get("notes", "")
+    steps    = result.get("steps", [])
+    run_id   = result.get("run_id", "unknown")
+
+    facts: List[str] = [f"Task: {task}", f"Status: {status}"]
+
+    if status == "dry_run_ready":
+        patch_ok     = result.get("patch_ok", False)
+        patch_reason = result.get("patch_reason", "")
+        allowed      = result.get("commands_allowed", [])
+        blocked      = result.get("commands_blocked", [])
+        facts.append("Mode: dry run — no changes applied yet")
+        facts.append(f"Patch valid: {patch_ok} ({patch_reason})")
+        if allowed:
+            facts.append(f"Commands ready to run: {chr(44).join(allowed)}")
+        if blocked:
+            facts.append(f"Commands blocked: {chr(44).join(str(b) for b in blocked)}")
+        facts.append(f"Next step: review runs/{run_id}/patch.diff then rerun with --apply")
+
+    elif status == "applied_and_passed":
+        facts.append("All changes applied and tests passed.")
+        for step in steps:
+            for r in step.get("results", []):
+                rc   = r.get("rc", "?")
+                kind = r.get("kind", "?")
+                facts.append(f"  {kind}: exit code {rc}")
+        if notes:
+            facts.append(f"Agent notes: {notes}")
+
+    else:
+        final_feedback = result.get("final_feedback", "")
+        facts.append("Did not complete successfully.")
+        if final_feedback:
+            facts.append(f"Last error: {final_feedback}")
+        if notes:
+            facts.append(f"Agent notes: {notes}")
+
+    facts_text = "\n".join(facts)
+
+    system = (
+        "You are LUCI. Chip just ran an autonomous agent task. "
+        "Narrate what happened in 3-5 sentences of plain English. "
+        "Be direct and specific. State what was done, what the outcome was, "
+        "and exactly what Chip should do next if anything. "
+        "No bullet points. No filler. Speak as LUCI in first person."
+    )
+    try:
+        return ollama_chat(
+            [{"role": "system", "content": system},
+             {"role": "user",   "content": facts_text}],
+            temperature=0.3,
+            model=ROUTER_DEFAULT_MODEL,
+        )
+    except Exception:
+        return f"Agent run {run_id}: {status}.\n" + "\n".join(facts[1:])
+
 def agent_loop(
     task: str, rag: TinyRAG, apply: bool, max_iters: int,
     context_files: Optional[List[str]] = None,
@@ -1274,7 +1342,9 @@ ANSWER:"""
     if args.cmd == "agent":
         task = " ".join(args.task)
         out = agent_loop(task, rag, apply=bool(args.apply), max_iters=int(args.iters), context_files=list(args.context))
-        print(json.dumps(out, indent=2))
+        narration = narrate_agent_result(out, task)
+        print("\n" + narration + "\n")
+        print(f"[run_id: {out.get('run_id', 'unknown')} | status: {out.get('status', 'unknown')}]")
         return
 
 
@@ -1629,20 +1699,40 @@ def web_search_ddg(query: str, max_results: int = 5) -> List[Dict[str, str]]:
 
 
 def get_weather(location: str = "The Bronx, New York") -> str:
-    """Get current weather using wttr.in (free, no API key needed)."""
-    import urllib.request
-    import urllib.parse
+    """Get current weather using Open-Meteo (free, no API key, reliable)."""
+    import urllib.request, json as _json
+    # Coordinates map for known locations — fallback to Bronx
+    _coords = {
+        "the bronx": (40.8448, -73.8648),
+        "bronx": (40.8448, -73.8648),
+        "new york": (40.7128, -74.0060),
+        "brooklyn": (40.6782, -73.9442),
+        "manhattan": (40.7831, -73.9712),
+    }
+    _key = location.lower().strip().rstrip(", new york").strip()
+    lat, lon = _coords.get(_key, _coords.get("the bronx", (40.8448, -73.8648)))
+    _wmo = {0:"Clear sky",1:"Mainly clear",2:"Partly cloudy",3:"Overcast",
+            45:"Fog",48:"Icy fog",51:"Light drizzle",53:"Drizzle",55:"Heavy drizzle",
+            61:"Light rain",63:"Rain",65:"Heavy rain",71:"Light snow",73:"Snow",
+            75:"Heavy snow",80:"Rain showers",81:"Heavy showers",82:"Violent showers",
+            95:"Thunderstorm",96:"Thunderstorm w/ hail",99:"Thunderstorm w/ heavy hail"}
     try:
-        loc = urllib.parse.quote(location)
-        url = f"https://wttr.in/{loc}?format=3"
-        req = urllib.request.Request(url, headers={"User-Agent": "curl/7.0"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            weather = resp.read().decode("utf-8").strip()
-        url2 = f"https://wttr.in/{loc}?format=%C+%t+%h+%w+%p"
-        req2 = urllib.request.Request(url2, headers={"User-Agent": "curl/7.0"})
-        with urllib.request.urlopen(req2, timeout=10) as resp2:
-            detail = resp2.read().decode("utf-8").strip()
-        return f"Weather for {location}:\n{weather}\nDetails: {detail}"
+        url = (
+            f"https://api.open-meteo.com/v1/forecast"
+            f"?latitude={lat}&longitude={lon}"
+            f"&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code"
+            f"&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America/New_York"
+        )
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            d = _json.loads(resp.read())
+        c = d["current"]
+        condition = _wmo.get(c.get("weather_code", 0), "Unknown")
+        return (
+            f"Weather for {location}: {condition}, "
+            f"{c['temperature_2m']}°F, "
+            f"humidity {c['relative_humidity_2m']}%, "
+            f"wind {c['wind_speed_10m']} mph"
+        )
     except Exception as e:
         return f"Weather fetch failed: {e}"
 
@@ -2149,7 +2239,93 @@ def generate_daily_briefing() -> str:
     )
 
 
+
+def luci_think_across(deep: bool = False) -> str:
+    """
+    Cross-capability reasoning: gather email + calendar + trading pulse,
+    then ask the reasoning model to synthesize and prioritize.
+    """
+    import datetime as _dt
+    today_str = _dt.date.today().strftime("%A, %B %d %Y")
+
+    # --- Gather email ---
+    try:
+        emails = email_list_unread(max_results=8)
+        if emails:
+            email_block = "\n".join(
+                f"- From: {e.get('sender','?')} | Subject: {e.get('subject','?')} | {e.get('snippet','')[:80]}"
+                for e in emails
+            )
+        else:
+            email_block = "Inbox clear."
+    except Exception as _e:
+        email_block = f"Email unavailable: {_e}"
+
+    # --- Gather calendar ---
+    try:
+        events = calendar_today()
+        if events:
+            cal_block = "\n".join(
+                f"- {ev['start'][:16].replace('T',' ')} — {ev['summary']}"
+                for ev in events
+            )
+        else:
+            cal_block = "No events today."
+    except Exception as _e:
+        cal_block = f"Calendar unavailable: {_e}"
+
+    # --- Gather trading pulse ---
+    try:
+        from luci_trading_agent import trade_pulse
+        trade_block = trade_pulse()
+    except Exception as _e:
+        trade_block = f"Trading data unavailable: {_e}"
+
+    # --- Compose reasoning prompt ---
+    context = f"""Today is {today_str}.
+
+UNREAD EMAILS:
+{email_block}
+
+TODAY'S CALENDAR:
+{cal_block}
+
+MARKET PULSE:
+{trade_block}
+"""
+
+    system_prompt = (
+        "You are LUCI, Chip's personal AI agent. "
+        "You have been given a live snapshot of his emails, calendar, and market data. "
+        "Your job is to reason across all of it and give him one clear, direct briefing: "
+        "What is urgent right now? What can wait? What is the single most important thing "
+        "he should do in the next 2 hours? Be specific, be concise, be honest. "
+        "Speak in first person as LUCI. Never pad or hedge. Max 200 words."
+    )
+
+    model = "beast70b:latest" if deep else os.getenv("LUCI_ROUTER_REASONING", os.getenv("LUCI_MODEL", "llama3.1:8b"))
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user",   "content": context},
+    ]
+
+    try:
+        result = ollama_chat(messages, temperature=0.3, model=model)
+        return result.strip()
+    except Exception as _e:
+        return f"Think error: {_e}"
+
+
+
 def send_daily_briefing() -> None:
+    # Trading pulse block
+    try:
+        from luci_trading_agent import trade_briefing_block
+        briefing_trading = trade_briefing_block()
+    except Exception:
+        briefing_trading = ""
+
     """Generate briefing and send to Telegram via requests.post."""
     try:
         from dotenv import load_dotenv
@@ -3377,6 +3553,358 @@ def run_telegram_bot() -> None:
                 "/github fix <repo> <description> — fix and open PR"
             )
 
+
+    async def cmd_agent(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Run the agent loop from Telegram with plain-English result narration."""
+        if not allowed(update):
+            return
+
+        if not context.args:
+            await update.message.reply_text(
+                "🤖 *LUCI Agent*\n\n"
+                "Usage: `/agent <task>`\n\n"
+                "Dry run by default — LUCI plans and shows what she would do.\n"
+                "Add `--apply` to actually execute.\n\n"
+                "Examples:\n"
+                "  `/agent check git status`\n"
+                "  `/agent fix import error in luci_trading/scanner.py`\n"
+                "  `/agent fix the scanner --apply`",
+                parse_mode="Markdown"
+            )
+            return
+
+        args_list = list(context.args)
+        apply     = "--apply" in args_list
+        if apply:
+            args_list.remove("--apply")
+        task = " ".join(args_list).strip()
+
+        if not task:
+            await update.message.reply_text("❌ No task specified.")
+            return
+
+        mode = "APPLY" if apply else "DRY RUN"
+        await update.message.reply_text(
+            f"🤖 Agent starting [{mode}]\n"
+            f"Task: {task}\n\n"
+            f"Working on it — I\u2019ll report back when done."
+        )
+
+        def _run_agent():
+            rag = TinyRAG(DOCS_DIR)
+            rag.build()
+            return agent_loop(task, rag, apply=apply, max_iters=MAX_ITERS)
+
+        try:
+            out       = await asyncio.to_thread(_run_agent)
+            narration = narrate_agent_result(out, task)
+            run_id    = out.get("run_id", "unknown")
+            status    = out.get("status", "unknown")
+
+            reply = f"🤖 *Agent complete*\n\n{narration}"
+
+            if status == "dry_run_ready":
+                if out.get("patch_ok"):
+                    reply += f"\n\n📄 Patch is ready and valid.\nTo apply: `/agent {task} --apply`"
+                else:
+                    reply += f"\n\n⚠️ Patch has issues — check `runs/{run_id}/patch.diff`"
+
+            blocked = out.get("commands_blocked", [])
+            if blocked:
+                names = [str(b.get("cmd", b)) for b in blocked]
+                reply += f"\n\n🚫 Blocked commands: {chr(44).join(names)}"
+
+            reply += f"\n\n`{status} | {run_id}`"
+            await send_long(update, reply)
+
+        except Exception as e:
+            await update.message.reply_text(f"❌ Agent error: {e}")
+
+
+
+    async def cmd_friction(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Friction Interceptor via Telegram.
+        Usage: /friction <what you were trying to do> | <what happened>
+        Pipe separator splits intent from symptom.
+        Or just: /friction <description> for a quick unblock.
+        """
+        if not allowed(update):
+            return
+
+        if not context.args:
+            await update.message.reply_text(
+                "⚡ *LUCI Friction Interceptor*\n\n"
+                "Usage:\n"
+                "`/friction <what you were trying to do>`\n\n"
+                "Or with symptom:\n"
+                "`/friction connect Alpaca API | got connection refused on port 8000`\n\n"
+                "LUCI will give you: DIAGNOSIS / FIX / FALLBACK / VERIFY",
+                parse_mode="Markdown"
+            )
+            return
+
+        full_text = " ".join(context.args)
+
+        # Split on pipe if present: "intent | symptom"
+        if "|" in full_text:
+            parts    = full_text.split("|", 1)
+            what     = parts[0].strip()
+            actual   = parts[1].strip()
+            expected = ""
+        else:
+            what     = full_text.strip()
+            expected = ""
+            actual   = ""
+
+        await update.message.reply_text(
+            f"⚡ Analyzing friction...\n_{what}_",
+            parse_mode="Markdown"
+        )
+
+        FRICTION_SYSTEM = (
+            "You are LUCI, an execution engine for a senior developer named Chip. "
+            "Your ONLY job is to unblock technical friction fast. No fluff, no encouragement. "
+            "When given a friction description:\n"
+            "1. Diagnose the most likely cause in ONE sentence\n"
+            "2. Give the single most direct fix (code snippet if relevant, under 10 lines)\n"
+            "3. Give one alternative if the first does not work\n"
+            "4. State what to check to confirm it is resolved\n\n"
+            "Format your response with exactly these labels:\n"
+            "DIAGNOSIS:\n"
+            "FIX:\n"
+            "FALLBACK:\n"
+            "VERIFY:\n\n"
+            "Be brutal and direct. Chip is technical. Treat him accordingly."
+        )
+
+        user_msg = f"What I was trying to do: {what}\n"
+        if expected:
+            user_msg += f"What I expected: {expected}\n"
+        if actual:
+            user_msg += f"What actually happened: {actual}\n"
+
+        try:
+            response = ollama_chat(
+                [{"role": "system", "content": FRICTION_SYSTEM},
+                 {"role": "user",   "content": user_msg}],
+                temperature=0.2,
+            )
+            await send_long(update, f"⚡ *Unblock*\n\n{response}", parse_mode="Markdown")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Friction error: {e}")
+
+
+
+
+    async def cmd_think(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Cross-capability reasoning: /think [deep]"""
+        if not (update.effective_user and update.effective_user.id == ALLOWED_USER_ID):
+            return
+        args = (context.args or [])
+        deep = "deep" in [a.lower() for a in args]
+        model_label = "beast70b (deep)" if deep else "reasoning model"
+        await update.message.reply_text(
+            f"🧠 Thinking across email, calendar, and market data\n"
+            f"_Using {model_label}... give me a moment._",
+            parse_mode="Markdown"
+        )
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, lambda: luci_think_across(deep=deep))
+        await send_long(update, f"🧠 *LUCI Think*\n\n{result}")
+
+
+    async def cmd_trade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Trading commands — scan, backtest, status, pulse."""
+        if not allowed(update):
+            return
+
+        sub = (context.args[0].lower() if context.args else "help")
+
+        if sub == "scan":
+            await update.message.reply_text("📈 Running momentum scan... (takes ~30s)")
+            def _scan():
+                from luci_trading_agent import trade_scan
+                return trade_scan()
+            try:
+                result = await asyncio.to_thread(_scan)
+                await send_long(update, result)
+            except Exception as e:
+                await update.message.reply_text(f"❌ Scan error: {e}")
+
+        elif sub == "backtest":
+            ticker = context.args[1].upper() if len(context.args) > 1 else "SPY"
+            await update.message.reply_text(f"📊 Running backtest on {ticker}...")
+            def _bt():
+                from luci_trading_agent import trade_backtest
+                return trade_backtest(ticker)
+            try:
+                result = await asyncio.to_thread(_bt)
+                await send_long(update, result)
+            except Exception as e:
+                await update.message.reply_text(f"❌ Backtest error: {e}")
+
+        elif sub == "status":
+            def _status():
+                from luci_trading_agent import trade_status
+                return trade_status()
+            try:
+                result = await asyncio.to_thread(_status)
+                await send_long(update, result)
+            except Exception as e:
+                await update.message.reply_text(f"❌ Status error: {e}")
+
+        elif sub == "pulse":
+            await update.message.reply_text("📡 Getting market pulse...")
+            def _pulse():
+                from luci_trading_agent import trade_pulse
+                return trade_pulse()
+            try:
+                result = await asyncio.to_thread(_pulse)
+                await send_long(update, result)
+            except Exception as e:
+                await update.message.reply_text(f"❌ Pulse error: {e}")
+
+
+        # ── Alpaca execution subcommands ───────────────────────────────────
+        elif sub == "account":
+            try:
+                from luci_trading_alpaca import alpaca_account
+                reply = alpaca_account()
+                await send_long(update, f"💼 *Account*\n\n`{reply}`")
+            except Exception as e:
+                await update.message.reply_text(f"❌ Account error: {e}")
+
+        elif sub == "positions":
+            try:
+                from luci_trading_alpaca import alpaca_positions
+                reply = alpaca_positions()
+                await send_long(update, f"📊 *Positions*\n\n`{reply}`")
+            except Exception as e:
+                await update.message.reply_text(f"❌ Positions error: {e}")
+
+        elif sub == "orders":
+            try:
+                from luci_trading_alpaca import alpaca_orders
+                reply = alpaca_orders("open")
+                await send_long(update, f"📋 *Orders*\n\n`{reply}`")
+            except Exception as e:
+                await update.message.reply_text(f"❌ Orders error: {e}")
+
+        elif sub == "cancel":
+            try:
+                from luci_trading_alpaca import alpaca_cancel_all
+                reply = alpaca_cancel_all()
+                await update.message.reply_text(f"🚫 {reply}")
+            except Exception as e:
+                await update.message.reply_text(f"❌ Cancel error: {e}")
+
+        elif sub == "buy":
+            # /trade buy SYMBOL QTY
+            _args = context.args or []
+            if len(_args) < 3:
+                await update.message.reply_text("Usage: `/trade buy SYMBOL QTY`\ne.g. `/trade buy AAPL 5`", parse_mode="Markdown")
+            else:
+                symbol = _args[1].upper()
+                try:
+                    qty = float(_args[2])
+                except ValueError:
+                    await update.message.reply_text("❌ QTY must be a number")
+                    return
+                # Confirmation step
+                confirm_key = f"trade_buy_{symbol}_{qty}"
+                if context.user_data.get("pending_trade") == confirm_key:
+                    context.user_data.pop("pending_trade", None)
+                    try:
+                        from luci_trading_alpaca import alpaca_buy
+                        result = alpaca_buy(symbol, qty)
+                        if result["ok"]:
+                            await update.message.reply_text(
+                                f"✅ *BUY order placed*\n"
+                                f"Symbol: {result['symbol']}\n"
+                                f"Qty: {result['qty']}\n"
+                                f"Type: {result['type']}\n"
+                                f"Status: {result['status']}\n"
+                                f"ID: `{result['id']}`",
+                                parse_mode="Markdown"
+                            )
+                        else:
+                            await update.message.reply_text(f"❌ Order failed: {result['error']}")
+                    except Exception as e:
+                        await update.message.reply_text(f"❌ Buy error: {e}")
+                else:
+                    context.user_data["pending_trade"] = confirm_key
+                    await update.message.reply_text(
+                        f"⚠️ *Confirm BUY order*\n"
+                        f"Symbol: {symbol}\n"
+                        f"Qty: {qty} shares\n"
+                        f"Type: market order\n\n"
+                        f"Send `/trade buy {symbol} {int(qty) if qty == int(qty) else qty}` again to confirm.\n"
+                        f"_Paper mode — no real money._",
+                        parse_mode="Markdown"
+                    )
+
+        elif sub == "sell":
+            # /trade sell SYMBOL QTY
+            _args = context.args or []
+            if len(_args) < 3:
+                await update.message.reply_text("Usage: `/trade sell SYMBOL QTY`\ne.g. `/trade sell AAPL 5`", parse_mode="Markdown")
+            else:
+                symbol = _args[1].upper()
+                try:
+                    qty = float(_args[2])
+                except ValueError:
+                    await update.message.reply_text("❌ QTY must be a number")
+                    return
+                confirm_key = f"trade_sell_{symbol}_{qty}"
+                if context.user_data.get("pending_trade") == confirm_key:
+                    context.user_data.pop("pending_trade", None)
+                    try:
+                        from luci_trading_alpaca import alpaca_sell
+                        result = alpaca_sell(symbol, qty)
+                        if result["ok"]:
+                            await update.message.reply_text(
+                                f"✅ *SELL order placed*\n"
+                                f"Symbol: {result['symbol']}\n"
+                                f"Qty: {result['qty']}\n"
+                                f"Type: {result['type']}\n"
+                                f"Status: {result['status']}\n"
+                                f"ID: `{result['id']}`",
+                                parse_mode="Markdown"
+                            )
+                        else:
+                            await update.message.reply_text(f"❌ Order failed: {result['error']}")
+                    except Exception as e:
+                        await update.message.reply_text(f"❌ Sell error: {e}")
+                else:
+                    context.user_data["pending_trade"] = confirm_key
+                    await update.message.reply_text(
+                        f"⚠️ *Confirm SELL order*\n"
+                        f"Symbol: {symbol}\n"
+                        f"Qty: {qty} shares\n"
+                        f"Type: market order\n\n"
+                        f"Send `/trade sell {symbol} {qty}` again to confirm.\n"
+                        f"_Paper mode — no real money._",
+                        parse_mode="Markdown"
+                    )
+
+        else:
+            await update.message.reply_text(
+                "📈 *LUCI Trading*\n\n"
+                "`/trade scan` — top SP500 momentum stocks\n"
+                "`/trade backtest AAPL` — rank strategies on a ticker\n"
+                "`/trade pulse` — quick market read\n"
+                "`/trade status` — recent activity log\n"
+                "`/trade account` — paper account summary\n"
+                "`/trade positions` — open positions\n"
+                "`/trade orders` — open orders\n"
+                "`/trade buy AAPL 5` — buy 5 shares (paper)\n"
+                "`/trade sell AAPL 5` — sell 5 shares (paper)\n"
+                "`/trade cancel` — cancel all open orders\n\n"
+                "_Paper mode. ALPACA\_PAPER=true_",
+                parse_mode="Markdown"
+            )
+
+
     app = Application.builder().token(token).build()
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_help))
@@ -3396,6 +3924,10 @@ def run_telegram_bot() -> None:
     app.add_handler(CommandHandler("calendar", cmd_calendar))
     app.add_handler(CommandHandler("remind", cmd_remind))
     app.add_handler(CommandHandler("github", cmd_github))
+    app.add_handler(CommandHandler("agent",  cmd_agent))
+    app.add_handler(CommandHandler("friction", cmd_friction))
+    app.add_handler(CommandHandler("trade",    cmd_trade))
+    app.add_handler(CommandHandler("think", cmd_think))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

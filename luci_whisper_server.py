@@ -1,119 +1,86 @@
 #!/usr/bin/env python3
 """
-LUCI Whisper STT Server
-Loads Whisper once into GPU VRAM at startup.
-Serves transcription requests at ~300ms instead of 10-30s cold load.
+LUCI Whisper Server — faster-whisper + large-v3-turbo
+Persistent GPU server so model loads once, transcribes fast.
 """
-import json
+from __future__ import annotations
 import os
 import tempfile
-import time
 from pathlib import Path
 
-from dotenv import load_dotenv
-load_dotenv(Path.home() / "beast" / "workspace" / ".env")
-
-import torch
-import whisper
-from fastapi import FastAPI, UploadFile, File, Request
+from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
-import uvicorn
 
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-WHISPER_MODEL = os.getenv("LUCI_WHISPER_MODEL", "base.en")
-WHISPER_PORT  = int(os.getenv("LUCI_WHISPER_PORT", "8765"))
-DEVICE        = "cuda" if torch.cuda.is_available() else "cpu"
+MODEL_SIZE   = os.getenv("LUCI_WHISPER_MODEL", "large-v3-turbo")
+DEVICE       = os.getenv("LUCI_WHISPER_DEVICE", "cuda")
+COMPUTE_TYPE = os.getenv("LUCI_WHISPER_COMPUTE", "float16")
+PORT         = int(os.getenv("LUCI_WHISPER_PORT", "8765"))
 
-# ---------------------------------------------------------------------------
-# Load model ONCE at startup
-# ---------------------------------------------------------------------------
-print(f"[whisper-server] Loading {WHISPER_MODEL} on {DEVICE}...", flush=True)
-_t0 = time.time()
-model = whisper.load_model(WHISPER_MODEL, device=DEVICE)
-print(f"[whisper-server] ✅ Ready on {DEVICE} ({time.time()-_t0:.1f}s load time)", flush=True)
+INITIAL_PROMPT = (
+    "LUCI is pronounced 'Lucy'. LUCI is a personal AI assistant. "
+    "Chip and Edward are the same person, the user. "
+    "Ogechi is his wife. "
+    "Names: LUCI, Chip, Edward, Ogechi, Andrew, Christopher, Athena. "
+    "Common topics: medication, Zoloft, Lyrica, health, code, GitHub, projects."
+)
 
-_FP16 = DEVICE == "cuda"
+print(f"Loading faster-whisper {MODEL_SIZE} on {DEVICE} ({COMPUTE_TYPE})...", flush=True)
+from faster_whisper import WhisperModel
+model = WhisperModel(MODEL_SIZE, device=DEVICE, compute_type=COMPUTE_TYPE)
+print(f"Model loaded.", flush=True)
 
-# ---------------------------------------------------------------------------
-# App
-# ---------------------------------------------------------------------------
-app = FastAPI(title="LUCI Whisper Server")
+app = FastAPI()
 
+def _transcribe(audio_path: str) -> tuple[str, float]:
+    """Run transcription, return (text, duration)."""
+    segments, info = model.transcribe(
+        audio_path,
+        language="en",
+        initial_prompt=INITIAL_PROMPT,
+        vad_filter=True,
+        vad_parameters=dict(
+            min_silence_duration_ms=500,
+            speech_pad_ms=200,
+        ),
+    )
+    text = " ".join(seg.text.strip() for seg in segments).strip()
+    return text, info.duration
 
 @app.get("/health")
-async def health() -> JSONResponse:
-    return JSONResponse({"status": "ok", "model": WHISPER_MODEL, "device": DEVICE})
-
+async def health():
+    return JSONResponse({
+        "status": "ok",
+        "model": MODEL_SIZE,
+        "device": DEVICE,
+        "compute_type": COMPUTE_TYPE,
+    })
 
 @app.post("/transcribe")
-async def transcribe(audio: UploadFile = File(...)) -> JSONResponse:
-    """Accept any audio file upload and return transcription."""
-    suffix = ".webm"
-    ct = audio.content_type or ""
-    if "wav" in ct:
-        suffix = ".wav"
-    elif "ogg" in ct:
-        suffix = ".ogg"
-    elif "mp4" in ct or "m4a" in ct:
-        suffix = ".m4a"
-
-    tmp_path = None
+async def transcribe(audio: UploadFile = File(...)):
     try:
-        data = await audio.read()
+        suffix = Path(audio.filename or "audio.wav").suffix or ".wav"
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-            tmp.write(data)
+            tmp.write(await audio.read())
             tmp_path = tmp.name
-
-        result = model.transcribe(
-            tmp_path, fp16=_FP16, language="en",
-            initial_prompt=(
-                "LUCI is pronounced 'Lucy'. LUCI is a personal AI assistant. "
-                "Chip and Edward are the same person, the user. "
-                "Ogechi is his wife. "
-                "Names: LUCI, Chip, Edward, Ogechi, Andrew, Christopher, Athena. "
-                "Common topics: medication, Zoloft, Lyrica, health, code, GitHub, projects."
-            ),
-        )
-        text = (result.get("text") or "").strip()
-        return JSONResponse({"text": text, "duration": result.get("duration", 0)})
+        try:
+            text, duration = _transcribe(tmp_path)
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+        return JSONResponse({"text": text, "duration": duration})
     except Exception as e:
         return JSONResponse({"text": "", "error": str(e)}, status_code=500)
-    finally:
-        if tmp_path:
-            try:
-                Path(tmp_path).unlink(missing_ok=True)
-            except Exception:
-                pass
-
 
 @app.post("/transcribe_path")
-async def transcribe_path(request: Request) -> JSONResponse:
-    """Accept JSON {"path": "/abs/path/to/file.wav"} and return transcription."""
+async def transcribe_path(body: dict):
     try:
-        body = await request.json()
         path = body.get("path", "")
         if not path or not Path(path).exists():
             return JSONResponse({"text": "", "error": "file not found"}, status_code=400)
-        result = model.transcribe(
-            path, fp16=_FP16, language="en",
-            initial_prompt=(
-                "LUCI is pronounced 'Lucy'. LUCI is a personal AI assistant. "
-                "Chip and Edward are the same person, the user. "
-                "Ogechi is his wife. "
-                "Names: LUCI, Chip, Edward, Ogechi, Andrew, Christopher, Athena. "
-                "Common topics: medication, Zoloft, Lyrica, health, code, GitHub, projects."
-            ),
-        )
-        text = (result.get("text") or "").strip()
-        return JSONResponse({"text": text})
+        text, duration = _transcribe(path)
+        return JSONResponse({"text": text, "duration": duration})
     except Exception as e:
         return JSONResponse({"text": "", "error": str(e)}, status_code=500)
 
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=WHISPER_PORT, log_level="warning")
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=PORT)

@@ -5,15 +5,25 @@ sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent.parent))
 
 from luci_trading.data import get_stock_data
 
-SP500_URL = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
 
+# Hardcoded SP500 top 100 by market cap — avoids Wikipedia 403 bot blocking
+_SP500_TICKERS = [
+    "AAPL","MSFT","NVDA","AMZN","GOOGL","META","BRK-B","TSLA","AVGO","JPM",
+    "LLY","UNH","V","XOM","MA","JNJ","PG","HD","COST","ABBV",
+    "MRK","CVX","NFLX","CRM","BAC","ORCL","AMD","PEP","KO","WMT",
+    "TMO","MCD","CSCO","ACN","ABT","LIN","DHR","TXN","ADBE","NEE",
+    "PM","QCOM","GE","INTU","RTX","CAT","SPGI","HON","LOW","AMAT",
+    "AMGN","T","ISRG","GS","IBM","ELV","BKNG","BLK","SYK","VRTX",
+    "MDT","AXP","GILD","TJX","ADP","REGN","MMC","ETN","C","CB",
+    "CI","MO","DUK","SO","BMY","NOW","PLD","SCHW","DE","ZTS",
+    "PANW","BSX","SBUX","ADI","MDLZ","CME","ITW","EOG","SLB","AON",
+    "WM","PH","FI","ICE","NOC","MCO","HUM","APH","CL","MSI",
+]
 
 def get_sp500_tickers() -> list[str]:
-    """Scrape SP500 ticker list from Wikipedia."""
-    tables = pd.read_html(SP500_URL)
-    tickers = tables[0]["Symbol"].tolist()
-    # Fix common formatting issues (BRK.B → BRK-B for yfinance)
-    return [t.replace(".", "-") for t in tickers]
+    return _SP500_TICKERS
+
+
 
 
 def scan_sp500(top_n: int = 50) -> pd.DataFrame:

@@ -236,6 +236,19 @@ class Tools:
             "change_dir", True, f"Working directory: {p}"
         ))
 
+
+    # ── INSTALL DEPS ──────────────────────────────────────────────────────
+    def install_deps(self, packages: list[str]) -> ToolResult:
+        """Auto-install missing Python packages."""
+        if not packages:
+            return self._record(ToolResult("install_deps", False, "", "No packages specified"))
+        import sys
+        pkg_str = " ".join(packages)
+        cmd = f"{sys.executable} -m pip install {pkg_str} --break-system-packages -q"
+        result = self.bash(cmd, timeout=120)
+        result.tool = "install_deps"
+        return result
+
     # ── INTERNAL ──────────────────────────────────────────────────────────
     def _resolve(self, path: str) -> Path:
         p = Path(path)
