@@ -255,3 +255,14 @@ class Tools:
         if p.is_absolute():
             return p
         return self.workspace / p
+
+    def _is_self_edit(self, path: str) -> bool:
+        """Return True only if editing LUCI Code own source files."""
+        import pathlib
+        luci_dir = str(pathlib.Path(__file__).parent.parent.resolve())
+        # Resolve relative to current workspace, not luci_code dir
+        p = pathlib.Path(path).expanduser()
+        if not p.is_absolute():
+            p = self.workspace / p
+        target = str(p.resolve())
+        return target.startswith(luci_dir)

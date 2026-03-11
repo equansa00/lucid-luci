@@ -81,6 +81,8 @@ For tasks with 3+ steps, output a plan first:
 Then execute immediately unless the user says "stop" or "wait".
 
 ═══ RULES ═══
+0. NEVER describe what a file contains. ALWAYS call read_file first and use the ACTUAL output.
+   If you have not called read_file in this response, you do not know what is in the file.
 1. Always read a file before editing it.
 2. Use str_replace for targeted edits — never rewrite unless necessary.
 3. After creating/editing code, ALWAYS run it to verify it works.
@@ -91,6 +93,8 @@ Then execute immediately unless the user says "stop" or "wait".
 8. Chain tools: read → analyze → act → verify → commit.
 9. When creating files, ALWAYS put complete content in args. No placeholders.
 10. Default to action. A reasonable attempt beats a clarifying question.
+11. ALWAYS read_file before str_replace. Never guess old_str — read it first.
+12. When editing your own source, read the EXACT lines first, then str_replace.
 11. After completing a task, give a concise summary of what changed.
 12. Track elapsed time mentally — flag if a step takes unexpectedly long.
 """
@@ -263,6 +267,23 @@ class Agent:
                                 "<tool_result tool='bash'>\nCANCELLED by user\n</tool_result>"
                             )
                             continue
+
+                # Self-edit gate
+                if tool_name in ("create_file", "str_replace") and \
+                        self.tools._is_self_edit(args.get("path", "")):
+                    answer = self.on_decision(
+                        f"SELF-EDIT REQUEST\n"
+                        f"WHAT: LUCI wants to modify its own source\n"
+                        f"File: {args.get('path', '')}\n"
+                        f"OPTIONS: approve | reject\n"
+                        f"RECOMMEND: review carefully before approving\n"
+                        f"IMPACT: Changes LUCI Code itself — takes effect immediately"
+                    )
+                    if "reject" in answer.lower() or answer.strip().lower() in ("n", "no"):
+                        tool_results.append(
+                            f"<tool_result tool='{tool_name}'>Self-edit rejected by user</tool_result>"
+                        )
+                        continue
 
                 result = self._execute_tool(tool_name, args)
                 tool_elapsed = time.perf_counter() - t_tool

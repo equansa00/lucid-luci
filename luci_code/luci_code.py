@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# LUCI Code v2
 """
 LUCI Code — Agentic coding CLI (Claude Code feature parity)
 Usage: luci-code [path] [--model MODEL] [--no-confirm] [--auto]
@@ -210,6 +211,7 @@ def main():
     auto          = args.auto
     current_model = args.model
     currently_streaming = False
+    user_history: list[str] = []
     task_start_time     = None
 
     _xml_buffer = ""
@@ -410,6 +412,14 @@ def main():
                     console.print("[luci.error]Usage: /run <command>[/]")
             elif cmd == "/benchmark":
                 run_benchmark([current_model])
+            elif cmd == "/history":
+                if user_history:
+                    last5 = user_history[-5:]
+                    console.print("[luci.gold]Recent requests:[/]")
+                    for i, h in enumerate(reversed(last5), 1):
+                        console.print(f"  [luci.dim]{i}.[/] {h[:80]}")
+                else:
+                    console.print("[luci.dim]No history yet.[/]")
             elif cmd == "/changed":
                 if agent._changed_files:
                     console.print(
@@ -423,6 +433,9 @@ def main():
             continue
 
         # Normal message
+        user_history.append(user_input)
+        if len(user_history) > 20:
+            user_history.pop(0)
         console.print()
         task_start_time = time.perf_counter()
         on_status("LUCI is thinking...")
