@@ -322,6 +322,104 @@ def load_persona() -> str:
 
 
 
+
+def strip_generic_phrases(text: str) -> str:
+    """Remove chatbot filler phrases that break LUCI persona."""
+    import re
+
+    openers = [
+        r"^As LUCI,?\s*",
+        r"^As your (personal )?AI (agent|assistant),?\s*",
+        r"^I have gathered\s+",
+        r"^Here (they are|are the results|is what I found)[:\.]?\s*",
+        r"^Certainly[!,.]?\s*",
+        r"^Of course[!,.]?\s*",
+        r"^Great question[!,.]?\s*",
+        r"^Sure[!,.]?\s*",
+        r"^Absolutely[!,.]?\s*",
+        r"^I can do many things\.?\s*",
+        r"^Here are some of the features I offer:?\s*",
+        r"^Here are my (key )?features:?\s*",
+        r"^Some of my (key )?features (include|are):?\s*",
+    ]
+    for pattern in openers:
+        text = re.sub(pattern, "", text, flags=re.IGNORECASE)
+
+    closers = [
+        r"\n?Please let me know if .*$",
+        r"\n?Is there anything (else )?I can help.*$",
+        r"\n?Let me know if you (need|want|have).*$",
+        r"\n?Feel free to ask.*$",
+        r"\n?Hope (this|that) helps.*$",
+        r"\n?If you (need|want|have) any.*$",
+        r"\n?In summary,.*$",
+        r"\n?To summarize,.*$",
+        r"\n?Overall,.*easier.*$",
+        r"\n?I am (a fully capable|designed to).*$",
+    ]
+    for pattern in closers:
+        text = re.sub(pattern, "", text, flags=re.IGNORECASE | re.DOTALL)
+
+    # Convert numbered lists to flowing prose
+    if re.search(r"^\d+\.", text, re.MULTILINE):
+        text = re.sub(r"^\d+\.\s*", "", text, flags=re.MULTILINE)
+        parts = [l.strip() for l in text.split("\n") if l.strip()]
+        text = " ".join(parts)
+
+    return text.strip()
+
+def build_capability_context() -> str:
+    """Read luci_features.json and build focused self-knowledge for capability questions."""
+    try:
+        registry_path = WORKSPACE / "luci_features.json"
+        if not registry_path.exists():
+            return ""
+        import json
+        data = json.loads(registry_path.read_text())
+        features = data.get("features", [])
+        if not features:
+            return ""
+
+        # Only real capabilities — skip auto-detected noise
+        skip = {
+            "API: /", "API: /status", "API: /manifest.json", "API: /sw.js",
+            "API: /audio/{filename}", "API: /output/{filename}", "API: /voices",
+            "API: /preview/{voice_id}", "API: /voice", "API: /voice/sessions",
+            "API: /voice/sessions/{sid}", "API: /memory/list", "API: /memory/delete",
+            "API: /friction", "API: /chat", "API: /build/status/{build_id}",
+            "API: /build", "API: /upload", "API: /health",
+            "API: /transcribe", "API: /transcribe_path",
+            "/start command", "/help command", "/yes command", "/heartbeat command",
+            "/status command", "/manifest.json command", "/sw.js command",
+        }
+        cap_lines = []
+        for f in features:
+            name = f.get("name", "")
+            desc = f.get("description", "")
+            cmds = f.get("commands", [])
+            if name in skip:
+                continue
+            if name.startswith("API:"):
+                continue
+            # Skip auto-detected commands — they add noise, real ones are in core caps
+            if name.endswith(" command") and f.get("_auto_detected"):
+                continue
+            cmd_hint = f" (use: {cmds[0]})" if cmds and cmds[0].startswith("/") else ""
+            cap_lines.append(f"- {name}{cmd_hint}: {desc}")
+
+        if not cap_lines:
+            return ""
+
+        block  = "MY FULL CAPABILITY LIST (every item — use this when asked what I can do):\n"
+        block += "\n".join(cap_lines)
+        block += (
+            "\n\nRULE: Cover every single item above. No numbered lists — write flowing sentences like a person talking. No bullet points. No closers like let me know if you need anything. Just speak naturally in first person and cover everything in one or two paragraphs."
+        )
+        return block
+    except Exception:
+        return ""
+
+
 def load_feature_registry() -> str:
     """Read luci_features.json and return a formatted capability block."""
     import json
@@ -3366,6 +3464,7 @@ def run_telegram_bot() -> None:
                     response = ollama_chat(messages, temperature=0.4, model=routed_model)
                 except Exception as e:
                     response = f"❌ Ollama error: {e}"
+                response = strip_generic_phrases(response)
                 tag = format_model_tag(routed_model, category)
                 if tag:
                     response = response + f"\n\n{tag}"
@@ -3380,7 +3479,15 @@ def run_telegram_bot() -> None:
             persona = load_persona_with_memory()
             messages = []
             if persona:
-                messages.append({"role": "system", "content": persona})
+                # Inject live capability context for self-knowledge questions
+                _cap_kw = ["can you", "what can you", "what do you", "tell me about yourself",
+                           "what are you", "who are you", "your features", "your capabilities",
+                           "what you can do", "features that you have", "abilities"]
+                if any(kw in text.lower() for kw in _cap_kw):
+                    cap_ctx = build_capability_context()
+                    messages.append({"role": "system", "content": persona + "\n\n" + cap_ctx})
+                else:
+                    messages.append({"role": "system", "content": persona})
 
             # Inject structured beast_memory.json entries (salience-sorted, top 30)
             try:
@@ -3482,8 +3589,22 @@ def run_telegram_bot() -> None:
                     augmented += f"\n\n[REAL TIME DATA]: {get_time('America/New_York')}"
                 except Exception:
                     pass
+            # Rewrite capability questions to force use of injected list
+            _cap_kw = ["can you", "what can you", "your features",
+                       "your capabilities", "what you can do",
+                       "features that you have", "tell me about yourself",
+                       "what are you", "who are you", "abilities"]
+            if any(kw in text.lower() for kw in _cap_kw):
+                augmented = (
+                    "Using ONLY the capability list in your system prompt, "
+                    "describe everything you can do in 2-3 natural flowing paragraphs. "
+                    "First person. No numbered lists. No bullet points. "
+                    "Cover every single item — do not skip any. "
+                    "Original question: " + text
+                )
             messages.append({"role": "user", "content": augmented})
             response = ollama_chat(messages, temperature=0.4, model=routed_model)
+            response = strip_generic_phrases(response)
         except Exception as e:
             response = f"❌ Ollama error: {e}"
         # Strip chatbot/apology language before sending to Telegram

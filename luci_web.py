@@ -2972,7 +2972,21 @@ async def chat_endpoint(request: Request) -> JSONResponse:
         if system_override:
             messages.append({"role": "system", "content": system_override})
         elif persona:
-            messages.append({"role": "system", "content": persona})
+            # Inject live capability context for self-knowledge questions
+            _cap_kw = ["can you", "what can you", "what do you", "tell me about yourself",
+                       "what are you", "who are you", "your features", "your capabilities",
+                       "what you can do", "features that you have", "abilities", "what all"]
+            try:
+                import sys as _sys
+                _sys.path.insert(0, str(Path(__file__).parent))
+                from luci import build_capability_context
+                if any(kw in text.lower() for kw in _cap_kw):
+                    cap_ctx = build_capability_context()
+                    messages.append({"role": "system", "content": persona + "\n\n" + cap_ctx})
+                else:
+                    messages.append({"role": "system", "content": persona})
+            except Exception:
+                messages.append({"role": "system", "content": persona})
 
         # Inject structured beast_memory.json entries (salience-sorted, top 30)
         try:
@@ -3025,6 +3039,19 @@ async def chat_endpoint(request: Request) -> JSONResponse:
             if content:
                 messages.append({"role": role, "content": content})
 
+        # For capability questions, rewrite the prompt to force the model to use the list
+        _cap_kw = ["can you", "what can you", "what do you", "tell me about yourself",
+                   "what are you", "who are you", "your features", "your capabilities",
+                   "what you can do", "features that you have", "abilities", "what all"]
+        if any(kw in text.lower() for kw in _cap_kw):
+            injected_text = (
+                "Using ONLY the capability list in your system prompt, "
+                "describe everything you can do in 2-3 natural flowing paragraphs. "
+                "First person. No numbered lists. No bullet points. "
+                "Cover every single item in the list — do not skip any. "
+                "Original question: " + text
+            )
+
         messages.append({"role": "user", "content": injected_text})
 
         await broadcast_state("thinking")
@@ -3033,29 +3060,35 @@ async def chat_endpoint(request: Request) -> JSONResponse:
             None, lambda: ollama_chat(messages, 0.4, model_name)
         )
 
-        # Auto-summarize large responses and save full output to file
-        topic = category if category else "output"
-        response_text, full_path = await loop.run_in_executor(
-            None, lambda: summarize_large_output(response_text, topic)
-        )
-        if full_path:
-            fname = Path(full_path).name
-            response_text += f"\n\n📄 [View full output](/output/{fname})"
+        # Auto-summarize large responses — but skip for capability/identity questions
+        _cap_kw = ["can you", "what can you", "your features", "your capabilities",
+                   "what you can do", "features that you have", "tell me about yourself",
+                   "what are you", "who are you", "abilities"]
+        _is_cap_question = any(kw in text.lower() for kw in _cap_kw)
+        if not _is_cap_question:
+            topic = category if category else "output"
+            response_text, full_path = await loop.run_in_executor(
+                None, lambda: summarize_large_output(response_text, topic)
+            )
+            if full_path:
+                fname = Path(full_path).name
+                response_text += f"\n\n📄 [View full output](/output/{fname})"
 
-        # Strip chatbot/apology language before sending
-        import re as _re
-        _apology_patterns = [
-            r"I apologize for (?:the )?(?:any )?inconvenience[.,]?\s*",
-            r"I(?:'m| am) sorry for[^.]*\.\s*",
-            r"I apologize[.,]?\s*",
-            r"Is there anything else I can (?:assist|help) you with\??\s*",
-            r"How can I (?:assist|help) you (?:today|further)\??\s*",
-            r"(?:Certainly|Of course|Absolutely|Sure thing)[!,]?\s*",
-            r"Thank you for your patience[.,]?\s*",
-            r"Please note that\s*",
-        ]
-        for _pat in _apology_patterns:
-            response_text = _re.sub(_pat, "", response_text, flags=_re.IGNORECASE)
+        # Strip chatbot/apology language using full LUCI persona filter
+        try:
+            import sys as _sys
+            _sys.path.insert(0, str(Path(__file__).parent))
+            from luci import strip_generic_phrases
+            response_text = strip_generic_phrases(response_text)
+        except Exception:
+            import re as _re
+            for _pat in [
+                r"I apologize for (?:the )?(?:any )?inconvenience[.,]?\s*",
+                r"Is there anything else I can (?:assist|help) you with\??\s*",
+                r"(?:Certainly|Of course|Absolutely|Sure thing)[!,]?\s*",
+                r"Please let me know if.*$",
+            ]:
+                response_text = _re.sub(_pat, "", response_text, flags=_re.IGNORECASE | _re.DOTALL)
         response_text = response_text.strip()
 
         tag = format_model_tag(model_name, category)
