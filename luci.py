@@ -321,6 +321,27 @@ def load_persona() -> str:
     return ""
 
 
+
+def load_feature_registry() -> str:
+    """Read luci_features.json and return a formatted capability block."""
+    import json
+    registry_path = WORKSPACE / "luci_features.json"
+    if not registry_path.exists():
+        return ""
+    try:
+        data = json.loads(registry_path.read_text())
+        features = data.get("features", [])
+        if not features:
+            return ""
+        lines = ["\nMY CURRENT CAPABILITIES (auto-updated):"]
+        for f in features:
+            cmds = f.get("commands", [])
+            cmd_str = f"  Commands: {', '.join(cmds)}" if cmds else ""
+            lines.append(f"- {f['name']}: {f['description']}{cmd_str}")
+        return "\n".join(lines)
+    except Exception:
+        return ""
+
 def load_persona_with_memory() -> str:
     """Return persona_agent.txt + memory.md for ask/cite/Telegram contexts.
     NOT used by agent_prompt — it receives memory_text separately."""
@@ -328,6 +349,9 @@ def load_persona_with_memory() -> str:
     persona = load_persona()
     if persona:
         parts.append(persona)
+    registry = load_feature_registry()
+    if registry:
+        parts.append(registry)
     mem = load_memory()
     if mem.strip():
         parts.append("## WHAT YOU REMEMBER ABOUT EDWARD:\n" + mem.strip())
@@ -3696,6 +3720,60 @@ def run_telegram_bot() -> None:
 
 
 
+
+    async def cmd_audit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Run LUCI workspace self-audit and report health status."""
+        if not (update.effective_user and update.effective_user.id == ALLOWED_USER_ID):
+            return
+        await update.message.reply_text("🔍 Running workspace audit... give me a moment.")
+        try:
+            import sys
+            sys.path.insert(0, str(WORKSPACE))
+            from luci_audit import run_audit
+            report = run_audit(verbose=False)
+            h = report["health"]
+            s = report["summary"]
+            issues = report["issues"]
+            services = report["services"]
+            health_emoji = {
+                "HEALTHY":        "✅",
+                "MOSTLY_HEALTHY": "🟡",
+                "NEEDS_ATTENTION":"🟠",
+                "DEGRADED":       "🔴",
+            }.get(h, "❓")
+
+            lines = [
+                f"{health_emoji} *LUCI Health: {h}*",
+                f"",
+                f"📁 Files scanned: {s['total_files']} ({s['python_files']} Python)",
+                f"⚙️ Services: {s['services_active']}/{s['services_checked']} active",
+                f"🔴 Critical: {s['critical_issues']}",
+                f"🟡 Warnings: {s['warnings']}",
+                f"ℹ️ Info: {s['info_items']}",
+                f"",
+            ]
+
+            if issues:
+                lines.append("*Issues:*")
+                for issue in issues[:8]:
+                    sev_emoji = {"CRITICAL":"🔴","WARNING":"🟡","INFO":"ℹ️"}.get(issue["severity"],"?")
+                    lines.append(f"{sev_emoji} `{issue['file']}` — {issue['detail'][:60]}")
+                if len(issues) > 8:
+                    lines.append(f"...and {len(issues)-8} more. Check /mnt/workspace/runs/last_audit.json")
+            else:
+                lines.append("✨ No issues found — everything looks good!")
+
+            lines.append("")
+            lines.append("*Services:*")
+            for svc, info in services.items():
+                emoji = "✅" if info["status"] == "active" else "🔴"
+                lines.append(f"{emoji} {svc}: {info['status']}")
+
+            await send_long(update, "\n".join(lines))
+        except Exception as e:
+            await update.message.reply_text(f"❌ Audit failed: {e}")
+
+
     async def cmd_think(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Cross-capability reasoning: /think [deep]"""
         if not (update.effective_user and update.effective_user.id == ALLOWED_USER_ID):
@@ -3900,12 +3978,25 @@ def run_telegram_bot() -> None:
                 "`/trade buy AAPL 5` — buy 5 shares (paper)\n"
                 "`/trade sell AAPL 5` — sell 5 shares (paper)\n"
                 "`/trade cancel` — cancel all open orders\n\n"
-                "_Paper mode. ALPACA\_PAPER=true_",
+                "_Paper mode. ALPACA\\_PAPER=true_",
                 parse_mode="Markdown"
             )
 
 
+    async def cmd_poly(update, context):
+        import sys
+        sys.path.insert(0, '/home/equansa00/beast/workspace')
+        from polymarket import handle_command
+        args = context.args or []
+        cmd = '/poly ' + ' '.join(args) if args else '/poly markets'
+        try:
+            result = handle_command(cmd)
+        except Exception as e:
+            result = f'Error: {e}'
+        await update.message.reply_text('```\n' + str(result) + '\n```', parse_mode='Markdown')
+
     app = Application.builder().token(token).build()
+    app.add_handler(CommandHandler("poly", cmd_poly))
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("status", cmd_status))
@@ -3928,6 +4019,7 @@ def run_telegram_bot() -> None:
     app.add_handler(CommandHandler("friction", cmd_friction))
     app.add_handler(CommandHandler("trade",    cmd_trade))
     app.add_handler(CommandHandler("think", cmd_think))
+    app.add_handler(CommandHandler("audit", cmd_audit))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

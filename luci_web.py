@@ -2950,30 +2950,6 @@ async def chat_endpoint(request: Request) -> JSONResponse:
             except Exception as _se:
                 print(f"[search] Error: {_se}", flush=True)
 
-
-        # Cross-capability think injection
-        _think_kw = [
-            "what should i focus", "what should i do", "prioritize",
-            "what's my priority", "think for me", "what's most important",
-            "cross-capability", "synthesize my day", "what's urgent",
-            "brief me", "give me a briefing", "morning briefing",
-        ]
-        if any(kw in text.lower() for kw in _think_kw):
-            try:
-                import sys as _sys
-                _sys.path.insert(0, str(Path(__file__).parent))
-                from luci import luci_think_across
-                _think_result = luci_think_across(deep=False)
-                injected_text = (
-                    f"{injected_text}\n\n"
-                    f"[LUCI CROSS-CAPABILITY ANALYSIS — synthesized live]:\n"
-                    f"{_think_result}\n"
-                    f"<inst>Deliver this analysis directly to Chip as your own reasoning. "
-                    f"Do not say you are retrieving or analyzing — just present it.</inst>"
-                )
-            except Exception as _te:
-                pass
-
         # Build request detection — hand off to autonomous builder
         if _LUCI_V2 and len(text) > 30 and any(t in text.lower() for t in _BUILD_TRIGGERS):
             try:
@@ -3167,6 +3143,107 @@ async def upload_file_endpoint(request: Request) -> JSONResponse:
         })
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+
+@app.get("/audit")
+async def audit_endpoint(request: Request) -> JSONResponse:
+    """LUCI workspace health check — returns full audit report as JSON."""
+    try:
+        import importlib, sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        import luci_audit
+        importlib.reload(luci_audit)
+        report = luci_audit.run_audit(verbose=False)
+        files  = luci_audit.scan_workspace()
+        luci_audit.auto_update_registry(files)
+        return JSONResponse(report)
+    except Exception as e:
+        return JSONResponse({"error": str(e), "health": "UNKNOWN"}, status_code=500)
+
+
+@app.get("/audit/ui", response_class=HTMLResponse)
+async def audit_ui_endpoint(request: Request) -> HTMLResponse:
+    """Human-readable audit dashboard."""
+    try:
+        import importlib, sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        import luci_audit
+        importlib.reload(luci_audit)
+        report = luci_audit.run_audit(verbose=False)
+        files  = luci_audit.scan_workspace()
+        luci_audit.auto_update_registry(files)
+    except Exception as e:
+        report = {"health": "ERROR", "summary": {}, "issues": [{"severity": "CRITICAL", "category": "audit_failed", "file": "luci_audit.py", "detail": str(e)}], "services": {}, "recommendations": []}
+
+    h        = report.get("health", "UNKNOWN")
+    s        = report.get("summary", {})
+    issues   = report.get("issues", [])
+    services = report.get("services", {})
+    recs     = report.get("recommendations", [])
+
+    health_color = {"HEALTHY": "#00ff88", "MOSTLY_HEALTHY": "#ffd700", "NEEDS_ATTENTION": "#ff8c00", "DEGRADED": "#ff3333", "ERROR": "#ff0000"}.get(h, "#888888")
+    sev_color    = {"CRITICAL": "#ff3333", "WARNING": "#ffd700", "INFO": "#88ccff"}
+
+    issues_html = ""
+    for issue in issues:
+        c = sev_color.get(issue["severity"], "#ccc")
+        issues_html += f'''<div style="background:rgba(255,255,255,0.05);border-left:3px solid {c};padding:10px 14px;margin:6px 0;border-radius:0 6px 6px 0;">
+          <span style="color:{c};font-weight:bold;font-size:11px;">{issue["severity"]}</span>
+          <span style="color:#aaa;font-size:11px;margin-left:8px;">{issue["category"]}</span>
+          <div style="color:#ddd;margin-top:4px;font-size:13px;">{issue["file"]}</div>
+          <div style="color:#999;font-size:12px;">{issue["detail"]}</div>
+        </div>'''
+
+    services_html = ""
+    for svc, info in services.items():
+        c = "#00ff88" if info["status"] == "active" else "#ff3333"
+        services_html += f'''<div style="display:flex;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.04);border-radius:6px;margin:4px 0;">
+          <span style="color:#ddd;">{svc}</span>
+          <span style="color:{c};font-weight:bold;">{info["status"].upper()}</span>
+        </div>'''
+
+    recs_html   = "".join(f'<div style="padding:6px 0;color:#ffd700;font-size:13px;">→ {r}</div>' for r in recs)
+    no_issues   = '<div style="color:#00ff88;padding:20px 0;text-align:center;">✨ No issues found — everything looks good!</div>'
+    recs_block  = f"<div class='section'><div class='section-title'>Recommendations</div>{recs_html}</div>" if recs_html else ""
+
+    html = f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LUCI Health Dashboard</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{background:#0a0a0a;color:#e0e0e0;font-family:'SF Mono','Fira Code',monospace;padding:24px}}
+  .header{{text-align:center;padding:32px 0 24px}}
+  .health-badge{{display:inline-block;background:{health_color}22;border:2px solid {health_color};color:{health_color};font-size:22px;font-weight:bold;padding:12px 32px;border-radius:40px;letter-spacing:2px}}
+  .grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:24px 0}}
+  .stat{{background:rgba(255,255,255,0.05);border-radius:10px;padding:16px;text-align:center}}
+  .stat-val{{font-size:28px;font-weight:bold;color:#D4AF37}}
+  .stat-lbl{{font-size:11px;color:#888;margin-top:4px;text-transform:uppercase;letter-spacing:1px}}
+  .section{{background:rgba(255,255,255,0.03);border-radius:12px;padding:20px;margin:16px 0}}
+  .section-title{{font-size:13px;font-weight:bold;color:#888;text-transform:uppercase;letter-spacing:2px;margin-bottom:14px}}
+  .refresh-btn{{display:block;margin:24px auto 0;background:#D4AF37;color:#000;border:none;padding:10px 28px;border-radius:20px;font-size:14px;font-weight:bold;cursor:pointer;letter-spacing:1px}}
+  .refresh-btn:hover{{background:#f0c840}}
+  .timestamp{{text-align:center;color:#444;font-size:11px;margin-top:16px}}
+</style></head><body>
+<div class="header">
+  <div style="color:#888;font-size:12px;letter-spacing:3px;margin-bottom:12px;">LUCI SYSTEM HEALTH</div>
+  <div class="health-badge">{h}</div>
+</div>
+<div class="grid">
+  <div class="stat"><div class="stat-val">{s.get("total_files",0)}</div><div class="stat-lbl">Total Files</div></div>
+  <div class="stat"><div class="stat-val">{s.get("python_files",0)}</div><div class="stat-lbl">Python Files</div></div>
+  <div class="stat"><div class="stat-val" style="color:{'#00ff88' if s.get('services_active',0)==s.get('services_checked',0) else '#ff8c00'}">{s.get("services_active",0)}/{s.get("services_checked",0)}</div><div class="stat-lbl">Services Active</div></div>
+  <div class="stat"><div class="stat-val" style="color:{'#ff3333' if s.get('critical_issues',0) else '#00ff88'}">{s.get("critical_issues",0)}</div><div class="stat-lbl">Critical</div></div>
+  <div class="stat"><div class="stat-val" style="color:{'#ffd700' if s.get('warnings',0) else '#00ff88'}">{s.get("warnings",0)}</div><div class="stat-lbl">Warnings</div></div>
+</div>
+<div class="section"><div class="section-title">Issues</div>{issues_html if issues_html else no_issues}</div>
+<div class="section"><div class="section-title">Services</div>{services_html if services_html else '<div style="color:#888;">No services found</div>'}</div>
+{recs_block}
+<button class="refresh-btn" onclick="location.reload()">↻ REFRESH</button>
+<div class="timestamp">Last checked: <span id="ts"></span></div>
+<script>document.getElementById("ts").textContent=new Date().toLocaleString();</script>
+</body></html>"""
+    return HTMLResponse(html)
 
 
 @app.websocket("/ws")
