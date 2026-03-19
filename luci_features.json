@@ -558,6 +558,33 @@
       "description": "Telegram /nextlesson command (auto-detected)",
       "_auto_detected": true,
       "_source": "luci.py"
+    },
+    {
+      "name": "/quiz command",
+      "commands": [
+        "/quiz"
+      ],
+      "description": "Test Chip on the current lesson with a real scenario.",
+      "_auto_detected": true,
+      "_source": "luci.py"
+    },
+    {
+      "name": "/exam command",
+      "commands": [
+        "/exam"
+      ],
+      "description": "Take a comprehensive exam on the current phase.",
+      "_auto_detected": true,
+      "_source": "luci.py"
+    },
+    {
+      "name": "/quizstats command",
+      "commands": [
+        "/quizstats"
+      ],
+      "description": "Telegram /quizstats command (auto-detected)",
+      "_auto_detected": true,
+      "_source": "luci.py"
     }
   ]
 }

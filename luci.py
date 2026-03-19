@@ -3924,6 +3924,162 @@ def run_telegram_bot() -> None:
             await update.message.reply_text(f"❌ Error: {e}")
 
 
+
+    async def cmd_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Test Chip on the current lesson with a real scenario."""
+        if not allowed(update):
+            return
+        try:
+            import sys, random
+            sys.path.insert(0, str(WORKSPACE))
+            from luci_teacher import load_curriculum, get_current_lesson
+            from luci_quiz   import get_random_scenario, get_all_scenarios, build_quiz_prompt, log_quiz_result
+            from luci        import load_persona_with_memory
+
+            data   = load_curriculum()
+            lesson = get_current_lesson(data)
+            if not lesson:
+                await update.message.reply_text("Curriculum complete — no more quizzes!")
+                return
+
+            # Check if a specific scenario number was requested
+            args = context.args if context.args else []
+            all_scenarios = get_all_scenarios(
+                lesson["phase"], lesson["module"], lesson["lesson"]
+            )
+
+            if not all_scenarios:
+                # No scenarios yet — generate one on the fly
+                await update.message.reply_text(
+                    f"🎯 *Quiz: {lesson['lesson_title']}*\n\nGenerating scenario...",
+                    parse_mode="Markdown"
+                )
+                persona = load_persona_with_memory()
+                messages = [
+                    {"role": "system", "content": persona},
+                    {"role": "user", "content": (
+                        f"Create ONE scenario-based test question for this lesson: "
+                        f"{lesson['lesson_title']} (Phase: {lesson['phase_title']}). "
+                        f"The scenario should be based on LUCI's real codebase or the HHA billing system. "
+                        f"Ask the question and wait for the answer. "
+                        f"Do not give the answer yet."
+                    )}
+                ]
+                response = ollama_chat(messages, temperature=0.8, model=ROUTER_DEFAULT_MODEL)
+                await send_long(update, response)
+                return
+
+            # Pick scenario
+            if args and args[0].isdigit():
+                idx = min(int(args[0]) - 1, len(all_scenarios) - 1)
+                scenario = all_scenarios[idx]
+            else:
+                scenario = random.choice(all_scenarios)
+
+            scenario_num = all_scenarios.index(scenario) + 1
+            await update.message.reply_text(
+                f"🎯 *Quiz — {lesson['lesson_title']}*\n"
+                f"Scenario {scenario_num}/{len(all_scenarios)}\n\n"
+                f"Answer in your own words. I\'ll evaluate after.",
+                parse_mode="Markdown"
+            )
+
+            persona  = load_persona_with_memory()
+            quiz_prompt = build_quiz_prompt(
+                scenario, lesson["lesson_title"], lesson["phase_title"]
+            )
+            messages = [
+                {"role": "system", "content": persona + "\n\n" + quiz_prompt},
+                {"role": "user",   "content": "Present the scenario."}
+            ]
+            response = ollama_chat(messages, temperature=0.6, model=ROUTER_DEFAULT_MODEL)
+            log_quiz_result(
+                lesson["phase"], lesson["module"], lesson["lesson"],
+                scenario, "PRESENTED"
+            )
+            await send_long(update, response)
+
+        except Exception as e:
+            await update.message.reply_text(f"❌ Quiz error: {e}")
+
+    async def cmd_exam(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Take a comprehensive exam on the current phase."""
+        if not allowed(update):
+            return
+        try:
+            import sys
+            sys.path.insert(0, str(WORKSPACE))
+            from luci_teacher import load_curriculum, get_current_lesson
+            from luci_quiz   import build_exam_prompt
+            from luci        import load_persona_with_memory
+
+            data   = load_curriculum()
+            lesson = get_current_lesson(data)
+            if not lesson:
+                await update.message.reply_text("Curriculum complete!")
+                return
+
+            await update.message.reply_text(
+                f"📝 *Phase {lesson['phase']} Exam*\n"
+                f"{lesson['phase_title']}\n\n"
+                f"3 scenario questions. No multiple choice. "
+                f"Apply what you\'ve learned. Starting now...",
+                parse_mode="Markdown"
+            )
+
+            # Build completed lessons list for this phase
+            completed = [
+                k for k in data.get("completed_lessons", [])
+                if k.startswith(f"p{lesson['phase']}_")
+            ]
+
+            persona     = load_persona_with_memory()
+            exam_prompt = build_exam_prompt(
+                lesson["phase"], lesson["phase_title"], completed
+            )
+            messages = [
+                {"role": "system", "content": persona + "\n\n" + exam_prompt},
+                {"role": "user",   "content": "Start the exam. Give me question 1."}
+            ]
+            response = ollama_chat(messages, temperature=0.5, model=ROUTER_DEFAULT_MODEL)
+            await send_long(update, response)
+
+        except Exception as e:
+            await update.message.reply_text(f"❌ Exam error: {e}")
+
+    async def cmd_quiz_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Show quiz performance stats."""
+        if not allowed(update):
+            return
+        try:
+            import sys
+            sys.path.insert(0, str(WORKSPACE))
+            from luci_quiz   import get_quiz_stats
+            from luci_teacher import load_curriculum, get_progress_summary
+            stats  = get_quiz_stats()
+            data   = load_curriculum()
+            progress = get_progress_summary(data)
+            total  = stats["total"]
+            if total == 0:
+                await update.message.reply_text(
+                    "No quizzes taken yet. Use /quiz to test yourself on the current lesson."
+                )
+                return
+            pct = round(stats["pass"] / total * 100) if total else 0
+            msg = (
+                f"📊 *Quiz Performance*\n\n"
+                f"{progress}\n\n"
+                f"*Quiz Results:*\n"
+                f"✅ Pass: {stats['pass']}\n"
+                f"🟡 Partial: {stats['partial']}\n"
+                f"🔴 Needs Review: {stats['needs_review']}\n"
+                f"Total: {total} ({pct}% pass rate)"
+            )
+            await update.message.reply_text(msg, parse_mode="Markdown")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Error: {e}")
+
+
     async def cmd_audit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Run LUCI workspace self-audit and report health status."""
         if not (update.effective_user and update.effective_user.id == ALLOWED_USER_ID):
@@ -4224,6 +4380,9 @@ def run_telegram_bot() -> None:
     app.add_handler(CommandHandler("think", cmd_think))
     app.add_handler(CommandHandler("audit", cmd_audit))
     app.add_handler(CommandHandler("learn",       cmd_learn))
+    app.add_handler(CommandHandler("quiz",        cmd_quiz))
+    app.add_handler(CommandHandler("exam",        cmd_exam))
+    app.add_handler(CommandHandler("quizstats",   cmd_quiz_stats))
     app.add_handler(CommandHandler("lesson",      cmd_lesson))
     app.add_handler(CommandHandler("nextlesson",  cmd_next_lesson))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
