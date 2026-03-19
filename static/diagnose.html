@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LUCI Diagnostics</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0a0a;color:#e0e0e0;font-family:'SF Mono','Fira Code',monospace;min-height:100vh}
+.header{background:#111;border-bottom:1px solid #222;padding:0 24px;height:56px;display:flex;align-items:center;gap:16px}
+.header h1{font-size:15px;color:#ff4444;letter-spacing:2px}
+.back{background:none;border:1px solid #333;color:#888;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;text-decoration:none;display:inline-flex;align-items:center}
+.back:hover{border-color:#D4AF37;color:#D4AF37}
+.badge{background:#ff4444;color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;margin-left:auto}
+.badge.ok{background:#00aa44}
+.container{max-width:1100px;margin:0 auto;padding:24px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.stat{background:#111;border:1px solid #1a1a1a;border-radius:8px;padding:16px;text-align:center}
+.stat-val{font-size:28px;font-weight:bold;color:#ff4444}
+.stat-val.ok{color:#00aa44}
+.stat-lbl{font-size:10px;color:#555;margin-top:4px;text-transform:uppercase;letter-spacing:1px}
+.card{background:#0d0d0d;border:1px solid #1a1a1a;border-radius:10px;padding:20px;margin-bottom:16px}
+.card-title{font-size:11px;color:#D4AF37;text-transform:uppercase;letter-spacing:2px;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.btn{padding:9px 18px;border-radius:7px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:bold;border:none;transition:all .15s}
+.btn-red{background:#ff4444;color:#fff}.btn-red:hover{background:#ff6666}
+.btn-gold{background:#D4AF37;color:#000}.btn-gold:hover{background:#f0c840}
+.btn-out{background:none;border:1px solid #333;color:#888}.btn-out:hover{border-color:#D4AF37;color:#D4AF37}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.actions{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+.diag-out{font-size:13px;color:#ccc;line-height:1.8;white-space:pre-wrap;min-height:80px}
+.diag-out strong{color:#fff}
+.diag-out em{color:#D4AF37}
+.diag-out code{background:#1a1a1a;padding:1px 5px;border-radius:3px;color:#D4AF37;font-family:monospace;font-size:12px}
+.placeholder{color:#333;font-style:italic}
+.error-list{display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto}
+.error-item{background:#111;border:1px solid #1a1a1a;border-radius:6px;padding:12px;cursor:pointer;transition:border-color .15s}
+.error-item:hover{border-color:#ff4444}
+.error-item.critical{border-left:3px solid #ff4444}
+.error-item.warning{border-left:3px solid #ffaa00}
+.error-item.info{border-left:3px solid #4488ff}
+.error-msg{font-size:12px;color:#ccc;margin-bottom:4px;word-break:break-all}
+.error-meta{font-size:10px;color:#555;display:flex;gap:12px;flex-wrap:wrap}
+.error-meta span{color:#666}
+.error-stack{font-size:11px;color:#444;margin-top:8px;display:none;white-space:pre-wrap;word-break:break-all}
+.error-item.expanded .error-stack{display:block}
+.svc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.svc-card{background:#111;border:1px solid #1a1a1a;border-radius:6px;padding:12px}
+.svc-name{font-size:11px;color:#D4AF37;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.svc-dot{width:8px;height:8px;border-radius:50%;background:#555}
+.svc-dot.ok{background:#00aa44}
+.svc-dot.err{background:#ff4444}
+.svc-log{font-size:11px;color:#555;line-height:1.5;max-height:80px;overflow:hidden;white-space:pre-wrap}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid #333;border-top-color:#ff4444;border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:bold;letter-spacing:1px}
+.tag-crit{background:#ff444422;color:#ff4444;border:1px solid #ff444444}
+.tag-warn{background:#ffaa0022;color:#ffaa00;border:1px solid #ffaa0044}
+.tag-info{background:#4488ff22;color:#4488ff;border:1px solid #4488ff44}
+.tag-ok{background:#00aa4422;color:#00aa44;border:1px solid #00aa4444}
+.empty{color:#333;font-style:italic;font-size:13px;padding:20px 0}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:#222;border-radius:2px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <a href="/" class="back">&#8592; LUCI</a>
+  <h1>&#128301; DIAGNOSTICS</h1>
+  <span class="badge" id="unresBadge">Loading...</span>
+</div>
+
+<div class="container">
+
+  <div class="grid">
+    <div class="stat">
+      <div class="stat-val" id="statTotal">—</div>
+      <div class="stat-lbl">Total Errors</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="statUnres">—</div>
+      <div class="stat-lbl">Unresolved</div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-red" id="runBtn" onclick="runDiagnosis()">&#128301; Run Diagnosis</button>
+    <button class="btn btn-out" onclick="loadErrors()">&#8635; Refresh Errors</button>
+    <button class="btn btn-out" onclick="clearErrors()">&#128465; Clear Log</button>
+    <a href="/learn" class="btn btn-out">&#128218; Back to Learn</a>
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      &#129302; LUCI Analysis
+      <span id="diagStatus" style="font-size:10px;color:#555;margin-left:auto"></span>
+    </div>
+    <div class="diag-out" id="diagOut">
+      <span class="placeholder">Click "Run Diagnosis" to have LUCI analyze recent errors and suggest fixes.</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">&#128680; Recent Errors</div>
+    <div class="error-list" id="errorList">
+      <div class="empty">Loading...</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">&#9881; Service Status</div>
+    <div class="svc-grid" id="svcGrid">
+      <div class="empty">Loading...</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function md(text) {
+  if (!text) return "";
+  var lines = text.split("\n");
+  var out = [];
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i]
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>")
+      .replace(/\*([^*\n]+)\*/g,"<em>$1</em>")
+      .replace(/`([^`\n]+)`/g,'<code>$1</code>');
+    if (line.indexOf("### ") === 0) line = '<strong style="color:#ff4444;font-size:13px">'+line.slice(4)+'</strong>';
+    else if (line.indexOf("## ")  === 0) line = '<strong style="color:#ff6644;font-size:14px">'+line.slice(3)+'</strong>';
+    else if (line.indexOf("# ")   === 0) line = '<strong style="color:#ff8844;font-size:15px">'+line.slice(2)+'</strong>';
+    else if (line.indexOf("- ")   === 0) line = '<span style="color:#ff4444">&#8226;</span> '+line.slice(2);
+    out.push(line);
+  }
+  return out.join("<br>");
+}
+
+function timeAgo(iso) {
+  var d = new Date(iso);
+  var s = Math.floor((Date.now() - d) / 1000);
+  if (s < 60)  return s+"s ago";
+  if (s < 3600) return Math.floor(s/60)+"m ago";
+  return Math.floor(s/3600)+"h ago";
+}
+
+function loadErrors() {
+  fetch("/diagnose/errors").then(function(r){ return r.json(); }).then(function(data){
+    var errors = data.errors || [];
+    var unres  = data.unresolved || 0;
+
+    document.getElementById("statTotal").textContent = errors.length;
+    document.getElementById("statUnres").textContent = unres;
+    document.getElementById("statUnres").className = "stat-val" + (unres === 0 ? " ok" : "");
+    document.getElementById("unresBadge").textContent = unres === 0 ? "All Clear" : unres+" unresolved";
+    document.getElementById("unresBadge").className = "badge" + (unres === 0 ? " ok" : "");
+
+    var list = document.getElementById("errorList");
+    if (!errors.length) {
+      list.innerHTML = '<div class="empty">No errors recorded yet. Browse /learn to capture any JS errors.</div>';
+      return;
+    }
+
+    // Show newest first
+    var sorted = errors.slice().reverse();
+    list.innerHTML = sorted.map(function(e) {
+      var sev = e.message && e.message.toLowerCase().indexOf("syntax") >= 0 ? "critical" :
+                e.source === "promise" ? "warning" : "info";
+      var tag = sev === "critical" ? "SYNTAX" : sev === "warning" ? "PROMISE" : "RUNTIME";
+      var tagClass = sev === "critical" ? "tag-crit" : sev === "warning" ? "tag-warn" : "tag-info";
+      return '<div class="error-item '+sev+'" onclick="this.classList.toggle(\'expanded\')">'
+           + '<div class="error-msg">'+String(e.message||"").replace(/&/g,"&amp;").replace(/</g,"&lt;")+'</div>'
+           + '<div class="error-meta">'
+           + '<span class="tag '+tagClass+'">'+tag+'</span>'
+           + '<span>#'+e.id+'</span>'
+           + (e.timestamp ? '<span>'+timeAgo(e.timestamp)+'</span>' : '')
+           + (e.lineno ? '<span>line '+e.lineno+'</span>' : '')
+           + (e.page ? '<span>'+e.page+'</span>' : '')
+           + '</div>'
+           + (e.stack ? '<div class="error-stack">'+String(e.stack).replace(/&/g,"&amp;").replace(/</g,"&lt;")+'</div>' : '')
+           + '</div>';
+    }).join("");
+  }).catch(function(e){
+    document.getElementById("errorList").innerHTML = '<div class="empty">Error loading: '+e.message+'</div>';
+  });
+}
+
+function loadServices() {
+  fetch("/diagnose/services").then(function(r){ return r.json(); }).then(function(data){
+    var grid = document.getElementById("svcGrid");
+    var svcs = data.services || {};
+    grid.innerHTML = Object.keys(svcs).map(function(name) {
+      var log = svcs[name] || "";
+      var hasErr = log && log !== "No recent errors" && log.indexOf("Could not") < 0;
+      return '<div class="svc-card">'
+           + '<div class="svc-name"><div class="svc-dot '+(hasErr?"err":"ok")+'"></div>'+name+'</div>'
+           + '<div class="svc-log">'+(hasErr ? log.slice(0,300) : "&#10003; No errors")+'</div>'
+           + '</div>';
+    }).join("");
+  }).catch(function(){
+    document.getElementById("svcGrid").innerHTML = '<div class="empty">Could not load service status.</div>';
+  });
+}
+
+function runDiagnosis() {
+  var btn = document.getElementById("runBtn");
+  var out = document.getElementById("diagOut");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>Analyzing...';
+  out.innerHTML = '<span class="spin"></span> LUCI is analyzing your errors...';
+  document.getElementById("diagStatus").textContent = "";
+
+  fetch("/diagnose/run").then(function(r){ return r.json(); }).then(function(data){
+    if (data.error) {
+      out.innerHTML = '<span style="color:#ff4444">Error: '+data.error+'</span>';
+    } else {
+      out.innerHTML = md(data.diagnosis || "No diagnosis returned");
+      document.getElementById("diagStatus").textContent =
+        "Checked "+data.errors_checked+" errors across "+data.services.length+" services";
+    }
+    btn.disabled = false;
+    btn.innerHTML = "&#128301; Run Diagnosis";
+    loadErrors();
+  }).catch(function(e){
+    out.innerHTML = '<span style="color:#ff4444">Failed: '+e.message+'</span>';
+    btn.disabled = false;
+    btn.innerHTML = "&#128301; Run Diagnosis";
+  });
+}
+
+function clearErrors() {
+  if (!confirm("Clear the error log?")) return;
+  fetch("/diagnose/clear", {method:"POST"}).then(function(){ loadErrors(); });
+}
+
+loadErrors();
+loadServices();
+setInterval(loadErrors, 30000);
+</script>
+</body>
+</html>

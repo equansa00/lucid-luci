@@ -3589,7 +3589,7 @@ async def capture_error(request: Request) -> JSONResponse:
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-@app.get("/diagnose")
+@app.get("/diagnose/run")
 async def diagnose_page(request: Request) -> JSONResponse:
     """Run LUCI self-diagnosis and return results."""
     try:
@@ -3621,6 +3621,39 @@ async def diagnose_page(request: Request) -> JSONResponse:
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
+
+
+@app.get("/diagnose", response_class=HTMLResponse)
+async def diagnose_root(request: Request) -> HTMLResponse:
+    from pathlib import Path
+    return HTMLResponse((Path(__file__).parent / "static" / "diagnose.html").read_text())
+
+@app.get("/diagnose/ui", response_class=HTMLResponse)
+async def diagnose_ui(request: Request) -> HTMLResponse:
+    from pathlib import Path
+    return HTMLResponse((Path(__file__).parent / "static" / "diagnose.html").read_text())
+
+@app.get("/diagnose/services")
+async def diagnose_services(request: Request) -> JSONResponse:
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from luci_diagnostics import get_all_service_errors
+        return JSONResponse({"services": get_all_service_errors()})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+@app.post("/diagnose/clear")
+async def diagnose_clear(request: Request) -> JSONResponse:
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from luci_diagnostics import ERROR_LOG
+        if ERROR_LOG.exists():
+            ERROR_LOG.write_text("[]")
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 @app.get("/diagnose/errors")
 async def get_errors(request: Request) -> JSONResponse:
