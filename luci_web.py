@@ -3493,6 +3493,64 @@ async def learn_exam(request: Request) -> JSONResponse:
         return JSONResponse({"error": str(e), "response": f"Error: {e}"}, status_code=500)
 
 
+
+@app.post("/learn/prev")
+async def learn_prev(request: Request) -> JSONResponse:
+    """Go back one lesson."""
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from luci_teacher import load_curriculum, save_curriculum, get_current_lesson
+        data = load_curriculum()
+        p, m, l = data["current_phase"], data["current_module"], data["current_lesson"]
+        # Go back one lesson
+        if l > 1:
+            data["current_lesson"] = l - 1
+        else:
+            # Go back one module
+            for phase in data["phases"]:
+                if phase["phase"] != p: continue
+                mods = [mod["module"] for mod in phase["modules"]]
+                mi = mods.index(m)
+                if mi > 0:
+                    prev_mod = phase["modules"][mi - 1]
+                    data["current_module"] = prev_mod["module"]
+                    data["current_lesson"] = len(prev_mod["lessons"])
+                elif p > 1:
+                    # Go back one phase
+                    for pp in data["phases"]:
+                        if pp["phase"] != p - 1: continue
+                        data["current_phase"]  = p - 1
+                        last_mod = pp["modules"][-1]
+                        data["current_module"] = last_mod["module"]
+                        data["current_lesson"] = len(last_mod["lessons"])
+        save_curriculum(data)
+        return JSONResponse({"ok": True, "lesson": get_current_lesson(data)})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/learn/goto")
+async def learn_goto(request: Request) -> JSONResponse:
+    """Jump to the first lesson of a given phase."""
+    try:
+        body = await request.json()
+        phase_num = int(body.get("phase", 1))
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from luci_teacher import load_curriculum, save_curriculum, get_current_lesson
+        data = load_curriculum()
+        for phase in data["phases"]:
+            if phase["phase"] == phase_num:
+                data["current_phase"]  = phase_num
+                data["current_module"] = phase["modules"][0]["module"]
+                data["current_lesson"] = 1
+                break
+        save_curriculum(data)
+        return JSONResponse({"ok": True, "lesson": get_current_lesson(data)})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
 @app.post("/learn/next")
 async def learn_next(request: Request) -> JSONResponse:
     """Advance to the next lesson."""

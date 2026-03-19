@@ -124,6 +124,7 @@ body{background:#0a0a0a;color:#e0e0e0;font-family:'SF Mono','Fira Code',monospac
       <div class="lesson-meta" id="lessonMeta"></div>
       <div class="actions">
         <button class="btn btn-gold" id="teachBtn" onclick="doTeach()">&#9654; Start Lesson</button>
+        <button class="btn btn-out" onclick="doPrev()">&#8592; Prev</button>
         <button class="btn btn-out" onclick="doNext()">Next Lesson &#8594;</button>
         <button class="btn btn-out" onclick="showTab('videos')">&#127909; Videos</button>
         <button class="btn btn-out" onclick="showTab('quiz')">&#127919; Quiz</button>
@@ -421,6 +422,7 @@ function loadCurriculum() {
       var btn = document.createElement("button");
       btn.className = "phase-btn" + ((_cur && p.phase===_cur.phase)?" active":"");
       btn.innerHTML = '<div>'+(p.phase)+'. '+esc(p.title)+'</div><div class="meta">'+esc(p.duration)+' \u00b7 '+p.module_count+' modules</div>';
+      btn.onclick = (function(ph){ return function(){ gotoPhase(ph); }; })(p.phase);
       list.appendChild(btn);
     });
   }).catch(function(e){ 
@@ -492,32 +494,29 @@ function renderVideos() {
     vids.forEach(function(v){
       var searchUrl = "https://www.youtube.com/results?search_query="+encodeURIComponent(v.t+" "+v.s);
       var thumbUrl  = "https://img.youtube.com/vi/"+v.id+"/mqdefault.jpg";
-      var card  = document.createElement("div");
-      card.className = "vid-card";
-      card.addEventListener("click", (function(vid){ return function(){ openVid(vid.id, vid.t); }; })(v));
-      var tDiv  = document.createElement("div");
-      tDiv.className = "vid-thumb";
-      var img   = document.createElement("img");
-      img.src   = thumbUrl;
-      img.alt   = "";
-      img.addEventListener("error", (function(su){ return function(){
-        this.parentElement.innerHTML = "<div style='padding:16px;color:#888;font-size:12px;text-align:center'>Unavailable &mdash; <a href=\""+su+"\" target=\"_blank\" style=\"color:#D4AF37\">Search YouTube</a></div>";
-        this.parentElement.parentElement.onclick = function(){ window.open(su,"_blank"); };
-      }; })(searchUrl));
-      var pDiv  = document.createElement("div");
-      pDiv.className = "play-ov";
-      pDiv.innerHTML = "<div class=\"play-ico\">&#9654;</div>";
-      tDiv.appendChild(img);
-      tDiv.appendChild(pDiv);
-      var iDiv  = document.createElement("div");
-      iDiv.className = "vid-info";
-      iDiv.innerHTML = "<div class=\"vid-title\">"+esc(v.t)+"</div><div class=\"vid-src\">"+esc(v.s)+"</div>";
-      card.appendChild(tDiv);
-      card.appendChild(iDiv);
-      var wrap  = document.createElement("div");
-      wrap.appendChild(card);
-      html += wrap.innerHTML;
+      html += '<div class="vid-card" data-vid-id="'+v.id+'" data-vid-title="'+v.t.replace(/"/g,"&quot;")+'" style="cursor:pointer">';
+      html += '<div class="vid-thumb">';
+      html += '<img src="'+thumbUrl+'" alt="" style="width:100%;height:100%;object-fit:cover">';
+      html += '<div class="play-ov"><div class="play-ico">&#9654;</div></div>';
+      html += '</div>';
+      html += '<div class="vid-info">';
+      html += '<div class="vid-title">'+esc(v.t)+'</div>';
+      html += '<div class="vid-src">'+esc(v.s)+'</div>';
+      html += '</div></div>';
     });
+    setTimeout(function(){
+      var cards = document.getElementById("vidContent").querySelectorAll(".vid-card[data-vid-id]");
+      cards.forEach(function(c){
+        c.onclick = function(){ openVid(this.getAttribute("data-vid-id"), this.getAttribute("data-vid-title")); };
+      });
+    }, 50);
+    // Attach click handlers after innerHTML is set
+    setTimeout(function(){
+      var cards = document.getElementById("vidContent").querySelectorAll(".vid-card[data-vid-id]");
+      cards.forEach(function(c){
+        c.onclick = function(){ openVid(this.getAttribute("data-vid-id"), this.getAttribute("data-vid-title")); };
+      });
+    }, 50);
     html += '</div>';
   } else {
     html += '<div style="color:#555;font-size:13px;padding:20px 0">No curated videos for this lesson yet. Ask LUCI on the Lesson tab.</div>';
@@ -620,6 +619,32 @@ function renderProgress() {
         +'<div class="phase-row-s">'+esc(p.duration)+(cur?" \u00b7 IN PROGRESS":"")+'</div>'
         +'</div>';
     }).join("");
+  });
+}
+
+
+function gotoPhase(phaseNum) {
+  fetch("/learn/goto", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({phase: phaseNum})
+  }).then(function(r){ return r.json(); }).then(function(data){
+    loadCurriculum();
+    document.getElementById("teachOut").innerHTML = '<span class="teach-placeholder">Click Start Lesson to begin.</span>';
+    _chatHist = [];
+    showTab("lesson");
+  });
+}
+
+function doPrev() {
+  fetch("/learn/prev", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:"{}"
+  }).then(function(r){ return r.json(); }).then(function(){
+    loadCurriculum();
+    document.getElementById("teachOut").innerHTML = '<span class="teach-placeholder">Click Start Lesson to begin.</span>';
+    _chatHist = [];
   });
 }
 
