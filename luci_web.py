@@ -3275,6 +3275,243 @@ async def audit_ui_endpoint(request: Request) -> HTMLResponse:
     return HTMLResponse(html)
 
 
+
+# ══════════════════════════════════════════════════════
+#  LUCI LEARN — Web-based curriculum + quiz endpoints
+# ══════════════════════════════════════════════════════
+
+@app.get("/learn", response_class=HTMLResponse)
+async def learn_page(request: Request) -> HTMLResponse:
+    """Serve the LUCI Learn dashboard."""
+    from luci_learn_web import LEARN_PAGE_HTML
+    return HTMLResponse(LEARN_PAGE_HTML)
+
+
+@app.get("/learn/curriculum")
+async def learn_curriculum(request: Request) -> JSONResponse:
+    """Return current curriculum state."""
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from luci_teacher import load_curriculum, get_current_lesson, get_progress_summary
+        data   = load_curriculum()
+        lesson = get_current_lesson(data)
+        total  = sum(
+            len(m["lessons"])
+            for p in data["phases"]
+            for m in p["modules"]
+        )
+        completed = len(data.get("completed_lessons", []))
+        pct = round(completed / total * 100, 1) if total else 0
+        return JSONResponse({
+            "current_lesson":  lesson,
+            "completed":       completed,
+            "total_lessons":   total,
+            "progress_pct":    pct,
+            "phases": [
+                {
+                    "phase":        p["phase"],
+                    "title":        p["title"],
+                    "duration":     p["duration"],
+                    "module_count": len(p["modules"]),
+                }
+                for p in data["phases"]
+            ],
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/learn/teach")
+async def learn_teach(request: Request) -> JSONResponse:
+    """Have LUCI teach the current lesson."""
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from luci_teacher import load_curriculum, get_current_lesson, build_teaching_prompt
+        from luci import load_persona_with_memory, strip_generic_phrases
+        loop = asyncio.get_running_loop()
+        data   = load_curriculum()
+        lesson = get_current_lesson(data)
+        if not lesson:
+            return JSONResponse({"response": "Curriculum complete!"})
+        persona       = load_persona_with_memory()
+        teach_prompt  = build_teaching_prompt(lesson)
+        messages = [
+            {"role": "system", "content": persona + "\n\n" + teach_prompt},
+            {"role": "user",   "content": f"Teach me: {lesson['lesson_title']}"},
+        ]
+        response = await loop.run_in_executor(
+            None, lambda: ollama_chat(messages, 0.7, route_model(lesson["lesson_title"])[0])
+        )
+        response = strip_generic_phrases(response)
+        return JSONResponse({"response": response})
+    except Exception as e:
+        return JSONResponse({"error": str(e), "response": f"Error: {e}"}, status_code=500)
+
+
+@app.post("/learn/chat")
+async def learn_chat(request: Request) -> JSONResponse:
+    """Follow-up chat during a lesson."""
+    try:
+        body = await request.json()
+        text    = (body.get("text") or "").strip()
+        history = body.get("history", [])
+        if not text:
+            return JSONResponse({"error": "no text"}, status_code=400)
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from luci_teacher import load_curriculum, get_current_lesson, build_teaching_prompt
+        from luci import load_persona_with_memory, strip_generic_phrases
+        loop = asyncio.get_running_loop()
+        data   = load_curriculum()
+        lesson = get_current_lesson(data)
+        persona      = load_persona_with_memory()
+        teach_prompt = build_teaching_prompt(lesson) if lesson else ""
+        messages = [{"role": "system", "content": persona + "\n\n" + teach_prompt}]
+        for h in history[-6:]:
+            messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
+        messages.append({"role": "user", "content": text})
+        response = await loop.run_in_executor(
+            None, lambda: ollama_chat(messages, 0.7, route_model(text)[0])
+        )
+        response = strip_generic_phrases(response)
+        return JSONResponse({"response": response})
+    except Exception as e:
+        return JSONResponse({"error": str(e), "response": f"Error: {e}"}, status_code=500)
+
+
+@app.get("/learn/quiz/scenarios")
+async def learn_quiz_scenarios(request: Request) -> JSONResponse:
+    """Get quiz scenarios for current lesson."""
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from luci_teacher import load_curriculum, get_current_lesson
+        from luci_quiz   import get_all_scenarios
+        data   = load_curriculum()
+        lesson = get_current_lesson(data)
+        if not lesson:
+            return JSONResponse({"scenarios": []})
+        scenarios = get_all_scenarios(lesson["phase"], lesson["module"], lesson["lesson"])
+        return JSONResponse({"scenarios": scenarios, "lesson": lesson["lesson_title"]})
+    except Exception as e:
+        return JSONResponse({"error": str(e), "scenarios": []}, status_code=500)
+
+
+@app.post("/learn/quiz/evaluate")
+async def learn_quiz_evaluate(request: Request) -> JSONResponse:
+    """Evaluate a quiz answer."""
+    try:
+        body = await request.json()
+        scenario = (body.get("scenario") or "").strip()
+        answer   = (body.get("answer")   or "").strip()
+        if not scenario or not answer:
+            return JSONResponse({"error": "missing scenario or answer"}, status_code=400)
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from luci_teacher import load_curriculum, get_current_lesson
+        from luci_quiz   import build_quiz_prompt, log_quiz_result
+        from luci import load_persona_with_memory
+        loop = asyncio.get_running_loop()
+        data   = load_curriculum()
+        lesson = get_current_lesson(data)
+        persona    = load_persona_with_memory()
+        quiz_prompt = build_quiz_prompt(
+            scenario,
+            lesson["lesson_title"] if lesson else "General",
+            lesson["phase_title"]  if lesson else "General",
+        )
+        messages = [
+            {"role": "system", "content": persona + "\n\n" + quiz_prompt},
+            {"role": "user",   "content": f"Here is my answer:\n{answer}\n\nEvaluate it."},
+        ]
+        response = await loop.run_in_executor(
+            None, lambda: ollama_chat(messages, 0.4, route_model(scenario)[0])
+        )
+        # Detect result from response
+        resp_upper = response.upper()
+        if "PASS" in resp_upper and "PARTIAL" not in resp_upper and "NEEDS" not in resp_upper:
+            result = "PASS"
+        elif "PARTIAL" in resp_upper:
+            result = "PARTIAL"
+        elif "NEEDS REVIEW" in resp_upper or "NEEDS_REVIEW" in resp_upper:
+            result = "NEEDS_REVIEW"
+        else:
+            result = "PARTIAL"
+        if lesson:
+            log_quiz_result(
+                lesson["phase"], lesson["module"], lesson["lesson"],
+                scenario, result
+            )
+        return JSONResponse({"response": response, "result": result})
+    except Exception as e:
+        return JSONResponse({"error": str(e), "response": f"Error: {e}"}, status_code=500)
+
+
+@app.get("/learn/quiz/stats")
+async def learn_quiz_stats(request: Request) -> JSONResponse:
+    """Return quiz performance stats."""
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from luci_quiz import get_quiz_stats
+        return JSONResponse(get_quiz_stats())
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/learn/exam")
+async def learn_exam(request: Request) -> JSONResponse:
+    """Run a phase exam."""
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from luci_teacher import load_curriculum, get_current_lesson
+        from luci_quiz   import build_exam_prompt
+        from luci import load_persona_with_memory
+        loop = asyncio.get_running_loop()
+        data   = load_curriculum()
+        lesson = get_current_lesson(data)
+        if not lesson:
+            return JSONResponse({"response": "Curriculum complete!"})
+        completed = [
+            k for k in data.get("completed_lessons", [])
+            if k.startswith(f"p{lesson['phase']}_")
+        ]
+        persona     = load_persona_with_memory()
+        exam_prompt = build_exam_prompt(lesson["phase"], lesson["phase_title"], completed)
+        messages = [
+            {"role": "system", "content": persona + "\n\n" + exam_prompt},
+            {"role": "user",   "content": "Start the exam. Give me question 1 of 3."},
+        ]
+        response = await loop.run_in_executor(
+            None, lambda: ollama_chat(messages, 0.5, route_model("exam analysis")[0])
+        )
+        return JSONResponse({"response": response})
+    except Exception as e:
+        return JSONResponse({"error": str(e), "response": f"Error: {e}"}, status_code=500)
+
+
+@app.post("/learn/next")
+async def learn_next(request: Request) -> JSONResponse:
+    """Advance to the next lesson."""
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from luci_teacher import load_curriculum, save_curriculum, advance_lesson, get_current_lesson
+        data   = load_curriculum()
+        data   = advance_lesson(data)
+        save_curriculum(data)
+        lesson = get_current_lesson(data)
+        return JSONResponse({
+            "ok":     True,
+            "lesson": lesson,
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
