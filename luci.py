@@ -4080,6 +4080,43 @@ def run_telegram_bot() -> None:
             await update.message.reply_text(f"❌ Error: {e}")
 
 
+
+    async def cmd_diagnose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Run LUCI self-diagnosis — analyze recent errors and suggest fixes."""
+        if not allowed(update):
+            return
+        await update.message.reply_text("🔍 Running self-diagnosis...")
+        try:
+            import sys, aiohttp
+            sys.path.insert(0, str(WORKSPACE))
+            from luci_diagnostics import (
+                get_recent_errors, get_all_service_errors,
+                build_diagnosis_prompt, save_diagnosis,
+                get_unresolved_count
+            )
+            errors  = get_recent_errors(10)
+            logs    = get_all_service_errors()
+            unres   = get_unresolved_count()
+
+            if not errors and all("No recent" in v for v in logs.values()):
+                await update.message.reply_text("✅ No errors detected. Everything looks healthy.")
+                return
+
+            prompt   = build_diagnosis_prompt(errors, logs)
+            persona  = load_persona_with_memory()
+            messages = [
+                {"role": "system", "content": persona},
+                {"role": "user",   "content": prompt},
+            ]
+            diagnosis = ollama_chat(messages, 0.3, ROUTER_DEFAULT_MODEL)
+            save_diagnosis([e["id"] for e in errors], diagnosis)
+
+            header = f"🔍 *Self-Diagnosis Report*\n{unres} unresolved errors\n\n"
+            await send_long(update, header + diagnosis)
+        except Exception as e:
+            await update.message.reply_text(f"❌ Diagnosis error: {e}")
+
+
     async def cmd_audit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Run LUCI workspace self-audit and report health status."""
         if not (update.effective_user and update.effective_user.id == ALLOWED_USER_ID):
@@ -4380,6 +4417,7 @@ def run_telegram_bot() -> None:
     app.add_handler(CommandHandler("think", cmd_think))
     app.add_handler(CommandHandler("audit", cmd_audit))
     app.add_handler(CommandHandler("learn",       cmd_learn))
+    app.add_handler(CommandHandler("diagnose",    cmd_diagnose))
     app.add_handler(CommandHandler("quiz",        cmd_quiz))
     app.add_handler(CommandHandler("exam",        cmd_exam))
     app.add_handler(CommandHandler("quizstats",   cmd_quiz_stats))

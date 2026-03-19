@@ -3570,6 +3570,72 @@ async def learn_next(request: Request) -> JSONResponse:
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+
+# ══════════════════════════════════════════════════════
+#  LUCI SELF-DIAGNOSIS — error capture + AI analysis
+# ══════════════════════════════════════════════════════
+
+@app.post("/learn/error")
+async def capture_error(request: Request) -> JSONResponse:
+    """Receive frontend error reports and store them."""
+    try:
+        body  = await request.json()
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from luci_diagnostics import log_error
+        entry = log_error(body)
+        return JSONResponse({"ok": True, "id": entry["id"]})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/diagnose")
+async def diagnose_page(request: Request) -> JSONResponse:
+    """Run LUCI self-diagnosis and return results."""
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from luci_diagnostics import (
+            get_recent_errors, get_all_service_errors,
+            build_diagnosis_prompt, save_diagnosis
+        )
+        from luci import load_persona_with_memory
+        loop    = asyncio.get_running_loop()
+        errors  = get_recent_errors(10)
+        logs    = get_all_service_errors()
+        prompt  = build_diagnosis_prompt(errors, logs)
+        persona = load_persona_with_memory()
+        messages = [
+            {"role": "system", "content": persona},
+            {"role": "user",   "content": prompt},
+        ]
+        diagnosis = await loop.run_in_executor(
+            None, lambda: ollama_chat(messages, 0.3, route_model("debug analysis")[0])
+        )
+        save_diagnosis([e["id"] for e in errors], diagnosis)
+        return JSONResponse({
+            "diagnosis":      diagnosis,
+            "errors_checked": len(errors),
+            "services":       list(logs.keys()),
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/diagnose/errors")
+async def get_errors(request: Request) -> JSONResponse:
+    """Return recent error log."""
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from luci_diagnostics import get_recent_errors, get_unresolved_count
+        return JSONResponse({
+            "errors":     get_recent_errors(20),
+            "unresolved": get_unresolved_count(),
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()

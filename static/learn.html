@@ -189,6 +189,38 @@ body{background:#0a0a0a;color:#e0e0e0;font-family:'SF Mono','Fira Code',monospac
 </div>
 
 <script>
+// ── Self-diagnosis error reporter ────────────────────────────────────────
+window.onerror = function(message, source, lineno, colno, error) {
+  fetch('/learn/error', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      page: 'learn',
+      message: message,
+      source: source,
+      lineno: lineno,
+      colno: colno,
+      stack: error ? error.stack : null,
+      url: window.location.href
+    })
+  }).catch(function(){});  // never let this crash the page
+  return false;  // let browser also handle it
+};
+
+window.addEventListener('unhandledrejection', function(e) {
+  fetch('/learn/error', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      page: 'learn',
+      message: 'Unhandled promise rejection: ' + String(e.reason),
+      source: 'promise',
+      stack: e.reason && e.reason.stack ? e.reason.stack : null,
+      url: window.location.href
+    })
+  }).catch(function(){});
+});
+
 var _cur = null;
 var _scenarios = [];
 var _curScenario = null;
