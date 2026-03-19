@@ -81,6 +81,99 @@ def parse_args():
     return p.parse_args()
 
 
+
+
+def arrow_select(question, options, default=0):
+    import sys, tty, termios
+    selected = default
+    n = len(options)
+    ESC = "\033"
+    def render():
+        sys.stdout.write("\r\033[K")
+        sys.stdout.write("  " + question + "\n")
+        for i, opt in enumerate(options):
+            if i == selected:
+                sys.stdout.write("  \033[1;32m\u25b6 " + opt + "\033[0m\n")
+            else:
+                sys.stdout.write("    " + opt + "\n")
+        sys.stdout.write("\033[" + str(n + 1) + "A")
+        sys.stdout.flush()
+    sys.stdout.write("\n")
+    render()
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        while True:
+            ch = sys.stdin.read(1)
+            if ch in ("\r", "\n"):
+                break
+            elif ch == "\x1b":
+                ch2 = sys.stdin.read(1)
+                ch3 = sys.stdin.read(1)
+                if ch2 == "[":
+                    if ch3 == "A":
+                        selected = (selected - 1) % n
+                    elif ch3 == "B":
+                        selected = (selected + 1) % n
+            elif ch in ("y", "Y"):
+                selected = 0
+                break
+            elif ch in ("n", "N"):
+                selected = min(1, n - 1)
+                break
+            elif ch == "\x03":
+                selected = min(1, n - 1)
+                break
+            render()
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+    sys.stdout.write("\033[" + str(n + 1) + "B\n")
+    chosen = options[selected]
+    sys.stdout.write("  \033[1;32m\u2713\033[0m " + chosen + "\n\n")
+    sys.stdout.flush()
+    return chosen
+
+
+class LiveTimer:
+    def __init__(self, label=""):
+        self.label = label
+        self._start = None
+        self._thread = None
+        self._active = False
+
+    def start(self, label=""):
+        import threading, time
+        if label:
+            self.label = label
+        self._start = time.perf_counter()
+        self._active = True
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def _run(self):
+        import sys, shutil, time
+        while self._active:
+            elapsed = time.perf_counter() - self._start
+            cols = shutil.get_terminal_size().columns
+            timer_str = "{:6.1f}s".format(elapsed)
+            label_str = self.label[:cols - len(timer_str) - 4]
+            pad = cols - len(label_str) - len(timer_str) - 2
+            line = "  \033[2m" + label_str + "\033[0m" + " " * max(0, pad) + "\033[33m" + timer_str + "\033[0m"
+            sys.stdout.write("\r\033[K" + line)
+            sys.stdout.flush()
+            time.sleep(0.1)
+
+    def stop(self):
+        import sys, shutil, time
+        self._active = False
+        if self._thread:
+            self._thread.join(timeout=0.3)
+        elapsed = time.perf_counter() - self._start if self._start else 0
+        sys.stdout.write("\r" + " " * shutil.get_terminal_size().columns + "\r")
+        sys.stdout.flush()
+        return elapsed
+
 def ask_decision(decision_text: str, auto: bool = False) -> str:
     """Show a decision panel and get user input."""
     stop_spinner()
@@ -111,10 +204,18 @@ def ask_plan(plan_text: str, auto: bool = False) -> bool:
         console.print("  [luci.dim](auto-mode: executing plan)[/]")
         return True
     try:
-        answer = input("  Proceed? [Y/n]: ").strip().lower()
-        return answer not in ("n", "no")
-    except (EOFError, KeyboardInterrupt):
-        return False
+        import sys
+        sys.stdout.flush()
+        sys.stderr.flush()
+        chosen = arrow_select("Execute this plan?", ["Yes — execute", "No — cancel"], default=0)
+        return chosen.lower().startswith("yes")
+    except Exception as _e:
+        import sys; print(f"ARROW_SELECT_FAIL: {_e}", file=sys.stderr)
+        try:
+            answer = input(f"  Proceed? [Y/n]: ").strip().lower()
+            return answer not in ("n", "no")
+        except (EOFError, KeyboardInterrupt):
+            return False
 
 
 def get_input(session=None, prompt_str: str = "❯ ") -> str:
@@ -394,7 +495,20 @@ def main():
             elif cmd == "/undo":
                 console.print("[luci.dim]Rolling back last changes...[/]")
                 result = agent.rollback()
-                console.print(result)
+                if "128" in str(result) or "not a git" in str(result).lower():
+                    if agent._changed_files:
+                        last = sorted(agent._changed_files)[-1]
+                        p = agent.tools.workspace / last
+                        if p.exists():
+                            p.unlink()
+                            agent._changed_files.discard(last)
+                            console.print(f"[luci.dim]Deleted {last}[/]")
+                        else:
+                            console.print("[luci.dim]Nothing to undo.[/]")
+                    else:
+                        console.print("[luci.dim]Nothing to undo.[/]")
+                else:
+                    console.print(result)
             elif cmd == "/git":
                 r = agent.tools.git_status()
                 console.print(r.output or "(clean)")
@@ -438,9 +552,12 @@ def main():
             user_history.pop(0)
         console.print()
         task_start_time = time.perf_counter()
+        _live_timer = LiveTimer()
         on_status("LUCI is thinking...")
+        _live_timer.start("thinking")
         try:
             response = agent.chat(user_input)
+            _live_timer.stop()
             stop_spinner()
             if currently_streaming:
                 print()

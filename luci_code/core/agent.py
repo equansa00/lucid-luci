@@ -72,13 +72,19 @@ IMPACT: What this changes
 Wait for user input before proceeding.
 
 ═══ PLAN PROTOCOL ═══
-For tasks with 3+ steps, output a plan first:
+ALWAYS output a plan before calling any tool — even for simple 1-step tasks. No exceptions.
 <plan>
 1. Step one description
 2. Step two description
-3. Step three description
 </plan>
-Then execute immediately unless the user says "stop" or "wait".
+Wait for user approval before executing. Do not call any tool before the plan is approved.
+
+═══ AVAILABLE TOOLS (use ONLY these) ═══
+read_file, create_file, str_replace, bash, glob, grep, tree, ls,
+git_diff, git_status, git_commit, install_deps
+DO NOT invent tools like git_add, git_push, git_pull, verify, analyze_file.
+Use bash to run any git commands not in the list above.
+STOP after task is complete — do not loop on git_status or git_diff.
 
 ═══ RULES ═══
 0. NEVER describe what a file contains. ALWAYS call read_file first and use the ACTUAL output.
@@ -193,16 +199,25 @@ class Agent:
 
             response_text = self._call_ollama()
             full_response = response_text
+
             elapsed = time.perf_counter() - t_iter
 
             # ── Handle plan block ────────────────────────────────────────
             plan_m = PLAN_PATTERN.search(response_text)
+            if plan_m and iterations > 1:
+                # Model re-planned instead of executing — strip plan and continue
+                response_text = PLAN_PATTERN.sub("", response_text).strip()
             if plan_m and iterations == 1:
                 plan_text = plan_m.group(1).strip()
                 proceed = self.on_plan(plan_text)
                 if not proceed:
                     self.messages.append({"role": "assistant", "content": response_text})
                     return response_text
+                # Plan approved — loop to execute
+                self.messages.append({"role": "assistant", "content": response_text})
+                first_step = plan_text.strip().splitlines()[0] if plan_text.strip() else ""
+                self.messages.append({"role": "user", "content": f"Plan approved. Execute now using tools. Start with: {first_step}. Do NOT output another plan — use tools directly."})
+                continue
 
             # ── Handle decision block ────────────────────────────────────
             decision_m = DECISION_PATTERN.search(response_text)
@@ -218,6 +233,12 @@ class Agent:
             tool_calls = TOOL_PATTERN.findall(response_text)
             if not tool_calls:
                 self.messages.append({"role": "assistant", "content": response_text})
+                # If model returned text but no tools and task needs file creation, nudge once
+                if iterations == 1 and any(w in self.messages[0]["content"].lower() 
+                                           for w in ["create", "write", "make", "build"]):
+                    self.messages.append({"role": "user", "content": 
+                        "You must use tools to complete this task. Use create_file now."})
+                    continue
                 break
 
             # ── Execute tools ────────────────────────────────────────────
@@ -341,10 +362,13 @@ class Agent:
                 last_error = failed_output
                 continue
             elif not run_failed and tool_calls:
-                self.messages.append({"role": "assistant", "content": combined})
-                final = self._call_ollama()
-                self.messages.append({"role": "assistant", "content": final})
-                return final
+                # Tools succeeded — nudge model to continue with next step
+                completed = [tc[0] for tc in tool_calls]
+                housekeeping = {"git_status", "git_diff", "git_commit", "git_push", "git_pull"}
+                if all(t in housekeeping for t in completed):
+                    break
+                self.messages.append({"role": "user", "content": f"Good. Completed: {completed}. Now execute the next step using a tool. You must call a tool — do not respond with text only."})
+                continue
 
         # ── Post-task summary ────────────────────────────────────────────
         if self._changed_files:

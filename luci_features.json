@@ -585,6 +585,87 @@
       "description": "Telegram /quizstats command (auto-detected)",
       "_auto_detected": true,
       "_source": "luci.py"
+    },
+    {
+      "name": "API: /learn",
+      "commands": [
+        "/learn"
+      ],
+      "description": "HTTP GET endpoint at /learn (auto-detected)",
+      "_auto_detected": true,
+      "_source": "luci_web.py"
+    },
+    {
+      "name": "API: /learn/curriculum",
+      "commands": [
+        "/learn/curriculum"
+      ],
+      "description": "HTTP GET endpoint at /learn/curriculum (auto-detected)",
+      "_auto_detected": true,
+      "_source": "luci_web.py"
+    },
+    {
+      "name": "API: /learn/teach",
+      "commands": [
+        "/learn/teach"
+      ],
+      "description": "HTTP POST endpoint at /learn/teach (auto-detected)",
+      "_auto_detected": true,
+      "_source": "luci_web.py"
+    },
+    {
+      "name": "API: /learn/chat",
+      "commands": [
+        "/learn/chat"
+      ],
+      "description": "HTTP POST endpoint at /learn/chat (auto-detected)",
+      "_auto_detected": true,
+      "_source": "luci_web.py"
+    },
+    {
+      "name": "API: /learn/quiz/scenarios",
+      "commands": [
+        "/learn/quiz/scenarios"
+      ],
+      "description": "HTTP GET endpoint at /learn/quiz/scenarios (auto-detected)",
+      "_auto_detected": true,
+      "_source": "luci_web.py"
+    },
+    {
+      "name": "API: /learn/quiz/evaluate",
+      "commands": [
+        "/learn/quiz/evaluate"
+      ],
+      "description": "HTTP POST endpoint at /learn/quiz/evaluate (auto-detected)",
+      "_auto_detected": true,
+      "_source": "luci_web.py"
+    },
+    {
+      "name": "API: /learn/quiz/stats",
+      "commands": [
+        "/learn/quiz/stats"
+      ],
+      "description": "HTTP GET endpoint at /learn/quiz/stats (auto-detected)",
+      "_auto_detected": true,
+      "_source": "luci_web.py"
+    },
+    {
+      "name": "API: /learn/exam",
+      "commands": [
+        "/learn/exam"
+      ],
+      "description": "HTTP POST endpoint at /learn/exam (auto-detected)",
+      "_auto_detected": true,
+      "_source": "luci_web.py"
+    },
+    {
+      "name": "API: /learn/next",
+      "commands": [
+        "/learn/next"
+      ],
+      "description": "HTTP POST endpoint at /learn/next (auto-detected)",
+      "_auto_detected": true,
+      "_source": "luci_web.py"
     }
   ]
 }
