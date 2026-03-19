@@ -3283,8 +3283,8 @@ async def audit_ui_endpoint(request: Request) -> HTMLResponse:
 @app.get("/learn", response_class=HTMLResponse)
 async def learn_page(request: Request) -> HTMLResponse:
     """Serve the LUCI Learn dashboard."""
-    from luci_learn_web import LEARN_PAGE_HTML
-    return HTMLResponse(LEARN_PAGE_HTML)
+    from luci_learn_web import get_learn_html
+    return HTMLResponse(get_learn_html())
 
 
 @app.get("/learn/curriculum")

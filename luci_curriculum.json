@@ -1,17 +1,20 @@
 {
   "version": "1.0",
   "student": "Chip (Edward Equansa)",
-  "goal": "Full-stack engineer + AI builder — capable of building production systems like LUCI, HHA ops assistant, and SaaS products",
+  "goal": "Full-stack engineer + AI builder \u2014 capable of building production systems like LUCI, HHA ops assistant, and SaaS products",
   "daily_time": "2 hours",
   "created": "2026-03-18",
   "current_phase": 1,
   "current_module": 1,
-  "current_lesson": 1,
-  "completed_lessons": [],
+  "current_lesson": 3,
+  "completed_lessons": [
+    "p1_m1_l1",
+    "p1_m1_l2"
+  ],
   "phases": [
     {
       "phase": 1,
-      "title": "Foundation — How the Web Actually Works",
+      "title": "Foundation \u2014 How the Web Actually Works",
       "duration": "3 weeks",
       "goal": "Understand the real mental model behind everything you already built",
       "modules": [
@@ -20,31 +23,31 @@
           "title": "The Internet, HTTP, and APIs",
           "lessons": [
             "How a request travels from browser to server and back",
-            "HTTP methods: GET, POST, PUT, DELETE — what they mean and when to use them",
-            "Status codes: 200, 401, 404, 500 — reading them like a native",
-            "Headers, bodies, and JSON — the anatomy of a request",
-            "REST vs other paradigms — why REST won",
+            "HTTP methods: GET, POST, PUT, DELETE \u2014 what they mean and when to use them",
+            "Status codes: 200, 401, 404, 500 \u2014 reading them like a native",
+            "Headers, bodies, and JSON \u2014 the anatomy of a request",
+            "REST vs other paradigms \u2014 why REST won",
             "Hands-on: use curl and httpie to hit real APIs including LUCI's own /chat endpoint"
           ]
         },
         {
           "module": 2,
-          "title": "The Terminal — Your Real Interface",
+          "title": "The Terminal \u2014 Your Real Interface",
           "lessons": [
-            "Navigation, files, permissions — the commands you use every day explained deeply",
-            "stdin, stdout, stderr — piping and redirection",
-            "Environment variables and .env files — why LUCI uses them",
-            "Processes, PIDs, signals — what systemctl is actually doing",
-            "SSH basics — how you'll connect to lucid-luci",
+            "Navigation, files, permissions \u2014 the commands you use every day explained deeply",
+            "stdin, stdout, stderr \u2014 piping and redirection",
+            "Environment variables and .env files \u2014 why LUCI uses them",
+            "Processes, PIDs, signals \u2014 what systemctl is actually doing",
+            "SSH basics \u2014 how you'll connect to lucid-luci",
             "Hands-on: write a bash script that checks LUCI's health and sends a Telegram message"
           ]
         },
         {
           "module": 3,
-          "title": "Git — Version Control as a Superpower",
+          "title": "Git \u2014 Version Control as a Superpower",
           "lessons": [
             "The mental model: snapshots not diffs",
-            "commit, push, pull, branch, merge — the core 20% you use 80% of the time",
+            "commit, push, pull, branch, merge \u2014 the core 20% you use 80% of the time",
             "Reading git log and git diff like a pro",
             "Fixing mistakes: reset, revert, stash",
             "Branch workflows: feature branches, PRs, code review culture",
@@ -55,25 +58,25 @@
     },
     {
       "phase": 2,
-      "title": "Python — The Language You're Already Using, Deeply",
+      "title": "Python \u2014 The Language You're Already Using, Deeply",
       "duration": "4 weeks",
       "goal": "Go from 'it works' to 'I understand why it works'",
       "modules": [
         {
           "module": 4,
-          "title": "Python Fundamentals — The Real Ones",
+          "title": "Python Fundamentals \u2014 The Real Ones",
           "lessons": [
-            "Data types deeply: strings, ints, floats, bools — mutability and why it matters",
-            "Lists, dicts, sets, tuples — when to use each and why",
+            "Data types deeply: strings, ints, floats, bools \u2014 mutability and why it matters",
+            "Lists, dicts, sets, tuples \u2014 when to use each and why",
             "Functions: args, kwargs, defaults, *args, **kwargs",
             "List comprehensions and generator expressions",
-            "Error handling: try/except/finally — reading tracebacks like LUCI's logs",
+            "Error handling: try/except/finally \u2014 reading tracebacks like LUCI's logs",
             "Hands-on: rewrite one of LUCI's utility functions from scratch"
           ]
         },
         {
           "module": 5,
-          "title": "Python Intermediate — How LUCI is Actually Built",
+          "title": "Python Intermediate \u2014 How LUCI is Actually Built",
           "lessons": [
             "Classes and OOP: when to use them, when not to",
             "Decorators: what @app.get actually does",
@@ -85,12 +88,12 @@
         },
         {
           "module": 6,
-          "title": "Python for Data — The HHA Business Case",
+          "title": "Python for Data \u2014 The HHA Business Case",
           "lessons": [
             "Reading and writing CSV, JSON, Excel files",
             "pandas basics: DataFrames, filtering, groupby",
             "Cleaning messy data: the real skill",
-            "Basic statistics: mean, median, percentiles — reading a remittance file",
+            "Basic statistics: mean, median, percentiles \u2014 reading a remittance file",
             "Visualizing data with matplotlib",
             "Hands-on: load a real HHA remittance file and find the top 3 denial patterns"
           ]
@@ -99,27 +102,27 @@
     },
     {
       "phase": 3,
-      "title": "Web Development — HTML, CSS, Modern JS",
+      "title": "Web Development \u2014 HTML, CSS, Modern JS",
       "duration": "3 weeks",
       "goal": "Understand and extend LUCI's web UI confidently",
       "modules": [
         {
           "module": 7,
-          "title": "HTML — Structure and Semantics",
+          "title": "HTML \u2014 Structure and Semantics",
           "lessons": [
             "The DOM: what it is and why JavaScript can manipulate it",
             "Semantic HTML: why section vs div matters for real apps",
-            "Forms, inputs, events — how the LUCI chat box works",
-            "Accessibility basics — why aria labels exist",
+            "Forms, inputs, events \u2014 how the LUCI chat box works",
+            "Accessibility basics \u2014 why aria labels exist",
             "HTML in Python: how FastAPI serves the LUCI page",
             "Hands-on: add a new panel to the LUCI web UI in pure HTML"
           ]
         },
         {
           "module": 8,
-          "title": "CSS — Modern Styling",
+          "title": "CSS \u2014 Modern Styling",
           "lessons": [
-            "The box model: margin, padding, border — finally understood",
+            "The box model: margin, padding, border \u2014 finally understood",
             "Flexbox: how LUCI's layout is built",
             "CSS Grid: when to use it over flexbox",
             "CSS variables: how LUCI's dark theme works",
@@ -129,12 +132,12 @@
         },
         {
           "module": 9,
-          "title": "JavaScript — Modern ES2024",
+          "title": "JavaScript \u2014 Modern ES2024",
           "lessons": [
-            "const, let — why var is dead",
+            "const, let \u2014 why var is dead",
             "Arrow functions, template literals, destructuring",
-            "Promises and async/await — how LUCI's frontend calls /chat",
-            "fetch API — reading the LUCI frontend JavaScript",
+            "Promises and async/await \u2014 how LUCI's frontend calls /chat",
+            "fetch API \u2014 reading the LUCI frontend JavaScript",
             "DOM manipulation: querySelector, addEventListener",
             "Hands-on: add a keyboard shortcut to the LUCI web UI"
           ]
@@ -143,7 +146,7 @@
     },
     {
       "phase": 4,
-      "title": "TypeScript — The Skill That Gets You Hired",
+      "title": "TypeScript \u2014 The Skill That Gets You Hired",
       "duration": "2 weeks",
       "goal": "Write typed code that catches bugs before runtime",
       "modules": [
@@ -163,7 +166,7 @@
     },
     {
       "phase": 5,
-      "title": "Databases — SQL and Beyond",
+      "title": "Databases \u2014 SQL and Beyond",
       "duration": "3 weeks",
       "goal": "Store, query, and understand data at a professional level",
       "modules": [
@@ -171,9 +174,9 @@
           "module": 11,
           "title": "SQL Fundamentals",
           "lessons": [
-            "Tables, rows, columns — the relational model",
+            "Tables, rows, columns \u2014 the relational model",
             "SELECT, WHERE, ORDER BY, LIMIT",
-            "JOINs: inner, left, right — with real examples",
+            "JOINs: inner, left, right \u2014 with real examples",
             "Aggregations: COUNT, SUM, GROUP BY, HAVING",
             "Indexes: why queries get slow and how to fix them",
             "Hands-on: query the LUCI trading SQLite database"
@@ -183,10 +186,10 @@
           "module": 12,
           "title": "Database Design",
           "lessons": [
-            "Normalization: 1NF, 2NF, 3NF — in plain English",
+            "Normalization: 1NF, 2NF, 3NF \u2014 in plain English",
             "Primary keys, foreign keys, constraints",
             "Designing the HHA pre-bill validation database",
-            "SQLite vs PostgreSQL — when to use each",
+            "SQLite vs PostgreSQL \u2014 when to use each",
             "Migrations: changing a schema without losing data",
             "Hands-on: design and build the HHA denial tracking schema"
           ]
@@ -195,7 +198,7 @@
     },
     {
       "phase": 6,
-      "title": "APIs and Backend — FastAPI in Depth",
+      "title": "APIs and Backend \u2014 FastAPI in Depth",
       "duration": "3 weeks",
       "goal": "Build production-grade APIs like LUCI's backend",
       "modules": [
@@ -227,7 +230,7 @@
     },
     {
       "phase": 7,
-      "title": "React — Modern Frontend",
+      "title": "React \u2014 Modern Frontend",
       "duration": "4 weeks",
       "goal": "Build the HHA ops dashboard as a real React app",
       "modules": [
@@ -237,7 +240,7 @@
           "lessons": [
             "Components: the mental model",
             "Props and state: data flow in React",
-            "useState and useEffect — the hooks you use 90% of the time",
+            "useState and useEffect \u2014 the hooks you use 90% of the time",
             "Event handling in React",
             "Conditional rendering and lists",
             "Hands-on: build the HHA denial triage component"
@@ -270,15 +273,15 @@
     },
     {
       "phase": 8,
-      "title": "AI Engineering — The Skill of This Decade",
+      "title": "AI Engineering \u2014 The Skill of This Decade",
       "duration": "4 weeks",
-      "goal": "Build production AI systems the way LUCI is built — but better",
+      "goal": "Build production AI systems the way LUCI is built \u2014 but better",
       "modules": [
         {
           "module": 18,
           "title": "LLMs and Prompt Engineering",
           "lessons": [
-            "How LLMs actually work — tokens, context windows, temperature",
+            "How LLMs actually work \u2014 tokens, context windows, temperature",
             "System prompts vs user prompts vs assistant turns",
             "Prompt engineering patterns: few-shot, chain-of-thought, ReAct",
             "Why LUCI's persona sometimes fails and how to fix it",
@@ -292,8 +295,8 @@
           "lessons": [
             "The Anthropic API: messages, tools, streaming",
             "The Ollama API: local models, embeddings",
-            "RAG: retrieval augmented generation — how to add knowledge to any model",
-            "Tool use and function calling — how LUCI Code works",
+            "RAG: retrieval augmented generation \u2014 how to add knowledge to any model",
+            "Tool use and function calling \u2014 how LUCI Code works",
             "Memory systems: episodic, semantic, procedural",
             "Hands-on: add RAG to the HHA assistant using denial pattern documents"
           ]
@@ -304,7 +307,7 @@
           "lessons": [
             "Agent loops: plan, act, observe, repeat",
             "Multi-step task execution without human intervention",
-            "Safety and guardrails — why mini-BEAST has an allowlist",
+            "Safety and guardrails \u2014 why mini-BEAST has an allowlist",
             "Evaluating and improving agent behavior",
             "Deploying agents as services",
             "Hands-on: build the HHA pre-bill validation agent end to end"
@@ -346,7 +349,7 @@
     },
     {
       "phase": 10,
-      "title": "Data Structures and Algorithms — Interview Ready",
+      "title": "Data Structures and Algorithms \u2014 Interview Ready",
       "duration": "3 weeks",
       "goal": "Pass technical interviews and write more efficient code",
       "modules": [
@@ -355,7 +358,7 @@
           "title": "Core Data Structures",
           "lessons": [
             "Arrays and strings: the foundation",
-            "Hash maps: O(1) lookup — why LUCI uses dicts everywhere",
+            "Hash maps: O(1) lookup \u2014 why LUCI uses dicts everywhere",
             "Stacks and queues",
             "Linked lists",
             "Trees and graphs: the scary ones made simple",
@@ -369,7 +372,7 @@
             "Big O notation: reading performance like a professional",
             "Binary search: the template",
             "Two pointers and sliding window",
-            "Recursion and dynamic programming — the mental model",
+            "Recursion and dynamic programming \u2014 the mental model",
             "Graph traversal: BFS and DFS",
             "Hands-on: solve 20 LeetCode problems in Python with LUCI as your tutor"
           ]
