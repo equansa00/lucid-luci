@@ -2348,7 +2348,7 @@ function renderMemoryList() {
   const listEl  = document.getElementById('mem-list');
   const query   = (document.getElementById('mem-search')?.value || '').toLowerCase().trim();
   const entries = query
-    ? _memoryData.filter(m => (m.text || m.content || '').toLowerCase().includes(query))
+    ? _memoryData.filter(m => (m.summary || m.embedding_text || m.text || m.content || '').toLowerCase().includes(query))
     : _memoryData;
 
   if (entries.length === 0) {
@@ -2356,8 +2356,8 @@ function renderMemoryList() {
     return;
   }
   listEl.innerHTML = entries.map((m, i) => {
-    const text    = escHtml(m.text || m.content || m.value || JSON.stringify(m));
-    const key     = escHtml(m.key || m.id || ('entry-' + i));
+    const text    = escHtml(m.summary || m.embedding_text || m.text || m.content || m.value || JSON.stringify(m));
+    const key     = escHtml(m.key || (m.id ? m.id.replace(/^mem_/, '').replace(/_/g, ' ') : ('entry-' + i)));
     const salience = m.salience != null ? ' · salience ' + m.salience : '';
     return (
       '<div class="mem-entry">' +
@@ -2683,10 +2683,6 @@ FRICTION_SYSTEM = (
 @app.get("/memory/list")
 async def memory_list(request: Request) -> JSONResponse:
     """Return all active beast_memory.json entries for the memory UI."""
-    secret   = request.headers.get("X-LUCI-Secret", "")
-    expected = os.getenv("LUCI_WEB_SECRET", "")
-    if expected and secret != expected:
-        return JSONResponse({"error": "unauthorized"}, status_code=401)
     try:
         mem_path = Path(os.getenv("LUCI_WORKSPACE", str(Path(__file__).parent))) / "beast_memory.json"
         if not mem_path.exists():

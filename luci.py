@@ -3842,6 +3842,88 @@ def run_telegram_bot() -> None:
 
 
 
+
+    async def cmd_learn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Start or continue today's coding lesson."""
+        if not allowed(update):
+            return
+        try:
+            import sys
+            sys.path.insert(0, str(WORKSPACE))
+            from luci_teacher import load_curriculum, get_current_lesson, build_teaching_prompt, log_session
+            from luci import load_persona_with_memory, ollama_chat
+            data   = load_curriculum()
+            lesson = get_current_lesson(data)
+            if not lesson:
+                await update.message.reply_text("🎓 Curriculum complete! You finished all 10 phases.")
+                return
+            await update.message.reply_text(
+                f"📚 *Phase {lesson['phase']}: {lesson['phase_title']}*\n"
+                f"Module {lesson['module']}: {lesson['module_title']}\n"
+                f"Lesson {lesson['lesson']}/{lesson['total_lessons']}: *{lesson['lesson_title']}*\n\n"
+                f"Starting lesson...",
+                parse_mode="Markdown"
+            )
+            persona = load_persona_with_memory()
+            teaching_prompt = build_teaching_prompt(lesson)
+            messages = [
+                {"role": "system", "content": persona + "\n\n" + teaching_prompt},
+                {"role": "user",   "content": f"Teach me today's lesson: {lesson['lesson_title']}"}
+            ]
+            response = ollama_chat(messages, temperature=0.7, model=ROUTER_DEFAULT_MODEL)
+            log_session(lesson)
+            await send_long(update, response)
+        except Exception as e:
+            await update.message.reply_text(f"❌ Lesson error: {e}")
+
+    async def cmd_lesson(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Show current lesson status and progress."""
+        if not allowed(update):
+            return
+        try:
+            import sys
+            sys.path.insert(0, str(WORKSPACE))
+            from luci_teacher import load_curriculum, get_progress_summary, get_current_lesson
+            data    = load_curriculum()
+            summary = get_progress_summary(data)
+            lesson  = get_current_lesson(data)
+            msg = f"📊 *LUCI Curriculum Progress*\n\n{summary}"
+            if lesson:
+                all_lessons = lesson["module_lessons"]
+                lessons_display = "\n".join(
+                    f"{'✅' if i+1 < lesson['lesson'] else '▶️' if i+1 == lesson['lesson'] else '⬜'} {i+1}. {l}"
+                    for i, l in enumerate(all_lessons)
+                )
+                msg += f"\n\n*Module lessons:*\n{lessons_display}"
+            await update.message.reply_text(msg, parse_mode="Markdown")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_next_lesson(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Mark current lesson complete and advance to next."""
+        if not allowed(update):
+            return
+        try:
+            import sys
+            sys.path.insert(0, str(WORKSPACE))
+            from luci_teacher import load_curriculum, save_curriculum, advance_lesson, get_current_lesson
+            data   = load_curriculum()
+            data   = advance_lesson(data)
+            save_curriculum(data)
+            lesson = get_current_lesson(data)
+            if lesson:
+                await update.message.reply_text(
+                    f"✅ Lesson complete! Moving to:\n"
+                    f"*{lesson['lesson_title']}*\n\n"
+                    f"Type /learn to start it.",
+                    parse_mode="Markdown"
+                )
+            else:
+                await update.message.reply_text("🎓 You've completed the entire curriculum!")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Error: {e}")
+
+
     async def cmd_audit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Run LUCI workspace self-audit and report health status."""
         if not (update.effective_user and update.effective_user.id == ALLOWED_USER_ID):
@@ -4141,6 +4223,9 @@ def run_telegram_bot() -> None:
     app.add_handler(CommandHandler("trade",    cmd_trade))
     app.add_handler(CommandHandler("think", cmd_think))
     app.add_handler(CommandHandler("audit", cmd_audit))
+    app.add_handler(CommandHandler("learn",       cmd_learn))
+    app.add_handler(CommandHandler("lesson",      cmd_lesson))
+    app.add_handler(CommandHandler("nextlesson",  cmd_next_lesson))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

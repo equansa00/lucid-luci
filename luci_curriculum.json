@@ -1,0 +1,380 @@
+{
+  "version": "1.0",
+  "student": "Chip (Edward Equansa)",
+  "goal": "Full-stack engineer + AI builder — capable of building production systems like LUCI, HHA ops assistant, and SaaS products",
+  "daily_time": "2 hours",
+  "created": "2026-03-18",
+  "current_phase": 1,
+  "current_module": 1,
+  "current_lesson": 1,
+  "completed_lessons": [],
+  "phases": [
+    {
+      "phase": 1,
+      "title": "Foundation — How the Web Actually Works",
+      "duration": "3 weeks",
+      "goal": "Understand the real mental model behind everything you already built",
+      "modules": [
+        {
+          "module": 1,
+          "title": "The Internet, HTTP, and APIs",
+          "lessons": [
+            "How a request travels from browser to server and back",
+            "HTTP methods: GET, POST, PUT, DELETE — what they mean and when to use them",
+            "Status codes: 200, 401, 404, 500 — reading them like a native",
+            "Headers, bodies, and JSON — the anatomy of a request",
+            "REST vs other paradigms — why REST won",
+            "Hands-on: use curl and httpie to hit real APIs including LUCI's own /chat endpoint"
+          ]
+        },
+        {
+          "module": 2,
+          "title": "The Terminal — Your Real Interface",
+          "lessons": [
+            "Navigation, files, permissions — the commands you use every day explained deeply",
+            "stdin, stdout, stderr — piping and redirection",
+            "Environment variables and .env files — why LUCI uses them",
+            "Processes, PIDs, signals — what systemctl is actually doing",
+            "SSH basics — how you'll connect to lucid-luci",
+            "Hands-on: write a bash script that checks LUCI's health and sends a Telegram message"
+          ]
+        },
+        {
+          "module": 3,
+          "title": "Git — Version Control as a Superpower",
+          "lessons": [
+            "The mental model: snapshots not diffs",
+            "commit, push, pull, branch, merge — the core 20% you use 80% of the time",
+            "Reading git log and git diff like a pro",
+            "Fixing mistakes: reset, revert, stash",
+            "Branch workflows: feature branches, PRs, code review culture",
+            "Hands-on: properly version the entire LUCI workspace with a clean .gitignore"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "title": "Python — The Language You're Already Using, Deeply",
+      "duration": "4 weeks",
+      "goal": "Go from 'it works' to 'I understand why it works'",
+      "modules": [
+        {
+          "module": 4,
+          "title": "Python Fundamentals — The Real Ones",
+          "lessons": [
+            "Data types deeply: strings, ints, floats, bools — mutability and why it matters",
+            "Lists, dicts, sets, tuples — when to use each and why",
+            "Functions: args, kwargs, defaults, *args, **kwargs",
+            "List comprehensions and generator expressions",
+            "Error handling: try/except/finally — reading tracebacks like LUCI's logs",
+            "Hands-on: rewrite one of LUCI's utility functions from scratch"
+          ]
+        },
+        {
+          "module": 5,
+          "title": "Python Intermediate — How LUCI is Actually Built",
+          "lessons": [
+            "Classes and OOP: when to use them, when not to",
+            "Decorators: what @app.get actually does",
+            "Context managers: with open() and why",
+            "Async/await: how LUCI handles multiple requests at once",
+            "Modules and imports: why LUCI uses sys.path.insert",
+            "Hands-on: add a new feature to luci_audit.py using everything above"
+          ]
+        },
+        {
+          "module": 6,
+          "title": "Python for Data — The HHA Business Case",
+          "lessons": [
+            "Reading and writing CSV, JSON, Excel files",
+            "pandas basics: DataFrames, filtering, groupby",
+            "Cleaning messy data: the real skill",
+            "Basic statistics: mean, median, percentiles — reading a remittance file",
+            "Visualizing data with matplotlib",
+            "Hands-on: load a real HHA remittance file and find the top 3 denial patterns"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "title": "Web Development — HTML, CSS, Modern JS",
+      "duration": "3 weeks",
+      "goal": "Understand and extend LUCI's web UI confidently",
+      "modules": [
+        {
+          "module": 7,
+          "title": "HTML — Structure and Semantics",
+          "lessons": [
+            "The DOM: what it is and why JavaScript can manipulate it",
+            "Semantic HTML: why section vs div matters for real apps",
+            "Forms, inputs, events — how the LUCI chat box works",
+            "Accessibility basics — why aria labels exist",
+            "HTML in Python: how FastAPI serves the LUCI page",
+            "Hands-on: add a new panel to the LUCI web UI in pure HTML"
+          ]
+        },
+        {
+          "module": 8,
+          "title": "CSS — Modern Styling",
+          "lessons": [
+            "The box model: margin, padding, border — finally understood",
+            "Flexbox: how LUCI's layout is built",
+            "CSS Grid: when to use it over flexbox",
+            "CSS variables: how LUCI's dark theme works",
+            "Responsive design: media queries",
+            "Hands-on: restyle the LUCI health dashboard to match your taste"
+          ]
+        },
+        {
+          "module": 9,
+          "title": "JavaScript — Modern ES2024",
+          "lessons": [
+            "const, let — why var is dead",
+            "Arrow functions, template literals, destructuring",
+            "Promises and async/await — how LUCI's frontend calls /chat",
+            "fetch API — reading the LUCI frontend JavaScript",
+            "DOM manipulation: querySelector, addEventListener",
+            "Hands-on: add a keyboard shortcut to the LUCI web UI"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "title": "TypeScript — The Skill That Gets You Hired",
+      "duration": "2 weeks",
+      "goal": "Write typed code that catches bugs before runtime",
+      "modules": [
+        {
+          "module": 10,
+          "title": "TypeScript Fundamentals",
+          "lessons": [
+            "Why TypeScript: the real business case",
+            "Types, interfaces, and type aliases",
+            "Optional and union types",
+            "Generics: what List<T> actually means",
+            "TypeScript with async/await",
+            "Hands-on: convert a LUCI JavaScript file to TypeScript"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "title": "Databases — SQL and Beyond",
+      "duration": "3 weeks",
+      "goal": "Store, query, and understand data at a professional level",
+      "modules": [
+        {
+          "module": 11,
+          "title": "SQL Fundamentals",
+          "lessons": [
+            "Tables, rows, columns — the relational model",
+            "SELECT, WHERE, ORDER BY, LIMIT",
+            "JOINs: inner, left, right — with real examples",
+            "Aggregations: COUNT, SUM, GROUP BY, HAVING",
+            "Indexes: why queries get slow and how to fix them",
+            "Hands-on: query the LUCI trading SQLite database"
+          ]
+        },
+        {
+          "module": 12,
+          "title": "Database Design",
+          "lessons": [
+            "Normalization: 1NF, 2NF, 3NF — in plain English",
+            "Primary keys, foreign keys, constraints",
+            "Designing the HHA pre-bill validation database",
+            "SQLite vs PostgreSQL — when to use each",
+            "Migrations: changing a schema without losing data",
+            "Hands-on: design and build the HHA denial tracking schema"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 6,
+      "title": "APIs and Backend — FastAPI in Depth",
+      "duration": "3 weeks",
+      "goal": "Build production-grade APIs like LUCI's backend",
+      "modules": [
+        {
+          "module": 13,
+          "title": "FastAPI Fundamentals",
+          "lessons": [
+            "Routes, path parameters, query parameters",
+            "Request and response models with Pydantic",
+            "Middleware: what runs before every request",
+            "Authentication: API keys, JWT tokens",
+            "Background tasks: how LUCI's auto_extract_memory works",
+            "Hands-on: build the HHA pre-bill validation API"
+          ]
+        },
+        {
+          "module": 14,
+          "title": "External APIs and Integrations",
+          "lessons": [
+            "Reading API documentation like a professional",
+            "Authentication patterns: Bearer tokens, OAuth, API keys",
+            "Rate limiting and retry logic",
+            "Webhooks: receiving data vs polling",
+            "The HHAeXchange API: EVV submission and aggregation",
+            "Hands-on: connect to the eMedNY EVV API"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 7,
+      "title": "React — Modern Frontend",
+      "duration": "4 weeks",
+      "goal": "Build the HHA ops dashboard as a real React app",
+      "modules": [
+        {
+          "module": 15,
+          "title": "React Fundamentals",
+          "lessons": [
+            "Components: the mental model",
+            "Props and state: data flow in React",
+            "useState and useEffect — the hooks you use 90% of the time",
+            "Event handling in React",
+            "Conditional rendering and lists",
+            "Hands-on: build the HHA denial triage component"
+          ]
+        },
+        {
+          "module": 16,
+          "title": "React Intermediate",
+          "lessons": [
+            "Custom hooks: extracting logic",
+            "useContext: sharing state without prop drilling",
+            "React Query: fetching and caching API data",
+            "Forms: controlled vs uncontrolled",
+            "Error boundaries and loading states",
+            "Hands-on: build the HHA billing readiness dashboard"
+          ]
+        },
+        {
+          "module": 17,
+          "title": "React with TypeScript",
+          "lessons": [
+            "Typing props and state",
+            "Typing API responses",
+            "Generic components",
+            "TypeScript patterns in real React apps",
+            "Hands-on: convert HHA components to TypeScript"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 8,
+      "title": "AI Engineering — The Skill of This Decade",
+      "duration": "4 weeks",
+      "goal": "Build production AI systems the way LUCI is built — but better",
+      "modules": [
+        {
+          "module": 18,
+          "title": "LLMs and Prompt Engineering",
+          "lessons": [
+            "How LLMs actually work — tokens, context windows, temperature",
+            "System prompts vs user prompts vs assistant turns",
+            "Prompt engineering patterns: few-shot, chain-of-thought, ReAct",
+            "Why LUCI's persona sometimes fails and how to fix it",
+            "Evaluating model outputs: what makes a good response",
+            "Hands-on: redesign LUCI's system prompt using professional prompt engineering"
+          ]
+        },
+        {
+          "module": 19,
+          "title": "Building AI Applications",
+          "lessons": [
+            "The Anthropic API: messages, tools, streaming",
+            "The Ollama API: local models, embeddings",
+            "RAG: retrieval augmented generation — how to add knowledge to any model",
+            "Tool use and function calling — how LUCI Code works",
+            "Memory systems: episodic, semantic, procedural",
+            "Hands-on: add RAG to the HHA assistant using denial pattern documents"
+          ]
+        },
+        {
+          "module": 20,
+          "title": "AI Agents and Automation",
+          "lessons": [
+            "Agent loops: plan, act, observe, repeat",
+            "Multi-step task execution without human intervention",
+            "Safety and guardrails — why mini-BEAST has an allowlist",
+            "Evaluating and improving agent behavior",
+            "Deploying agents as services",
+            "Hands-on: build the HHA pre-bill validation agent end to end"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 9,
+      "title": "DevOps and Deployment",
+      "duration": "2 weeks",
+      "goal": "Ship and maintain real software like a professional",
+      "modules": [
+        {
+          "module": 21,
+          "title": "Docker and Containers",
+          "lessons": [
+            "What Docker actually does and why it matters",
+            "Dockerfile: building an image",
+            "docker-compose: running multi-service apps",
+            "Volumes and networking",
+            "Containerizing LUCI for lucid-luci deployment",
+            "Hands-on: Dockerize the HHA validation service"
+          ]
+        },
+        {
+          "module": 22,
+          "title": "Linux Systems and systemd",
+          "lessons": [
+            "systemd deeply: units, targets, dependencies",
+            "Logs: journalctl, log rotation",
+            "Networking: ports, firewalls, nginx as reverse proxy",
+            "Security basics: users, permissions, SSH keys",
+            "Monitoring: knowing when something breaks before users do",
+            "Hands-on: migrate LUCI services to lucid-luci properly"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 10,
+      "title": "Data Structures and Algorithms — Interview Ready",
+      "duration": "3 weeks",
+      "goal": "Pass technical interviews and write more efficient code",
+      "modules": [
+        {
+          "module": 23,
+          "title": "Core Data Structures",
+          "lessons": [
+            "Arrays and strings: the foundation",
+            "Hash maps: O(1) lookup — why LUCI uses dicts everywhere",
+            "Stacks and queues",
+            "Linked lists",
+            "Trees and graphs: the scary ones made simple",
+            "Hands-on: implement each structure in Python from scratch"
+          ]
+        },
+        {
+          "module": 24,
+          "title": "Algorithms and Problem Solving",
+          "lessons": [
+            "Big O notation: reading performance like a professional",
+            "Binary search: the template",
+            "Two pointers and sliding window",
+            "Recursion and dynamic programming — the mental model",
+            "Graph traversal: BFS and DFS",
+            "Hands-on: solve 20 LeetCode problems in Python with LUCI as your tutor"
+          ]
+        }
+      ]
+    }
+  ]
+}

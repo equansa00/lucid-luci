@@ -531,6 +531,33 @@
       "description": "HTTP GET endpoint at /audit/ui (auto-detected)",
       "_auto_detected": true,
       "_source": "luci_web.py"
+    },
+    {
+      "name": "/learn command",
+      "commands": [
+        "/learn"
+      ],
+      "description": "Start or continue today's coding lesson.",
+      "_auto_detected": true,
+      "_source": "luci.py"
+    },
+    {
+      "name": "/lesson command",
+      "commands": [
+        "/lesson"
+      ],
+      "description": "Show current lesson status and progress.",
+      "_auto_detected": true,
+      "_source": "luci.py"
+    },
+    {
+      "name": "/nextlesson command",
+      "commands": [
+        "/nextlesson"
+      ],
+      "description": "Telegram /nextlesson command (auto-detected)",
+      "_auto_detected": true,
+      "_source": "luci.py"
     }
   ]
 }
