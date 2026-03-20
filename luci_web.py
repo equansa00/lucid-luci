@@ -1057,6 +1057,7 @@ _HTML = r"""<!DOCTYPE html>
     #chat-panel { flex: 1; min-height: 0; }
   }
 </style>
+<script src="/static/luci-nav.js"></script>
 </head>
 <body>
 
@@ -1151,6 +1152,16 @@ _HTML = r"""<!DOCTYPE html>
           ⚡
         </button>
         <button id="new-chat-btn" title="New conversation">&#xFF0B;</button>
+        <button id="luci-nav-open-btn" title="LUCI Pages"
+          onclick="lucNavToggle()"
+          style="background:none;border:1px solid rgba(212,175,55,0.3);color:#D4AF37;
+                 width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:13px;
+                 display:flex;align-items:center;justify-content:center;transition:all 0.15s;
+                 margin-left:2px;"
+          onmouseover="this.style.background='rgba(212,175,55,0.15)'"
+          onmouseout="this.style.background='none'">
+          &#x229E;
+        </button>
       </div>
     </div>
     <div id="history-list"></div>
@@ -2436,6 +2447,103 @@ async function deleteMemoryEntry(key) {
     </div>
   </div>
 
+
+  <!-- LUCI Nav Dropdown -->
+  <div id="luci-nav-overlay"
+    onclick="if(event.target===this)lucNavClose()"
+    style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.4)">
+  </div>
+  <div id="luci-nav-panel" style="
+    display:none;position:fixed;top:44px;left:8px;
+    width:250px;background:#0a0a0e;
+    border:1px solid #2a2a3a;border-top:2px solid #D4AF37;
+    border-radius:0 0 10px 10px;z-index:9999;
+    box-shadow:8px 8px 40px rgba(0,0,0,0.9);overflow:hidden;
+    font-family:\'SF Mono\',\'JetBrains Mono\',monospace;">
+    <div style="padding:8px 14px 6px;font-size:9px;color:#D4AF37;
+      letter-spacing:3px;text-transform:uppercase;border-bottom:1px solid #1a1a1a">
+      &#9889; LUCI SYSTEM
+    </div>
+    <a href="/" style="display:flex;align-items:center;gap:10px;padding:10px 14px;
+      border-left:3px solid #D4AF37;background:rgba(212,175,55,0.08);
+      border-bottom:1px solid #111;text-decoration:none">
+      <span style="font-size:14px;width:20px;text-align:center">&#x1F4AC;</span>
+      <div>
+        <div style="font-size:12px;color:#D4AF37;font-weight:700;letter-spacing:.5px">Chat</div>
+        <div style="font-size:10px;color:#444;margin-top:1px">Main AI interface</div>
+      </div>
+      <div style="width:5px;height:5px;border-radius:50%;background:#D4AF37;
+        box-shadow:0 0 6px #D4AF37;margin-left:auto"></div>
+    </a>
+    <a href="/learn" style="display:flex;align-items:center;gap:10px;padding:10px 14px;
+      border-left:3px solid transparent;border-bottom:1px solid #111;
+      text-decoration:none;transition:all .1s"
+      onmouseover="this.style.background=\'rgba(212,175,55,0.05)\';this.style.borderLeftColor=\'#D4AF37\'"
+      onmouseout="this.style.background=\'transparent\';this.style.borderLeftColor=\'transparent\'">
+      <span style="font-size:14px;width:20px;text-align:center">&#x1F4DA;</span>
+      <div>
+        <div style="font-size:12px;color:#ccc;letter-spacing:.5px">Learn</div>
+        <div style="font-size:10px;color:#444;margin-top:1px">Curriculum &amp; lessons</div>
+      </div>
+    </a>
+    <a href="/agent" style="display:flex;align-items:center;gap:10px;padding:10px 14px;
+      border-left:3px solid transparent;border-bottom:1px solid #111;
+      text-decoration:none;transition:all .1s"
+      onmouseover="this.style.background=\'rgba(212,175,55,0.05)\';this.style.borderLeftColor=\'#D4AF37\'"
+      onmouseout="this.style.background=\'transparent\';this.style.borderLeftColor=\'transparent\'">
+      <span style="font-size:14px;width:20px;text-align:center">&#9889;</span>
+      <div>
+        <div style="font-size:12px;color:#ccc;letter-spacing:.5px">Agent</div>
+        <div style="font-size:10px;color:#444;margin-top:1px">Autonomous execution</div>
+      </div>
+    </a>
+    <a href="/diagnose" style="display:flex;align-items:center;gap:10px;padding:10px 14px;
+      border-left:3px solid transparent;border-bottom:1px solid #111;
+      text-decoration:none;transition:all .1s"
+      onmouseover="this.style.background=\'rgba(212,175,55,0.05)\';this.style.borderLeftColor=\'#D4AF37\'"
+      onmouseout="this.style.background=\'transparent\';this.style.borderLeftColor=\'transparent\'">
+      <span style="font-size:14px;width:20px;text-align:center">&#x1F52C;</span>
+      <div>
+        <div style="font-size:12px;color:#ccc;letter-spacing:.5px">Diagnostics</div>
+        <div style="font-size:10px;color:#444;margin-top:1px">Error analysis &amp; health</div>
+      </div>
+    </a>
+    <a href="/audit/ui" style="display:flex;align-items:center;gap:10px;padding:10px 14px;
+      border-left:3px solid transparent;border-bottom:1px solid #111;
+      text-decoration:none;transition:all .1s"
+      onmouseover="this.style.background=\'rgba(212,175,55,0.05)\';this.style.borderLeftColor=\'#D4AF37\'"
+      onmouseout="this.style.background=\'transparent\';this.style.borderLeftColor=\'transparent\'">
+      <span style="font-size:14px;width:20px;text-align:center">&#x1F4CB;</span>
+      <div>
+        <div style="font-size:12px;color:#ccc;letter-spacing:.5px">Audit</div>
+        <div style="font-size:10px;color:#444;margin-top:1px">Workspace health report</div>
+      </div>
+    </a>
+    <div style="padding:6px 14px;font-size:9px;color:#2a2a2a;
+      text-align:center;letter-spacing:2px;border-top:1px solid #111">
+      ESC TO CLOSE
+    </div>
+  </div>
+  <script>
+    function lucNavToggle() {
+      var p = document.getElementById(\'luci-nav-panel\');
+      var o = document.getElementById(\'luci-nav-overlay\');
+      var b = document.getElementById(\'luci-nav-open-btn\');
+      var open = p.style.display !== \'none\';
+      p.style.display = open ? \'none\' : \'block\';
+      o.style.display = open ? \'none\' : \'block\';
+      if(b) b.style.background = open ? \'none\' : \'rgba(212,175,55,0.15)\';
+    }
+    function lucNavClose() {
+      document.getElementById(\'luci-nav-panel\').style.display = \'none\';
+      document.getElementById(\'luci-nav-overlay\').style.display = \'none\';
+      var b = document.getElementById(\'luci-nav-open-btn\');
+      if(b) b.style.background = \'none\';
+    }
+    document.addEventListener(\'keydown\', function(e){
+      if(e.key===\'Escape\') lucNavClose();
+    });
+  </script>
 </body>
 </html>
 """
