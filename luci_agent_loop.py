@@ -325,12 +325,19 @@ def run_agent(goal: str, max_steps: int = 10, confirm_fn=None,
             print(f"  ❌ Invalid JSON from model: {e}")
             tool_call = {"tool": "fail", "reason": f"Model returned invalid JSON: {response[:100]}"}
 
-        print(f"  → Tool: {tool_call.get('tool')}")
+        tool_name = tool_call.get("tool", "")
+        print(f"  → Tool: {tool_name}")
         if tool_call.get("command"):
             print(f"    Command: {tool_call['command']}")
 
-        # Execute tool
-        result = execute_tool(tool_call, confirm_fn=confirm_fn)
+        # Reject hallucinated tools not in allowed list
+        allowed = classify_goal(goal)
+        if tool_name not in allowed and tool_name not in ("done", "fail"):
+            print(f"  ⛔ Tool '{tool_name}' not allowed for this goal — skipping")
+            result = {"ok": False, "error": f"Tool '{tool_name}' not allowed. Use: {allowed}"}
+        else:
+            # Execute tool
+            result = execute_tool(tool_call, confirm_fn=confirm_fn)
         print(f"  {'✅' if result.get('ok') else '❌'} Result: {str(result)[:200]}")
 
         # Record step
