@@ -26,3 +26,4 @@ __pycache__/
 *.pyc
 .env
 .env.*
+luci_features.json
