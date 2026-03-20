@@ -16,3 +16,13 @@ builds/
 tests/
 luci_trade_log.db
 luci_voice_history.db
+
+# Runtime files — never commit
+runs/
+*.db
+*.sqlite
+*.bak
+__pycache__/
+*.pyc
+.env
+.env.*
