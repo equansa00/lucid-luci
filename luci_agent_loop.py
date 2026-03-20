@@ -64,6 +64,9 @@ CONFIRM_REQUIRED = [
     "truncate", "DROP TABLE", "DELETE FROM"
 ]
 
+# Tools that require confirmation before executing
+CONFIRM_TOOLS = ["service_restart", "file_write", "file_patch"]
+
 def is_safe(command: str) -> tuple[bool, str]:
     for blocked in BLOCKED_COMMANDS:
         if blocked in command:
@@ -77,6 +80,13 @@ def needs_confirm(command: str) -> bool:
 # ── Tool executor ─────────────────────────────────────────────────────────────
 def execute_tool(tool_call: dict, confirm_fn=None) -> dict:
     tool = tool_call.get("tool")
+
+    # Block destructive tools when no confirm_fn provided
+    if tool in globals().get("CONFIRM_TOOLS", []) and confirm_fn is None:
+        # Auto-allow status checks, block mutations in unattended mode
+        if tool == "service_restart":
+            print(f"  ⚠️  Skipping service_restart (no confirm_fn) — use /goal from Telegram for destructive actions")
+            return {"ok": False, "error": "service_restart requires confirmation"}
 
     if tool == "shell":
         cmd = tool_call.get("command", "")
