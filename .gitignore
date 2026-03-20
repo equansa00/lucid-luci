@@ -27,3 +27,4 @@ __pycache__/
 .env
 .env.*
 luci_features.json
+repo/
