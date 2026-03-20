@@ -3669,6 +3669,64 @@ async def get_errors(request: Request) -> JSONResponse:
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
+
+# ══════════════════════════════════════════════════════
+#  LUCI AGENT — Web-based autonomous execution
+# ══════════════════════════════════════════════════════
+
+@app.get("/agent", response_class=HTMLResponse)
+async def agent_ui(request: Request) -> HTMLResponse:
+    return HTMLResponse((Path(__file__).parent / "static" / "agent.html").read_text())
+
+@app.post("/agent/run")
+async def agent_run(request: Request) -> JSONResponse:
+    """Run the autonomous agent loop."""
+    try:
+        body     = await request.json()
+        goal     = (body.get("goal") or "").strip()
+        max_steps = int(body.get("max_steps") or 8)
+        if not goal:
+            return JSONResponse({"error": "no goal"}, status_code=400)
+
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from luci_agent_loop import run_agent
+        from luci import load_persona_with_memory
+
+        loop = asyncio.get_running_loop()
+
+        def sync_chat(messages, temperature=0.1):
+            return ollama_chat(messages, temperature, route_model(goal)[0])
+
+        result = await loop.run_in_executor(
+            None,
+            lambda: run_agent(goal, max_steps=min(max_steps, 15), chat_fn=sync_chat)
+        )
+        return JSONResponse(result)
+    except Exception as e:
+        return JSONResponse({"error": str(e), "status": "failed", "steps": 0}, status_code=500)
+
+
+@app.get("/agent/history")
+async def agent_history(request: Request) -> JSONResponse:
+    """Return recent task history."""
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from luci_agent_loop import TASK_LOG
+        import json as _json
+        if not TASK_LOG.exists():
+            return JSONResponse({"tasks": []})
+        tasks = _json.loads(TASK_LOG.read_text())
+        # Return last 20, strip full history to keep response small
+        slim = [
+            {k: v for k, v in t.items() if k != "history"}
+            for t in tasks[-20:]
+        ]
+        return JSONResponse({"tasks": slim})
+    except Exception as e:
+        return JSONResponse({"error": str(e), "tasks": []}, status_code=500)
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()

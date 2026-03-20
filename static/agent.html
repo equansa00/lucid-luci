@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LUCI Agent</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap');
+
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060608;
+  --surface:#0c0c10;
+  --border:#16161e;
+  --border-bright:#2a2a3a;
+  --gold:#D4AF37;
+  --gold-dim:#8a7020;
+  --green:#00ff88;
+  --red:#ff4455;
+  --blue:#4488ff;
+  --text:#c8c8d8;
+  --text-dim:#555566;
+  --font:'JetBrains Mono',monospace;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;overflow-x:hidden}
+
+/* Subtle grid background */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:40px 40px;
+  opacity:.4;pointer-events:none;z-index:0;
+}
+
+.header{
+  position:relative;z-index:10;
+  background:rgba(6,6,8,.9);
+  border-bottom:1px solid var(--border-bright);
+  padding:0 24px;height:56px;
+  display:flex;align-items:center;gap:16px;
+  backdrop-filter:blur(10px);
+}
+.header-logo{
+  font-size:13px;font-weight:700;color:var(--gold);
+  letter-spacing:3px;text-transform:uppercase;
+  display:flex;align-items:center;gap:8px;
+}
+.header-logo::before{content:'⚡';font-size:16px}
+.back{
+  background:none;border:1px solid var(--border-bright);
+  color:var(--text-dim);padding:5px 12px;border-radius:4px;
+  cursor:pointer;font-size:11px;font-family:var(--font);
+  text-decoration:none;letter-spacing:1px;transition:all .15s;
+}
+.back:hover{border-color:var(--gold);color:var(--gold)}
+.header-status{
+  margin-left:auto;display:flex;align-items:center;gap:8px;
+  font-size:11px;color:var(--text-dim);
+}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.container{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:32px 24px}
+
+/* Goal input section */
+.goal-section{margin-bottom:28px}
+.section-label{
+  font-size:10px;color:var(--gold-dim);text-transform:uppercase;
+  letter-spacing:3px;margin-bottom:10px;display:block;
+}
+.goal-input-wrap{
+  background:var(--surface);border:1px solid var(--border-bright);
+  border-radius:8px;overflow:hidden;
+  transition:border-color .2s;
+}
+.goal-input-wrap:focus-within{border-color:var(--gold)}
+.goal-input{
+  width:100%;background:none;border:none;
+  color:var(--text);font-family:var(--font);font-size:14px;
+  padding:16px 18px;resize:none;min-height:80px;
+  outline:none;line-height:1.6;
+}
+.goal-input::placeholder{color:var(--text-dim)}
+.goal-footer{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;border-top:1px solid var(--border);
+}
+.steps-control{
+  display:flex;align-items:center;gap:8px;
+  font-size:11px;color:var(--text-dim);
+}
+.steps-input{
+  background:var(--bg);border:1px solid var(--border-bright);
+  color:var(--text);font-family:var(--font);font-size:12px;
+  padding:4px 8px;border-radius:4px;width:48px;text-align:center;
+}
+.run-btn{
+  margin-left:auto;background:var(--gold);color:#000;
+  border:none;padding:9px 24px;border-radius:5px;
+  cursor:pointer;font-family:var(--font);font-size:12px;
+  font-weight:700;letter-spacing:1px;transition:all .15s;
+  display:flex;align-items:center;gap:8px;
+}
+.run-btn:hover{background:#f0c840;transform:translateY(-1px)}
+.run-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+/* Quick goals */
+.quick-goals{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:28px}
+.quick-btn{
+  background:none;border:1px solid var(--border-bright);
+  color:var(--text-dim);padding:6px 12px;border-radius:4px;
+  cursor:pointer;font-family:var(--font);font-size:11px;
+  transition:all .15s;letter-spacing:.5px;
+}
+.quick-btn:hover{border-color:var(--gold-dim);color:var(--text)}
+
+/* Execution display */
+.exec-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;overflow:hidden;margin-bottom:16px;
+}
+.exec-header{
+  display:flex;align-items:center;gap:10px;
+  padding:12px 16px;border-bottom:1px solid var(--border);
+  font-size:11px;
+}
+.exec-title{color:var(--gold);font-weight:700;letter-spacing:1px;text-transform:uppercase}
+.exec-goal{color:var(--text-dim);font-size:12px;flex:1;margin-left:4px}
+.exec-badge{
+  padding:2px 8px;border-radius:3px;font-size:10px;
+  font-weight:700;letter-spacing:1px;text-transform:uppercase;
+}
+.badge-running{background:rgba(68,136,255,.15);color:var(--blue);border:1px solid rgba(68,136,255,.3)}
+.badge-success{background:rgba(0,255,136,.1);color:var(--green);border:1px solid rgba(0,255,136,.2)}
+.badge-failed{background:rgba(255,68,85,.1);color:var(--red);border:1px solid rgba(255,68,85,.2)}
+.badge-timeout{background:rgba(212,175,55,.1);color:var(--gold);border:1px solid rgba(212,175,55,.2)}
+
+/* Steps */
+.steps-list{padding:12px 0}
+.step-item{
+  display:flex;gap:12px;padding:8px 16px;
+  border-bottom:1px solid var(--border);
+  transition:background .1s;
+}
+.step-item:last-child{border-bottom:none}
+.step-item:hover{background:rgba(255,255,255,.02)}
+.step-num{
+  width:22px;height:22px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;flex-shrink:0;margin-top:1px;
+}
+.step-num.ok{background:rgba(0,255,136,.15);color:var(--green);border:1px solid rgba(0,255,136,.3)}
+.step-num.err{background:rgba(255,68,85,.15);color:var(--red);border:1px solid rgba(255,68,85,.3)}
+.step-num.pending{background:rgba(68,136,255,.15);color:var(--blue);border:1px solid rgba(68,136,255,.3);
+  animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.step-content{flex:1;min-width:0}
+.step-tool{
+  font-size:11px;color:var(--gold);font-weight:700;
+  letter-spacing:1px;margin-bottom:3px;
+}
+.step-cmd{
+  font-size:12px;color:var(--text);word-break:break-all;
+  margin-bottom:4px;
+}
+.step-result{
+  font-size:11px;color:var(--text-dim);
+  max-height:80px;overflow:hidden;word-break:break-all;
+  line-height:1.5;
+}
+.step-result.expanded{max-height:none}
+.step-result.ok-result{color:#4a9a6a}
+.step-result.err-result{color:#9a4a4a}
+.expand-btn{
+  font-size:10px;color:var(--text-dim);background:none;
+  border:none;cursor:pointer;font-family:var(--font);
+  padding:2px 0;margin-top:2px;
+}
+.expand-btn:hover{color:var(--gold)}
+
+/* Final result */
+.final-result{
+  padding:16px;border-top:1px solid var(--border);
+  font-size:13px;line-height:1.7;
+}
+.final-result.success{color:var(--green)}
+.final-result.failed{color:var(--red)}
+
+/* Task history */
+.history-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;overflow:hidden;
+}
+.history-header{
+  padding:12px 16px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;
+}
+.history-title{font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:2px;font-weight:700}
+.history-count{font-size:10px;color:var(--text-dim);margin-left:auto}
+.history-list{max-height:300px;overflow-y:auto}
+.history-item{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 16px;border-bottom:1px solid var(--border);
+  cursor:pointer;transition:background .1s;font-size:12px;
+}
+.history-item:last-child{border-bottom:none}
+.history-item:hover{background:rgba(255,255,255,.03)}
+.history-goal{flex:1;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.history-steps{color:var(--text-dim);font-size:10px;white-space:nowrap}
+.history-time{color:var(--text-dim);font-size:10px;white-space:nowrap}
+
+/* Spinner */
+.spin-inline{
+  display:inline-block;width:12px;height:12px;
+  border:2px solid var(--border-bright);border-top-color:var(--gold);
+  border-radius:50%;animation:spin .7s linear infinite;
+  vertical-align:middle;margin-right:6px;
+}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:var(--border-bright);border-radius:2px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <a href="/" class="back">← LUCI</a>
+  <div class="header-logo">Agent</div>
+  <div class="header-status">
+    <div class="dot"></div>
+    <span id="statusText">Ready</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <span class="section-label">Goal</span>
+  <div class="goal-section">
+    <div class="goal-input-wrap">
+      <textarea class="goal-input" id="goalInput"
+        placeholder="Describe what you want LUCI to do...&#10;&#10;e.g. Check why luci-web is responding slowly and fix it&#10;e.g. Find all TODO comments in the workspace and summarize them&#10;e.g. Verify all services are healthy and restart any that are down"
+        rows="3"></textarea>
+      <div class="goal-footer">
+        <div class="steps-control">
+          <span>Max steps:</span>
+          <input class="steps-input" id="maxSteps" type="number" value="8" min="2" max="20">
+        </div>
+        <button class="run-btn" id="runBtn" onclick="runGoal()">
+          <span>&#9654;</span> Execute
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="quick-goals">
+    <button class="quick-btn" onclick="setGoal('Verify all LUCI services are healthy and report status')">⚡ Health check</button>
+    <button class="quick-btn" onclick="setGoal('Check disk usage on the workspace and find the largest files')">💾 Disk usage</button>
+    <button class="quick-btn" onclick="setGoal('Find all TODO and FIXME comments in the Python files')">📝 Find TODOs</button>
+    <button class="quick-btn" onclick="setGoal('Check LUCI web response time and audit health status')">🌐 Web status</button>
+    <button class="quick-btn" onclick="setGoal('Show recent errors from all LUCI service logs')">🔍 Recent errors</button>
+    <button class="quick-btn" onclick="setGoal('Count lines of code in each Python file in the workspace')">📊 Code stats</button>
+  </div>
+
+  <div id="execArea"></div>
+
+  <div class="history-card" id="historyCard" style="display:none">
+    <div class="history-header">
+      <span class="history-title">Task History</span>
+      <span class="history-count" id="historyCount"></span>
+    </div>
+    <div class="history-list" id="historyList"></div>
+  </div>
+
+</div>
+
+<script>
+var _running = false;
+var _eventSource = null;
+
+function setGoal(text) {
+  document.getElementById("goalInput").value = text;
+  document.getElementById("goalInput").focus();
+}
+
+function timeAgo(iso) {
+  var d = new Date(iso);
+  var s = Math.floor((Date.now() - d) / 1000);
+  if (s < 60)  return s+"s ago";
+  if (s < 3600) return Math.floor(s/60)+"m ago";
+  return Math.floor(s/3600)+"h ago";
+}
+
+function toolColor(tool) {
+  var map = {
+    shell:"var(--gold)", file_read:"var(--blue)", file_write:"#ff9944",
+    file_patch:"#ff9944", service_restart:"var(--red)", service_status:"var(--green)",
+    http_get:"var(--blue)", done:"var(--green)", fail:"var(--red)"
+  };
+  return map[tool] || "var(--text)";
+}
+
+function runGoal() {
+  var goal = document.getElementById("goalInput").value.trim();
+  if (!goal) return;
+  var maxSteps = parseInt(document.getElementById("maxSteps").value) || 8;
+
+  _running = true;
+  var btn = document.getElementById("runBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin-inline"></span>Running';
+  document.getElementById("statusText").textContent = "Executing...";
+
+  // Build execution UI
+  var execArea = document.getElementById("execArea");
+  execArea.innerHTML = [
+    '<div class="exec-card" id="execCard">',
+      '<div class="exec-header">',
+        '<span class="exec-title">Executing</span>',
+        '<span class="exec-goal">'+goal.slice(0,80)+(goal.length>80?"...":"")+'</span>',
+        '<span class="exec-badge badge-running" id="execBadge">RUNNING</span>',
+      '</div>',
+      '<div class="steps-list" id="stepsList"></div>',
+      '<div class="final-result" id="finalResult" style="display:none"></div>',
+    '</div>'
+  ].join("");
+
+  // Use fetch with streaming-like polling
+  fetch("/agent/run", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({goal: goal, max_steps: maxSteps})
+  }).then(function(r){ return r.json(); })
+    .then(function(data){ handleResult(data); })
+    .catch(function(e){ handleError(e.message); });
+}
+
+function handleResult(data) {
+  _running = false;
+  var btn = document.getElementById("runBtn");
+  btn.disabled = false;
+  btn.innerHTML = '<span>&#9654;</span> Execute';
+
+  var badge = document.getElementById("execBadge");
+  var final = document.getElementById("finalResult");
+  var stepsList = document.getElementById("stepsList");
+  document.getElementById("statusText").textContent = "Ready";
+
+  // Render steps
+  var steps = data.history || [];
+  stepsList.innerHTML = steps.map(function(h, i) {
+    var tc = h.tool_call || {};
+    var res = h.result || {};
+    var ok = res.ok !== false;
+    var tool = tc.tool || "unknown";
+
+    var detail = tc.command || tc.path || tc.url || tc.name || tc.goal || "";
+    var resultText = "";
+    if (res.stdout) resultText = res.stdout.slice(-500);
+    else if (res.body) resultText = res.body.slice(-300);
+    else if (res.content) resultText = res.content.slice(-300);
+    else if (res.status) resultText = "Status: "+res.status;
+    else if (res.error) resultText = "Error: "+res.error;
+    else if (res.message) resultText = res.message;
+    else resultText = JSON.stringify(res).slice(0,200);
+
+    var stepId = "step_"+i;
+    return [
+      '<div class="step-item">',
+        '<div class="step-num '+(ok?"ok":"err")+'">'+(i+1)+'</div>',
+        '<div class="step-content">',
+          '<div class="step-tool" style="color:'+toolColor(tool)+'">'+tool+'</div>',
+          (detail ? '<div class="step-cmd">'+escHtml(detail)+'</div>' : ""),
+          '<div class="step-result '+(ok?"ok-result":"err-result")+'" id="'+stepId+'">'+escHtml(resultText)+'</div>',
+          (resultText.length > 150 ?
+            '<button class="expand-btn" onclick="toggleStep(\''+stepId+'\',this)">▼ Show more</button>' : ""),
+        '</div>',
+      '</div>'
+    ].join("");
+  }).join("");
+
+  // Final status
+  var status = data.status || "unknown";
+  var message = data.message || "";
+  var emoji = status === "success" ? "✅" : status === "failed" ? "❌" : "⏱";
+  badge.textContent = status.toUpperCase();
+  badge.className = "exec-badge badge-"+(status==="success"?"success":status==="failed"?"failed":"timeout");
+  if (message) {
+    final.style.display = "block";
+    final.className = "final-result "+(status==="success"?"success":"failed");
+    final.innerHTML = emoji+" "+escHtml(message);
+  }
+
+  loadHistory();
+}
+
+function handleError(msg) {
+  _running = false;
+  document.getElementById("runBtn").disabled = false;
+  document.getElementById("runBtn").innerHTML = '<span>&#9654;</span> Execute';
+  document.getElementById("statusText").textContent = "Error";
+  var final = document.getElementById("finalResult");
+  if (final) { final.style.display="block"; final.className="final-result failed"; final.textContent="❌ "+msg; }
+}
+
+function toggleStep(id, btn) {
+  var el = document.getElementById(id);
+  el.classList.toggle("expanded");
+  btn.textContent = el.classList.contains("expanded") ? "▲ Show less" : "▼ Show more";
+}
+
+function escHtml(s) {
+  return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function loadHistory() {
+  fetch("/agent/history").then(function(r){ return r.json(); }).then(function(data){
+    var tasks = (data.tasks || []).slice().reverse();
+    if (!tasks.length) return;
+    document.getElementById("historyCard").style.display = "block";
+    document.getElementById("historyCount").textContent = tasks.length+" tasks";
+    document.getElementById("historyList").innerHTML = tasks.map(function(t){
+      var emoji = t.status==="success"?"✅":t.status==="failed"?"❌":"⏱";
+      return [
+        '<div class="history-item">',
+          '<span>'+emoji+'</span>',
+          '<span class="history-goal">'+escHtml(t.goal||"")+'</span>',
+          '<span class="history-steps">'+t.steps+' steps</span>',
+          '<span class="history-time">'+(t.timestamp?timeAgo(t.timestamp):"")+'</span>',
+        '</div>'
+      ].join("");
+    }).join("");
+  });
+}
+
+document.getElementById("goalInput").addEventListener("keydown", function(e){
+  if (e.key === "Enter" && e.ctrlKey) { e.preventDefault(); runGoal(); }
+});
+
+loadHistory();
+</script>
+</body>
+</html>
