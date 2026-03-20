@@ -4081,6 +4081,68 @@ def run_telegram_bot() -> None:
 
 
 
+
+    async def cmd_agent_goal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Autonomous goal execution — LUCI plans and executes until done."""
+        if not allowed(update):
+            return
+        goal = " ".join(context.args) if context.args else ""
+        if not goal:
+            await update.message.reply_text(
+                "Usage: /goal <what you want done>\n\n"
+                "Examples:\n"
+                "• /goal check why luci-web is slow and fix it\n"
+                "• /goal find all TODO comments in luci.py\n"
+                "• /goal verify all services are healthy"
+            )
+            return
+
+        await update.message.reply_text(
+            f"🤖 *Starting autonomous task*\n\n_{goal}_\n\nI\'ll update you as I work...",
+            parse_mode="Markdown"
+        )
+
+        try:
+            import sys
+            sys.path.insert(0, str(WORKSPACE))
+            from luci_agent_loop import run_agent
+
+            # Confirm function sends Telegram message and waits
+            async def telegram_confirm(prompt):
+                # For now auto-approve non-destructive, block destructive
+                destructive = any(w in prompt for w in ["rm ", "DELETE", "DROP"])
+                if destructive:
+                    await update.message.reply_text(
+                        f"⚠️ Confirmation needed:\n`{prompt}`\n\nReply /yes to proceed",
+                        parse_mode="Markdown"
+                    )
+                    return False  # Block for now — manual confirm flow later
+                return True
+
+            def sync_chat(messages, temperature=0.1):
+                return ollama_chat(messages, temperature, ROUTER_DEFAULT_MODEL)
+
+            result = run_agent(
+                goal,
+                max_steps=8,
+                chat_fn=sync_chat,
+                confirm_fn=None
+            )
+
+            status_emoji = "✅" if result["status"] == "success" else "❌" if result["status"] == "failed" else "⏱"
+            status_str  = result["status"]
+            message_str = result.get("message", "No message")
+            steps_str   = result["steps"]
+            await update.message.reply_text(
+                f"{status_emoji} *Task {status_str}*\n\n"
+                f"{message_str}\n\n"
+                f"Steps taken: {steps_str}",
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            await update.message.reply_text(f"❌ Agent error: {e}")
+
+
     async def cmd_diagnose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Run LUCI self-diagnosis — analyze recent errors and suggest fixes."""
         if not allowed(update):
@@ -4417,6 +4479,7 @@ def run_telegram_bot() -> None:
     app.add_handler(CommandHandler("think", cmd_think))
     app.add_handler(CommandHandler("audit", cmd_audit))
     app.add_handler(CommandHandler("learn",       cmd_learn))
+    app.add_handler(CommandHandler("goal",        cmd_agent_goal))
     app.add_handler(CommandHandler("diagnose",    cmd_diagnose))
     app.add_handler(CommandHandler("quiz",        cmd_quiz))
     app.add_handler(CommandHandler("exam",        cmd_exam))
