@@ -181,6 +181,59 @@ def execute_tool(tool_call: dict, confirm_fn=None) -> dict:
     return {"ok": False, "error": f"Unknown tool: {tool}"}
 
 
+# ── Tool restriction by goal type ─────────────────────────────────────────────
+def classify_goal(goal: str) -> list:
+    """Return allowed tools based on goal content."""
+    goal_lower = goal.lower()
+
+    # Read-only goals — no writing, no restarts
+    if any(w in goal_lower for w in [
+        "check", "find", "show", "list", "count", "search",
+        "what", "how many", "status", "report", "disk", "usage",
+        "largest", "errors", "log", "health", "verify", "look"
+    ]):
+        return ["shell", "file_read", "service_status", "http_get", "done", "fail"]
+
+    # Service management
+    if any(w in goal_lower for w in [
+        "restart", "start", "stop", "service", "fix service"
+    ]):
+        return ["service_status", "service_restart", "shell", "http_get", "done", "fail"]
+
+    # File editing goals
+    if any(w in goal_lower for w in [
+        "fix", "patch", "edit", "update", "change", "modify",
+        "replace", "correct", "rewrite"
+    ]):
+        return ["file_read", "file_patch", "file_write", "shell", "service_restart", "done", "fail"]
+
+    # Default — all tools except destructive ones
+    return ["shell", "file_read", "file_patch", "file_write",
+            "service_status", "service_restart", "http_get", "done", "fail"]
+
+
+def get_completion_check(goal: str, history: list) -> str:
+    """Check if goal is already satisfied based on history."""
+    if not history:
+        return ""
+    # Look for successful results that answer the goal
+    goal_lower = goal.lower()
+    for h in history:
+        res = h.get("result", {})
+        if not res.get("ok"):
+            continue
+        stdout = res.get("stdout", "")
+        body   = res.get("body", "")
+        content = stdout or body
+        # If we have substantial output and goal is info-seeking
+        if content and len(content) > 50 and any(w in goal_lower for w in [
+            "check", "find", "show", "list", "status", "report",
+            "disk", "usage", "largest", "count", "what"
+        ]):
+            return "\nNOTE: You already have useful output from previous steps. If it answers the goal, call done NOW with a summary."
+    return ""
+
+
 # ── Planner prompt ────────────────────────────────────────────────────────────
 def build_planner_prompt(goal: str, history: list, tools: dict) -> str:
     tool_list = "\n".join(
@@ -192,30 +245,37 @@ def build_planner_prompt(goal: str, history: list, tools: dict) -> str:
     for h in history[-6:]:
         history_str += f"\nStep: {json.dumps(h.get('tool_call'))}\nResult: {json.dumps(h.get('result'))}\n"
 
-    steps_done = len(history)
-    max_before_done = 4  # Force summary after this many steps
+    steps_done   = len(history)
+    max_before_done = 4
+    allowed      = classify_goal(goal)
+    completion   = get_completion_check(goal, history)
+
+    # Only show allowed tools
+    allowed_tools = {k: v for k, v in tools.items() if k in allowed}
+    tool_list = "\n".join(
+        f'- {name}: {info["description"]} — e.g. {json.dumps(info["example"])}' 
+        for name, info in allowed_tools.items()
+    )
 
     return f"""You are LUCI's autonomous execution engine.
 
 GOAL: {goal}
 
-AVAILABLE TOOLS:
+ALLOWED TOOLS FOR THIS GOAL ({len(allowed_tools)} available):
 {tool_list}
 
 EXECUTION HISTORY ({steps_done} steps so far):
 {history_str or "None yet — this is the first step."}
+{completion}
+RULES:
+- Respond with ONLY one JSON tool call object — no text, no markdown
+- Only use tools from the ALLOWED list above
+- If you have the answer, call "done" immediately with a clear summary
+- After {max_before_done} steps, you MUST call "done"
+- Never repeat a failed tool call — try a different approach
+- File paths: absolute or ~/beast/workspace/
 
-INSTRUCTIONS:
-- Respond with ONLY a single JSON tool call object
-- No explanation, no markdown, no extra text — raw JSON only
-- Choose ONE tool that makes the most progress toward the goal
-- After {max_before_done} steps, you MUST use "done" with a summary even if not 100% complete
-- If you have enough information to answer the goal, use "done" immediately
-- If you've tried 3+ times and failed, use "fail"
-- File paths: use absolute paths or ~/beast/workspace/
-- Be decisive — one action per response
-
-{"IMPORTANT: You have taken " + str(steps_done) + " steps. Summarize findings and call done NOW." if steps_done >= max_before_done else ""}
+{"IMPORTANT: " + str(steps_done) + " steps taken. You MUST call done NOW with summary of findings." if steps_done >= max_before_done else ""}
 
 Respond with exactly one JSON object:"""
 
