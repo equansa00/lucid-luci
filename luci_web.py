@@ -3698,9 +3698,14 @@ async def agent_run(request: Request) -> JSONResponse:
         def sync_chat(messages, temperature=0.1):
             return ollama_chat(messages, temperature, route_model(goal)[0])
 
+        # Force fresh import to avoid cached module
+        import importlib
+        import luci_agent_loop as _lal
+        importlib.reload(_lal)
+
         result = await loop.run_in_executor(
             None,
-            lambda: run_agent(goal, max_steps=min(max_steps, 15), chat_fn=sync_chat)
+            lambda: _lal.run_agent(goal, max_steps=min(max_steps, 15), chat_fn=sync_chat)
         )
         return JSONResponse(result)
     except Exception as e:

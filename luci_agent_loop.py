@@ -182,6 +182,9 @@ def build_planner_prompt(goal: str, history: list, tools: dict) -> str:
     for h in history[-6:]:
         history_str += f"\nStep: {json.dumps(h.get('tool_call'))}\nResult: {json.dumps(h.get('result'))}\n"
 
+    steps_done = len(history)
+    max_before_done = 4  # Force summary after this many steps
+
     return f"""You are LUCI's autonomous execution engine.
 
 GOAL: {goal}
@@ -189,17 +192,20 @@ GOAL: {goal}
 AVAILABLE TOOLS:
 {tool_list}
 
-EXECUTION HISTORY:
+EXECUTION HISTORY ({steps_done} steps so far):
 {history_str or "None yet — this is the first step."}
 
 INSTRUCTIONS:
-- Respond with ONLY a JSON tool call object
-- No explanation, no markdown, just raw JSON
-- Choose the best next tool to make progress toward the goal
-- If the goal is complete, use "done"
+- Respond with ONLY a single JSON tool call object
+- No explanation, no markdown, no extra text — raw JSON only
+- Choose ONE tool that makes the most progress toward the goal
+- After {max_before_done} steps, you MUST use "done" with a summary even if not 100% complete
+- If you have enough information to answer the goal, use "done" immediately
 - If you've tried 3+ times and failed, use "fail"
-- File paths should be absolute or use ~/beast/workspace/
-- Keep commands simple and targeted
+- File paths: use absolute paths or ~/beast/workspace/
+- Be decisive — one action per response
+
+{"IMPORTANT: You have taken " + str(steps_done) + " steps. Summarize findings and call done NOW." if steps_done >= max_before_done else ""}
 
 Respond with exactly one JSON object:"""
 
@@ -266,11 +272,33 @@ def run_agent(goal: str, max_steps: int = 10, confirm_fn=None,
             message = result.get("message", "")
             print(f"\n{'✅' if status == 'success' else '❌'} Task {status}: {message}")
             log_task(task_id, goal, history, status, message)
-            return {"status": status, "message": message, "steps": len(history)}
+            return {"status": status, "message": message, "steps": len(history), "history": history}
+
+        # Force done after 4 steps — build summary from history
+        if step >= 4:
+            print(f"  ⚡ Force-completing after {step} steps")
+            summary_lines = []
+            for h in history:
+                tc  = h.get("tool_call", {})
+                res = h.get("result", {})
+                t   = tc.get("tool", "")
+                if t == "service_status":
+                    summary_lines.append(f"{tc.get('name','?')}: {res.get('status','?')}")
+                elif t == "shell":
+                    out = res.get("stdout","").strip()[:200]
+                    if out:
+                        summary_lines.append(f"$ {tc.get('command','?')[:60]}\n{out}")
+                elif t == "http_get":
+                    summary_lines.append(f"GET {tc.get('url','?')}: {res.get('status','?')}")
+                elif t in ("file_read","file_patch","file_write"):
+                    summary_lines.append(f"{t}: {tc.get('path','?')} — {'ok' if res.get('ok') else 'failed'}")
+            message = "\n".join(summary_lines) if summary_lines else "Task completed after exploration."
+            log_task(task_id, goal, history, "success", message)
+            return {"status": "success", "message": message, "steps": len(history), "history": history}
 
     # Max steps reached
     log_task(task_id, goal, history, "timeout", "Max steps reached")
-    return {"status": "timeout", "steps": max_steps}
+    return {"status": "timeout", "steps": max_steps, "history": history}
 
 
 def log_task(task_id: str, goal: str, history: list,
