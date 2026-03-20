@@ -748,6 +748,7 @@ _HTML = r"""<!DOCTYPE html>
     -webkit-backdrop-filter: blur(20px);
     display: flex; flex-direction: column;
     overflow: hidden; z-index: 10;
+    margin-left: 44px;
   }
   #history-header {
     padding: 20px 16px 12px;
@@ -1060,6 +1061,140 @@ _HTML = r"""<!DOCTYPE html>
 <script src="/static/luci-nav.js"></script>
 </head>
 <body>
+<!-- LUCI Vertical Nav Rail -->
+<div id="luci-rail" style="
+  position:fixed;
+  left:0;top:0;bottom:0;
+  width:44px;
+  background:#080808;
+  border-right:1px solid #1c1c1c;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:8px 0;
+  gap:2px;
+  z-index:9000;
+">
+  <!-- L logo -->
+  <div style="width:30px;height:30px;border-radius:50%;
+    background:radial-gradient(circle,#D4AF37 0%,#7a6010 100%);
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:900;color:#000;
+    margin-bottom:6px;flex-shrink:0;
+    box-shadow:0 0 10px rgba(212,175,55,0.5)">L</div>
+
+  <!-- Divider -->
+  <div style="width:24px;height:1px;background:#222;margin:2px 0"></div>
+
+  <!-- Section 1: AI Tools (existing LUCI buttons) -->
+  <div title="Memory" onclick="openMemory ? openMemory() : null"
+    style="width:36px;height:36px;border-radius:7px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:15px;cursor:pointer;transition:all .15s;
+    background:none;border:1px solid transparent;"
+    onmouseover="this.style.background='rgba(212,175,55,0.1)';this.style.borderColor='rgba(212,175,55,0.25)'"
+    onmouseout="this.style.background='none';this.style.borderColor='transparent'">
+    🧠
+  </div>
+
+  <div title="Friction Interceptor" onclick="openFriction ? openFriction() : null"
+    style="width:36px;height:36px;border-radius:7px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:15px;cursor:pointer;transition:all .15s;
+    background:none;border:1px solid transparent;"
+    onmouseover="this.style.background='rgba(0,229,255,0.1)';this.style.borderColor='rgba(0,229,255,0.25)'"
+    onmouseout="this.style.background='none';this.style.borderColor='transparent'">
+    ⚡
+  </div>
+
+  <!-- Divider -->
+  <div style="width:24px;height:1px;background:#222;margin:4px 0"></div>
+
+  <!-- Section 2: Pages -->
+  <div style="height:6px"></div>
+  <a href="/" title="Chat — Main interface"
+    style="width:36px;height:36px;border-radius:7px;
+    display:flex;align-items:center;justify-content:center;
+    text-decoration:none;font-size:15px;transition:all .15s;
+    background:rgba(212,175,55,0.12);border:1px solid rgba(212,175,55,0.3);"
+    onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+    💬
+  </a>
+
+  <a href="/learn" title="Learn — Curriculum & lessons"
+    style="width:36px;height:36px;border-radius:7px;
+    display:flex;align-items:center;justify-content:center;
+    text-decoration:none;font-size:15px;transition:all .15s;
+    background:none;border:1px solid transparent;"
+    onmouseover="this.style.background='rgba(212,175,55,0.1)';this.style.borderColor='rgba(212,175,55,0.25)'"
+    onmouseout="this.style.background='none';this.style.borderColor='transparent'">
+    📚
+  </a>
+
+  <a href="/agent" title="Agent — Autonomous execution"
+    style="width:36px;height:36px;border-radius:7px;
+    display:flex;align-items:center;justify-content:center;
+    text-decoration:none;font-size:15px;transition:all .15s;
+    background:none;border:1px solid transparent;"
+    onmouseover="this.style.background='rgba(212,175,55,0.1)';this.style.borderColor='rgba(212,175,55,0.25)'"
+    onmouseout="this.style.background='none';this.style.borderColor='transparent'">
+    🤖
+  </a>
+
+  <a href="/diagnose" title="Diagnostics — Error analysis"
+    style="width:36px;height:36px;border-radius:7px;
+    display:flex;align-items:center;justify-content:center;
+    text-decoration:none;font-size:15px;transition:all .15s;
+    background:none;border:1px solid transparent;"
+    onmouseover="this.style.background='rgba(212,175,55,0.1)';this.style.borderColor='rgba(212,175,55,0.25)'"
+    onmouseout="this.style.background='none';this.style.borderColor='transparent'">
+    🔬
+  </a>
+
+  <a href="/audit/ui" title="Audit — Workspace health"
+    style="width:36px;height:36px;border-radius:7px;
+    display:flex;align-items:center;justify-content:center;
+    text-decoration:none;font-size:15px;transition:all .15s;
+    background:none;border:1px solid transparent;"
+    onmouseover="this.style.background='rgba(212,175,55,0.1)';this.style.borderColor='rgba(212,175,55,0.25)'"
+    onmouseout="this.style.background='none';this.style.borderColor='transparent'">
+    📋
+  </a>
+
+  <!-- Spacer -->
+  <div style="flex:1"></div>
+
+  <!-- Divider -->
+  <div style="width:24px;height:1px;background:#222;margin:2px 0"></div>
+
+  <!-- Bottom: settings -->
+  <a href="/audit/ui" title="System Health"
+    style="width:36px;height:36px;border-radius:7px;
+    display:flex;align-items:center;justify-content:center;
+    text-decoration:none;font-size:14px;transition:all .15s;
+    background:none;border:1px solid transparent;margin-bottom:4px;"
+    onmouseover="this.style.background='rgba(212,175,55,0.1)';this.style.borderColor='rgba(212,175,55,0.25)'"
+    onmouseout="this.style.background='none';this.style.borderColor='transparent'">
+    ⚙️
+  </a>
+</div>
+
+<script>
+// Mark current page active in rail
+(function(){
+  var path = window.location.pathname;
+  document.querySelectorAll('#luci-rail a[href]').forEach(function(a){
+    var href = a.getAttribute('href');
+    if (href === path || (path !== '/' && href !== '/' && path.startsWith(href))) {
+      a.style.background = 'rgba(212,175,55,0.15)';
+      a.style.borderColor = 'rgba(212,175,55,0.4)';
+    }
+  });
+})();
+</script>
+<!-- End LUCI Rail -->
+
+
 
 <!-- Mode toggle — always visible in both modes -->
 <button id="mode-toggle" title="Switch mode">&#x1F4AC;</button>
