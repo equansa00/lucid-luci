@@ -51,3 +51,19 @@
 - Full phone control via Telegram
 - Local-only, private, no cloud dependency
 - Expand capabilities: memory, web, email, calendar
+
+## Hardware (updated 2026-03-22)
+Running on lucid-luci Threadripper workstation:
+- AMD Ryzen Threadripper PRO 9985WX 64-core
+- 256GB DDR5 ECC RAM  
+- NVIDIA RTX 6000 Ada 48GB VRAM
+- Ubuntu 24.04.4 LTS
+- Primary model: llama3.1:70b
+
+## Hardware (updated 2026-03-22)
+Running on lucid-luci Threadripper workstation:
+- AMD Ryzen Threadripper PRO 9985WX 64-core
+- 256GB DDR5 ECC RAM  
+- NVIDIA RTX 6000 Ada 48GB VRAM
+- Ubuntu 24.04.4 LTS
+- Primary model: llama3.1:70b
