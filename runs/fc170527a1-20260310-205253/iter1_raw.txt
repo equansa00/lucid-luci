@@ -1,9 +1,0 @@
-{
-  "plan": [
-    "Run sed command to modify luci_web.py",
-    "Restart luci.service using systemctl"
-  ],
-  "patch_unified_diff": "",
-  "commands_to_run": ["sed -i 's/host=\"127.0.0.1\"/host=\"0.0.0.0\"/g' ~/beast/workspace/luci_web.py", "systemctl --user restart luci.service"],
-  "notes": ""
-}

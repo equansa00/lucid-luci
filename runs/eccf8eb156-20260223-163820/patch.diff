@@ -1,8 +1,0 @@
---- a/app.py
-+++ b/app.py
-@@ -1,3 +1,6 @@
- def existing():
-    pass
-+
-+def multiply(x: int, y: int) -> int:
-+    return x * y

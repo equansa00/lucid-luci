@@ -1,6 +1,0 @@
-{
-  "plan": ["Update luci_web.py to bind to all interfaces", "Restart luci.service"],
-  "patch_unified_diff": "--- a/~/beast/workspace/luci_web.py\n+++ b/~/beast/workspace/luci_web.py\n@@ -1,3 +1,4 @@\n host = \"127.0.0.1\"\n+\n+host = \"0.0.0.0\"",
-  "commands_to_run": ["sed -i 's/host=\"127.0.0.1\"/host=\"0.0.0.0\"/g' ~/beast/workspace/luci_web.py", "systemctl --user restart luci.service"],
-  "notes": "Updated luci_web.py to bind to all interfaces and restarted luci.service"
-}

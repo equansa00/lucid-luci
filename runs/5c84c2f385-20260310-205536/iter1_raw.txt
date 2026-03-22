@@ -1,6 +1,0 @@
-{
-  "plan": ["Restart luci service with systemctl"],
-  "patch_unified_diff": "",
-  "commands_to_run": ["systemctl --user restart luci.service --prefix=/usr"],
-  "notes": ""
-}

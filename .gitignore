@@ -28,3 +28,10 @@ __pycache__/
 .env.*
 luci_features.json
 repo/
+
+# Runtime / generated files
+runs/
+*.wav
+*.log
+*.db
+luci_voice_history.db
