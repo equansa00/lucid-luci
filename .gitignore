@@ -36,3 +36,6 @@ runs/
 *.db
 luci_voice_history.db
 repos/
+gmail_credentials.json
+gmail_token.json
+.env
