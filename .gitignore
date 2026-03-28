@@ -35,3 +35,4 @@ runs/
 *.log
 *.db
 luci_voice_history.db
+repos/
