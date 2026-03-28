@@ -3300,18 +3300,9 @@ async def chat_endpoint(request: Request) -> JSONResponse:
         )
 
         # Auto-summarize large responses — but skip for capability/identity questions
-        _cap_kw = ["can you", "what can you", "your features", "your capabilities",
-                   "what you can do", "features that you have", "tell me about yourself",
-                   "what are you", "who are you", "abilities"]
-        _is_cap_question = any(kw in text.lower() for kw in _cap_kw)
-        if not _is_cap_question:
-            topic = category if category else "output"
-            response_text, full_path = await loop.run_in_executor(
-                None, lambda: summarize_large_output(response_text, topic)
-            )
-            if full_path:
-                fname = Path(full_path).name
-                response_text += f"\n\n📄 [View full output](/output/{fname})"
+        # Auto-summarize disabled for chat — adds latency with no benefit
+        # summarize_large_output is still used for agent/code tasks
+        full_path = None
 
         # Strip chatbot/apology language using full LUCI persona filter
         try:
@@ -4061,6 +4052,490 @@ def _parse_json(raw: str) -> dict:
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+#  LUCI LEARN — Repo-aware lesson + quiz endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/learn/repos")
+async def learn_repos(request: Request) -> JSONResponse:
+    """List repos filtered to current phase with clean labels."""
+    try:
+        import json as _json
+        from luci_teacher import load_curriculum, get_current_lesson
+        from luci_github  import github_list_repos
+
+        mapping_path = Path(__file__).parent / "luci_repo_phases.json"
+        mapping      = _json.loads(mapping_path.read_text()) if mapping_path.exists() else {}
+        phase_repos  = mapping.get("phase_repos", {})
+        repo_labels  = mapping.get("repo_labels", {})
+
+        data   = load_curriculum()
+        lesson = get_current_lesson(data)
+        phase  = str(lesson["phase"]) if lesson else "1"
+
+        # Support explore mode (?all=1)
+        explore    = request.query_params.get("all") == "1"
+        all_repos  = github_list_repos()
+        all_count  = len(all_repos)
+
+        if explore:
+            slim = [{
+                "name":  r["name"],
+                "label": repo_labels.get(r["name"],
+                         r["name"].replace("-"," ").replace("_"," ").title()),
+            } for r in all_repos]
+        else:
+            phase_list = list(phase_repos.get(phase, {}).get("repos", []))
+            if "lucid-luci" not in phase_list:
+                phase_list = ["lucid-luci"] + phase_list
+            slim = [{
+                "name":  name,
+                "label": repo_labels.get(name,
+                         name.replace("-"," ").replace("_"," ").title()),
+            } for name in phase_list]
+
+        return JSONResponse({
+            "repos":       slim,
+            "phase":       phase,
+            "phase_label": phase_repos.get(phase, {}).get("label", ""),
+            "all_count":   all_count,
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/learn/repo-lesson")
+async def learn_repo_lesson(request: Request) -> JSONResponse:
+    """Teach the current lesson using code from the student's chosen repo."""
+    try:
+        body      = await request.json()
+        repo_name = str(body.get("repo_name", "")).strip()
+        if not repo_name:
+            return JSONResponse({"error": "repo_name is required"}, status_code=400)
+
+        from luci_teacher import load_curriculum, get_current_lesson, build_teaching_prompt
+        from luci_github  import get_repo_code_for_lesson, github_repo_summary
+
+        data   = load_curriculum()
+        lesson = get_current_lesson(data)
+        if not lesson:
+            return JSONResponse({"error": "Curriculum complete"}, status_code=404)
+
+        # Step 1: detect repo stack and pick best lesson BEFORE fetching code
+        try:
+            summary  = github_repo_summary(repo_name)
+            lang     = (summary.get("language") or "").lower()
+            topics   = [t.lower() for t in summary.get("topics", [])]
+            combined = lang + " " + " ".join(topics)
+            keywords = ["react","flask","sql","express","node",
+                        "typescript","javascript","python","html","fastapi"]
+            for kw in keywords:
+                if kw not in combined:
+                    continue
+                for phase in data["phases"]:
+                    phase_text = (
+                        phase["title"] + " " +
+                        " ".join(m["title"] for m in phase["modules"]) + " " +
+                        " ".join(l for m in phase["modules"] for l in m["lessons"])
+                    ).lower()
+                    if kw in phase_text and phase["phase"] != lesson["phase"]:
+                        fm = phase["modules"][0]
+                        lesson = {
+                            "phase":         phase["phase"],
+                            "phase_title":   phase["title"],
+                            "module":        fm["module"],
+                            "module_title":  fm["title"],
+                            "lesson":        1,
+                            "lesson_title":  fm["lessons"][0],
+                            "total_lessons": len(fm["lessons"]),
+                            "phase_goal":    phase["goal"],
+                            "module_lessons":fm["lessons"],
+                        }
+                        break
+                else:
+                    continue
+                break
+        except Exception:
+            pass  # fall back to current lesson silently
+
+        # Step 2: fetch code using the correctly chosen lesson title
+        try:
+            repo_context = get_repo_code_for_lesson(repo_name, lesson["lesson_title"])
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, status_code=404)
+        teach_prompt  = build_teaching_prompt(lesson)
+        if repo_context:
+            teach_prompt += f"\n\nSTUDENT'S ACTUAL CODE TO TEACH FROM:\n{repo_context}"
+
+        from luci import load_persona_with_memory
+        persona  = load_persona_with_memory()
+        messages = [
+            {"role": "system", "content": persona + "\n\n" + teach_prompt},
+            {"role": "user",   "content": f"Teach me about {lesson['lesson_title']} using my own code."},
+        ]
+        reply = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: ollama_chat(messages, 0.7, route_model(lesson["lesson_title"])[0])
+        )
+        return JSONResponse({"reply": reply, "lesson": lesson, "repo": repo_name})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/learn/repo-quiz")
+async def learn_repo_quiz(request: Request) -> JSONResponse:
+    """Generate a quiz question based on the student's actual repo code."""
+    try:
+        body      = await request.json()
+        repo_name = str(body.get("repo_name", "")).strip()
+        if not repo_name:
+            return JSONResponse({"error": "repo_name is required"}, status_code=400)
+
+        from luci_teacher import load_curriculum, get_current_lesson
+        from luci_quiz    import build_quiz_prompt, get_random_scenario
+        from luci_github  import get_repo_code_for_lesson
+
+        data   = load_curriculum()
+        lesson = get_current_lesson(data)
+        if not lesson:
+            return JSONResponse({"error": "Curriculum complete"}, status_code=404)
+
+        repo_context = get_repo_code_for_lesson(repo_name, lesson["lesson_title"])
+        scenario     = get_random_scenario(lesson["phase"], lesson["module"], lesson["lesson"])
+        if not scenario:
+            scenario = f"Explain what is happening in your {repo_name} code and how it relates to {lesson['lesson_title']}."
+
+        quiz_prompt = build_quiz_prompt(scenario, lesson["lesson_title"], lesson["phase_title"])
+        if repo_context:
+            quiz_prompt += f"\n\nSTUDENT'S CODE (base your questions on this):\n{repo_context}"
+
+        from luci import load_persona_with_memory
+        persona  = load_persona_with_memory()
+        messages = [
+            {"role": "system", "content": persona + "\n\n" + quiz_prompt},
+            {"role": "user",   "content": "Quiz me using my own code."},
+        ]
+        reply = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: ollama_chat(messages, 0.7, route_model(lesson["lesson_title"])[0])
+        )
+        return JSONResponse({"reply": reply, "lesson": lesson,
+                             "repo": repo_name, "scenario": scenario})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+# ---------------------------------------------------------------------------
+#  LUCI LEARN — Code editor endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/learn/repo-file")
+async def learn_repo_file(request: Request) -> JSONResponse:
+    """Load a representative file from a repo into the code editor."""
+    try:
+        repo_name = request.query_params.get("repo", "").strip()
+        if not repo_name:
+            return JSONResponse({"error": "repo required"}, status_code=400)
+
+        from luci_github import clone_or_pull_repo, _pick_relevant_files
+        from luci_teacher import load_curriculum, get_current_lesson
+
+        data   = load_curriculum()
+        lesson = get_current_lesson(data)
+        title  = lesson["lesson_title"] if lesson else ""
+
+        repo_path = clone_or_pull_repo(repo_name)
+        files     = _pick_relevant_files(repo_path, title)
+        if not files:
+            return JSONResponse({"error": "No relevant files found"}, status_code=404)
+
+        rel, content = files[0]
+        ext = rel.rsplit(".", 1)[-1].lower() if "." in rel else ""
+        lang_map = {"py": "python", "js": "javascript", "ts": "typescript",
+                    "html": "html", "css": "css", "sql": "sql", "jsx": "javascript",
+                    "tsx": "typescript"}
+        language = lang_map.get(ext, "javascript")
+
+        return JSONResponse({
+            "filename": rel,
+            "content":  content[:8000],
+            "language": language,
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/learn/code-review")
+async def learn_code_review(request: Request) -> JSONResponse:
+    """Have LUCI review the student's code."""
+    try:
+        body     = await request.json()
+        code     = body.get("code", "").strip()
+        language = body.get("language", "javascript")
+        repo     = body.get("repo", "")
+        lesson_title = body.get("lesson", "")
+
+        if not code:
+            return JSONResponse({"error": "no code provided"}, status_code=400)
+
+        from luci import load_persona_with_memory
+        from luci_teacher import load_curriculum, get_current_lesson, build_teaching_prompt
+
+        data   = load_curriculum()
+        lesson = get_current_lesson(data)
+
+        persona      = load_persona_with_memory()
+        lesson_ctx   = f"Current lesson: {lesson_title or (lesson['lesson_title'] if lesson else 'general')}"
+        phase_ctx    = f"Phase: {lesson['phase_title'] if lesson else 'general'}"
+
+        review_prompt = f"""You are LUCI acting as Chip's coding mentor reviewing his code.
+
+{phase_ctx}
+{lesson_ctx}
+{"Repo: " + repo if repo else ""}
+
+STUDENT'S CODE ({language}):
+```{language}
+{code[:6000]}
+```
+
+REVIEW APPROACH:
+1. Start with what they got RIGHT (be specific, reference actual lines)
+2. Point out 1-3 concrete issues or improvements (with line references)
+3. Give one specific task: "Now try changing X to see what happens"
+4. End with one question that checks understanding
+
+RULES:
+- Be direct and specific, not generic
+- Reference actual variable names, functions, and patterns from their code
+- Keep review under 300 words
+- Stay within the current phase scope: {lesson['phase_title'] if lesson else 'general'}
+- Do NOT rewrite their entire code — guide them to fix it themselves"""
+
+        messages = [
+            {"role": "system", "content": persona},
+            {"role": "user",   "content": review_prompt},
+        ]
+
+        reply = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: ollama_chat(messages, 0.7, route_model(lesson_title or "code review")[0])
+        )
+        return JSONResponse({"reply": reply, "lesson": lesson_title, "language": language})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/learn/live-hint")
+async def learn_live_hint(request: Request) -> JSONResponse:
+    """Return a single short hint while the student types."""
+    try:
+        body     = await request.json()
+        code     = body.get("code", "").strip()
+        language = body.get("language", "javascript")
+        lesson   = body.get("lesson", "")
+
+        if not code or len(code) < 20:
+            return JSONResponse({"hint": "keep going...", "ok": True})
+
+        from luci import load_persona_with_memory
+        from luci_teacher import load_curriculum, get_current_lesson
+
+        data       = load_curriculum()
+        cur_lesson = get_current_lesson(data)
+        phase      = cur_lesson["phase_title"] if cur_lesson else "general"
+
+        # Detect language mismatch
+        js_keywords  = ["function ", "const ", "let ", "var ", "=>", "console.log"]
+        py_keywords  = ["def ", "print(", "elif ", "import ", "self.", "    "]
+        is_js_in_py  = language == "python"  and any(k in code for k in js_keywords)
+        is_py_in_js  = language == "javascript" and any(k in code for k in py_keywords) and "def " in code
+
+        if is_js_in_py:
+            mismatch_note = "IMPORTANT: Student is writing JavaScript syntax but the language is set to Python. Point this out and show the Python equivalent."
+        elif is_py_in_js:
+            mismatch_note = "IMPORTANT: Student is writing Python syntax but the language is set to JavaScript. Point this out and show the JavaScript equivalent."
+        else:
+            mismatch_note = ""
+
+        prompt = f"""You are a coding mentor giving a short inline hint.
+
+Student is writing {language} code in a lesson about: {lesson or phase}
+{mismatch_note}
+
+CODE SO FAR:
+```{language}
+{code}
+```
+
+Respond in this EXACT format — no extra text, no preamble:
+
+If LANGUAGE MISMATCH:
+❌ [what's wrong — name the exact keyword or symbol]
+Why: [one sentence explaining why this doesn't work in {language}]
+Fix: [show 1-3 lines of corrected code]
+
+If SYNTAX ERROR (missing colon, bracket, indent, etc):
+⚠️ [exactly what's missing and exactly where — e.g. "Missing `:` after `def greet(name)`"]
+Why: [one sentence — what does the colon/indent/bracket DO]
+Fix: [show the corrected line only]
+
+If BUG or LOGIC ERROR:
+⚠️ [what's wrong — name the variable/function]
+Why: [one sentence]
+Fix: [show corrected line]
+
+If INCOMPLETE but correct so far:
+→ [what to add next — be specific, e.g. "Add `return` statement inside `greet`"]
+Why: [one sentence — what happens without it]
+
+If CORRECT:
+✓ [what they did right — name the actual function/variable]
+Next: [one small thing to try or add]
+
+Rules:
+- Always name the EXACT line, keyword, symbol, or variable
+- Why must explain the concept, not just repeat the error
+- Fix must show real code, not a description
+- Never write more than 4 lines total
+- Never say "good job" or "looks great" generically"""
+
+        messages = [{"role": "user", "content": prompt}]
+        hint = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: ollama_chat(messages, 0.3, "luci-core:latest")
+        )
+        hint = hint.strip().split("\n")[0][:80]
+        ok   = hint.startswith("✓") or "good" in hint.lower() or "correct" in hint.lower()
+        return JSONResponse({"hint": hint, "ok": ok})
+    except Exception as e:
+        return JSONResponse({"hint": "LUCI is watching...", "ok": True})
+
+
+
+@app.post("/learn/git-push")
+async def learn_git_push(request: Request) -> JSONResponse:
+    """Save edited file and push to GitHub."""
+    try:
+        import subprocess
+        body      = await request.json()
+        repo_name = body.get("repo_name", "").strip()
+        filename  = body.get("filename", "").strip()
+        content   = body.get("content", "")
+        message   = body.get("message", "LUCI Learn: practice session").strip()
+
+        if not repo_name or not filename or not content:
+            return JSONResponse({"error": "repo_name, filename and content required"}, status_code=400)
+
+        from luci_github import clone_or_pull_repo, GITHUB_TOKEN, GITHUB_USERNAME
+
+        repo_path   = clone_or_pull_repo(repo_name)
+        target_file = repo_path / filename
+
+        # Safety check — must be inside repo
+        target_file.resolve().relative_to(repo_path.resolve())
+
+        target_file.parent.mkdir(parents=True, exist_ok=True)
+        target_file.write_text(content, encoding="utf-8")
+
+        # Configure git identity if needed
+        subprocess.run(["git", "config", "user.email", "luci@lucid-luci.local"],
+                       cwd=str(repo_path), capture_output=True)
+        subprocess.run(["git", "config", "user.name", "LUCI Learn"],
+                       cwd=str(repo_path), capture_output=True)
+
+        # Stage, commit, push
+        subprocess.run(["git", "add", filename], cwd=str(repo_path), capture_output=True)
+
+        commit_result = subprocess.run(
+            ["git", "commit", "-m", message],
+            cwd=str(repo_path), capture_output=True, text=True
+        )
+        if "nothing to commit" in commit_result.stdout:
+            return JSONResponse({"error": "No changes to commit — file is identical to repo version"})
+
+        push_url = f"https://{GITHUB_TOKEN}@github.com/{GITHUB_USERNAME}/{repo_name}.git"
+        push_result = subprocess.run(
+            ["git", "push", push_url, "HEAD"],
+            cwd=str(repo_path), capture_output=True, text=True, timeout=30
+        )
+        if push_result.returncode != 0:
+            safe_err = push_result.stderr.replace(GITHUB_TOKEN, "***")
+            return JSONResponse({"error": f"Push failed: {safe_err[:200]}"}, status_code=500)
+
+        # Get commit hash
+        sha = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=str(repo_path), capture_output=True, text=True
+        ).stdout.strip()
+
+        return JSONResponse({
+            "ok": True,
+            "commit": sha,
+            "file": filename,
+            "repo": repo_name,
+            "message": message,
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+
+@app.post("/learn/code-chat")
+async def learn_code_chat(request: Request) -> JSONResponse:
+    """Answer coding questions without writing code for the student."""
+    try:
+        body     = await request.json()
+        text     = body.get("text", "").strip()
+        code     = body.get("code", "")
+        language = body.get("language", "python")
+        lesson   = body.get("lesson", "")
+        history  = body.get("history", [])
+
+        if not text:
+            return JSONResponse({"error": "no question"}, status_code=400)
+
+        from luci import load_persona_with_memory
+        from luci_teacher import load_curriculum, get_current_lesson
+
+        data      = load_curriculum()
+        cur       = get_current_lesson(data)
+        phase     = cur["phase_title"] if cur else "general"
+
+        system = f"""You are LUCI, a coding mentor helping a student learn {language}.
+
+Current lesson: {lesson or phase}
+
+The student's current code:
+```{language}
+{code[:1500] if code else "(empty)"}
+```
+
+YOUR STRICT RULES:
+- NEVER write complete code solutions for the student
+- NEVER complete their functions for them
+- NEVER show the full corrected version
+- DO explain concepts clearly with analogies
+- DO point to the exact line or keyword that needs attention
+- DO ask guiding questions that help them figure it out
+- DO show one-line EXAMPLES that are different from their code
+- If they ask "how do I write X" — explain the concept and show a DIFFERENT example, not their solution
+- If they ask "why does X work" — explain the concept fully
+- Keep answers focused and under 150 words
+- Always end with a question that pushes them to try it themselves
+
+You are a teacher, not a code generator."""
+
+        messages = [{"role": "system", "content": system}]
+        for h in history[-6:]:
+            messages.append({"role": h.get("role","user"), "content": h.get("content","")})
+        messages.append({"role": "user", "content": text})
+
+        reply = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: ollama_chat(messages, 0.7, route_model(text)[0])
+        )
+        return JSONResponse({"reply": reply})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host=WEB_HOST, port=WEB_PORT, log_level="info")

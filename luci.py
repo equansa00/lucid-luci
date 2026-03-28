@@ -64,13 +64,19 @@ _BUILD_TRIGGERS_TG = [
 # -----------------------------
 # Config
 # -----------------------------
-OLLAMA_CHAT_URL = os.getenv("OLLAMA_CHAT_URL", "http://127.0.0.1:11434/api/chat")
+# Load .env before reading config so OLLAMA_CHAT_URL is set correctly
+try:
+    from dotenv import load_dotenv as _load_dotenv
+    _load_dotenv(Path.home() / "beast" / "workspace" / ".env")
+except Exception:
+    pass
+OLLAMA_CHAT_URL = os.getenv("OLLAMA_CHAT_URL", "http://127.0.0.1:8000/v1/chat/completions")
 MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:70b")
 
 # Model router
 ROUTER_DEFAULT_MODEL = os.getenv("LUCI_ROUTER_DEFAULT", "luci-core:latest")
 ROUTER_CODE_MODEL    = os.getenv("LUCI_ROUTER_CODE",    "luci-coder:latest")
-ROUTER_REASON_MODEL  = os.getenv("LUCI_ROUTER_REASON",  "llama3.1:8b")
+ROUTER_REASON_MODEL  = os.getenv("LUCI_ROUTER_REASON",  "llama3.1:70b")
 ROUTER_DEEP_MODEL    = os.getenv("LUCI_ROUTER_DEEP",    "chip-assistant:latest")
 ROUTER_BEAST_MODEL   = os.getenv("LUCI_ROUTER_BEAST",   "beast70b:latest")
 ROUTER_AGENT_MODEL = os.getenv("LUCI_ROUTER_AGENT", "llama3.1:70b")
@@ -83,13 +89,13 @@ RUNS_DIR = WORKSPACE / "runs"
 PERSONA_PATH = os.getenv("LUCI_PERSONA_PATH", str(WORKSPACE / "persona_agent.txt"))
 MEMORY_PATH = WORKSPACE / "memory.md"
 MEMORIES_DIR = WORKSPACE / "memories"
-MEMORY_EXTRACT_MODEL = os.getenv("LUCI_MEMORY_EXTRACT_MODEL", "llama3.1:8b")
+MEMORY_EXTRACT_MODEL = os.getenv("LUCI_MEMORY_EXTRACT_MODEL", "llama3.1:70b")
 LUCI_AUTO_MEMORY = os.getenv("LUCI_AUTO_MEMORY", "0") == "1"
 
 # Web system
 WEB_MAX_BYTES = int(os.getenv("LUCI_WEB_MAX_BYTES", str(512 * 1024)))
 WEB_TIMEOUT_SEC = int(os.getenv("LUCI_WEB_TIMEOUT_SEC", "10"))
-WEB_SUMMARY_MODEL = os.getenv("LUCI_WEB_SUMMARY_MODEL", "llama3.1:8b")
+WEB_SUMMARY_MODEL = os.getenv("LUCI_WEB_SUMMARY_MODEL", "llama3.1:70b")
 WEB_MONITORS_PATH = WORKSPACE / "monitors.json"
 WEB_USER_AGENT = "Mozilla/5.0 (compatible; LUCI-Agent/1.0)"
 
@@ -101,7 +107,7 @@ CALENDAR_ID = os.getenv("LUCI_CALENDAR_ID", "primary")
 REMINDERS_PATH = WORKSPACE / "reminders.json"
 DAILY_BRIEFING_HOUR = int(os.getenv("LUCI_BRIEFING_HOUR", "8"))
 REMINDER_MAX_DAYS = int(os.getenv("LUCI_REMINDER_MAX_DAYS", "30"))
-EMAIL_SUMMARY_MODEL = os.getenv("LUCI_EMAIL_SUMMARY_MODEL", "llama3.1:8b")
+EMAIL_SUMMARY_MODEL = os.getenv("LUCI_EMAIL_SUMMARY_MODEL", "llama3.1:70b")
 
 # Voice
 PIPER_BIN = WORKSPACE / "piper" / "piper" / "piper"
@@ -440,16 +446,18 @@ def load_feature_registry() -> str:
     except Exception:
         return ""
 
-def load_persona_with_memory() -> str:
+def load_persona_with_memory(include_registry: bool = False) -> str:
     """Return persona_agent.txt + memory.md for ask/cite/Telegram contexts.
-    NOT used by agent_prompt — it receives memory_text separately."""
+    NOT used by agent_prompt — it receives memory_text separately.
+    Registry excluded by default — only needed for agent/tool tasks."""
     parts: List[str] = []
     persona = load_persona()
     if persona:
         parts.append(persona)
-    registry = load_feature_registry()
-    if registry:
-        parts.append(registry)
+    if include_registry:
+        registry = load_feature_registry()
+        if registry:
+            parts.append(registry)
     mem = load_memory()
     if mem.strip():
         parts.append("## WHAT YOU REMEMBER ABOUT EDWARD:\n" + mem.strip())
@@ -460,25 +468,42 @@ def ollama_chat(
     temperature: float = 0.2,
     model: Optional[str] = None,
 ) -> str:
-    payload = {
-        "model": model if model is not None else MODEL,
-        "messages": messages,
-        "stream": False,
-        "options": {
+    max_tokens = int(os.getenv("LUCI_MAX_TOKENS", "2048"))
+    # Detect vLLM (OpenAI-compatible) vs native Ollama by URL
+    is_vllm = "/v1/" in OLLAMA_CHAT_URL
+    if is_vllm:
+        payload = {
+            "model": model if model is not None else MODEL,
+            "messages": messages,
+            "stream": False,
             "temperature": temperature,
-            "num_predict": int(os.getenv("LUCI_MAX_TOKENS", "2048")),
-        },
-    }
+            "max_tokens": max_tokens,
+            "stop": ["<|eot_id|>", "<|end_of_text|>", "assistant", "User:"],
+        }
+    else:
+        payload = {
+            "model": model if model is not None else MODEL,
+            "messages": messages,
+            "stream": False,
+            "options": {
+                "temperature": temperature,
+                "num_predict": max_tokens,
+            },
+        }
     r = requests.post(OLLAMA_CHAT_URL, json=payload, timeout=OLLAMA_TIMEOUT_SEC)
     r.raise_for_status()
     data = r.json()
-    msg = (data.get("message") or {}).get("content")
+    # Support both OpenAI (vLLM) and Ollama response formats
+    if "choices" in data:
+        msg = (data["choices"][0].get("message") or {}).get("content")
+    else:
+        msg = (data.get("message") or {}).get("content")
     if not isinstance(msg, str):
-        die(f"Bad Ollama response shape: {json.dumps(data)[:400]}")
+        die(f"Bad response shape: {json.dumps(data)[:400]}")
     return msg  # type: ignore[return-value]
 
 
-def summarize_large_output(raw: str, topic: str, model: str = "llama3.1:8b") -> tuple[str, str]:
+def summarize_large_output(raw: str, topic: str, model: str = "llama3.1:70b") -> tuple[str, str]:
     """
     If raw output exceeds 2000 chars, summarize it via Ollama.
     Returns (summary_text, full_output_path)
@@ -1582,18 +1607,10 @@ def auto_extract_memory(user_msg: str, beast_response: str) -> None:
     )
     prompt = f"USER: {user_msg[:600]}\nLUCI: {beast_response[:600]}"
     try:
-        payload = {
-            "model": MEMORY_EXTRACT_MODEL,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": prompt},
-            ],
-            "stream": False,
-            "options": {"temperature": 0.0},
-        }
-        r = requests.post(OLLAMA_CHAT_URL, json=payload, timeout=10)
-        r.raise_for_status()
-        raw = (r.json().get("message") or {}).get("content", "").strip()
+        raw = ollama_chat(
+            [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+            temperature=0.0, model=MEMORY_EXTRACT_MODEL
+        ).strip()
         if not (raw.startswith("{") and raw.endswith("}")):
             return
         try:
@@ -1629,7 +1646,7 @@ def init_memory() -> None:
     models: List[str] = []
     try:
         base = OLLAMA_CHAT_URL.split("/api/")[0]
-        r = requests.get(f"{base}/api/tags", timeout=5)
+        r = requests.get(f"{base}/v1/models" if "/v1/" in OLLAMA_CHAT_URL else f"{base}/api/tags", timeout=5)
         if r.status_code == 200:
             models = [m["name"] for m in r.json().get("models", [])]
     except Exception:
@@ -1896,18 +1913,10 @@ def web_summarize(content: str, query: str = "") -> str:
     else:
         system = "Summarize in 3-5 concise bullet points."
     try:
-        payload = {
-            "model": WEB_SUMMARY_MODEL,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": content[:4000]},
-            ],
-            "stream": False,
-            "options": {"temperature": 0.2},
-        }
-        r = requests.post(OLLAMA_CHAT_URL, json=payload, timeout=30)
-        r.raise_for_status()
-        return (r.json().get("message") or {}).get("content", "").strip()
+        return ollama_chat(
+            [{"role": "system", "content": system}, {"role": "user", "content": content[:4000]}],
+            temperature=0.2, model=WEB_SUMMARY_MODEL
+        ).strip()
     except Exception as e:
         return f"(summarization failed: {e})"
 
@@ -2051,7 +2060,7 @@ def _gmail_body(payload: dict) -> str:
     return ""
 
 
-def email_list_unread(max_results: int = 10) -> List[Dict[str, Any]]:
+def email_list_unread(max_results: int = 25) -> List[Dict[str, Any]]:
     """Return metadata for unread emails. Returns [] on any failure."""
     try:
         svc = gmail_get_service()
@@ -2191,11 +2200,12 @@ def email_summarize(emails: List[Dict[str, Any]]) -> str:
                 {"role": "user", "content": content[:4000]},
             ],
             "stream": False,
-            "options": {"temperature": 0.2},
         }
-        r = requests.post(OLLAMA_CHAT_URL, json=payload, timeout=30)
-        r.raise_for_status()
-        return (r.json().get("message") or {}).get("content", "").strip()
+        return ollama_chat(
+            [{"role": "system", "content": payload["messages"][0]["content"]},
+             {"role": "user", "content": payload["messages"][1]["content"]}],
+            temperature=0.2, model=payload["model"]
+        ).strip()
     except Exception as e:
         return f"(summarization failed: {e})"
 
@@ -2425,7 +2435,7 @@ MARKET PULSE:
         "Speak in first person as LUCI. Never pad or hedge. Max 200 words."
     )
 
-    model = "beast70b:latest" if deep else os.getenv("LUCI_ROUTER_REASONING", os.getenv("LUCI_MODEL", "llama3.1:8b"))
+    model = "beast70b:latest" if deep else os.getenv("LUCI_ROUTER_REASONING", os.getenv("LUCI_MODEL", "llama3.1:70b"))
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -2857,7 +2867,7 @@ def run_telegram_bot() -> None:
         if not allowed(update):
             return
         try:
-            r = requests.get("http://127.0.0.1:11434/api/tags", timeout=5)
+            r = requests.get(f"{OLLAMA_CHAT_URL.split('/v1/')[0]}/v1/models" if "/v1/" in OLLAMA_CHAT_URL else "http://127.0.0.1:11434/api/tags", timeout=5)
             r.raise_for_status()
             models = [m["name"] for m in r.json().get("models", [])]
             lines = [f"✅ Ollama running", f"Active model: {MODEL}", f"Available ({len(models)}):"]
@@ -2871,7 +2881,7 @@ def run_telegram_bot() -> None:
         if not allowed(update):
             return
         try:
-            r = requests.get("http://127.0.0.1:11434/api/tags", timeout=5)
+            r = requests.get(f"{OLLAMA_CHAT_URL.split('/v1/')[0]}/v1/models" if "/v1/" in OLLAMA_CHAT_URL else "http://127.0.0.1:11434/api/tags", timeout=5)
             r.raise_for_status()
             models = [m["name"] for m in r.json().get("models", [])]
             msg = "Available models:\n" + "\n".join(f"  • {m}" for m in models)
@@ -2973,11 +2983,10 @@ def run_telegram_bot() -> None:
                     {"role": "user", "content": text},
                 ],
                 "stream": False,
-                "options": {"temperature": 0.0},
             }
-            r = requests.post(OLLAMA_CHAT_URL, json=payload, timeout=10)
-            r.raise_for_status()
-            raw = (r.json().get("message") or {}).get("content", "").strip()
+            raw = ollama_chat(
+                payload["messages"], temperature=0.0, model=payload["model"]
+            ).strip()
             if raw.startswith("{") and raw.endswith("}"):
                 try:
                     obj = json.loads(raw)
@@ -3160,16 +3169,49 @@ def run_telegram_bot() -> None:
         try:
             if not args:
                 await update.message.reply_text("📧 Fetching unread emails...")
-                emails = email_list_unread(max_results=10)
+                emails = email_list_unread(max_results=25)
                 if not emails:
                     await update.message.reply_text("📭 No unread emails.")
                     return
-                summary = email_summarize(emails)
-                lines = [f"📧 {len(emails)} unread:\n"]
-                for e in emails[:5]:
-                    lines.append(f"[{e['id'][:8]}] {e['subject']}")
-                    lines.append(f"  From: {e['sender'][:50]}\n")
-                lines.append(f"📝 Summary:\n{summary}")
+
+                # Smart categorization
+                important_keys = ['hhaexchange', 'google', 'gmail', 'bank', 'chase',
+                                   'wellsfargo', 'irs', '.gov', 'hospital', 'school',
+                                   'putintseva', 'jnscorp', 'work', 'payroll', 'hr']
+                junk_keys = ['ebay', 'expedia', 'groupon', 'promo', 'newsletter',
+                             'unsubscribe', 'marketing', 'noreply', 'no-reply',
+                             'wayfair', 'amazon', 'bizbuysell', 'tasteofhome',
+                             'mail@eg', 'deals', 'offer', 'sale']
+
+                important, other, junk = [], [], []
+                for e in emails:
+                    s = e.get('sender', '').lower()
+                    if any(k in s for k in important_keys):
+                        important.append(e)
+                    elif any(k in s for k in junk_keys):
+                        junk.append(e)
+                    else:
+                        other.append(e)
+
+                lines = [f"📧 {len(emails)} unread emails\n"]
+
+                if important:
+                    lines.append(f"🔴 IMPORTANT ({len(important)}):")
+                    for e in important:
+                        lines.append(f"  [{e['id'][:8]}] {e['subject'][:50]}")
+                        lines.append(f"  From: {e['sender'][:50]}")
+                        lines.append(f"  {e['date'][:16]}\n")
+
+                if other:
+                    lines.append(f"📬 OTHER ({len(other)}):")
+                    for e in other[:10]:
+                        lines.append(f"  [{e['id'][:8]}] {e['subject'][:50]}")
+                        lines.append(f"  From: {e['sender'][:40]}")
+
+                if junk:
+                    lines.append(f"\n🗑️ JUNK ({len(junk)}) — skipped")
+
+                lines.append(f"\nReply with email ID to read full email.")
                 await send_long(update, "\n".join(lines))
                 return
 
@@ -3383,11 +3425,10 @@ def run_telegram_bot() -> None:
                         {"role": "user", "content": full},
                     ],
                     "stream": False,
-                    "options": {"temperature": 0.0},
                 }
-                r = requests.post(OLLAMA_CHAT_URL, json=payload, timeout=15)
-                r.raise_for_status()
-                raw = (r.json().get("message") or {}).get("content", "").strip()
+                raw = ollama_chat(
+                    payload["messages"], temperature=0.0, model=payload["model"]
+                ).strip()
                 if not (raw.startswith("{") and raw.endswith("}")):
                     raise ValueError("Could not parse time — try: /remind in 30 minutes <message>")
                 obj = json.loads(raw)
@@ -4612,7 +4653,7 @@ def _hb_check_cpu_load() -> Optional[str]:
 def _hb_check_ollama() -> Optional[str]:
     base = OLLAMA_CHAT_URL.split("/api/")[0]
     try:
-        r = requests.get(f"{base}/api/tags", timeout=2)
+        r = requests.get(f"{base}/v1/models" if "/v1/" in OLLAMA_CHAT_URL else f"{base}/api/tags", timeout=2)
         if r.status_code != 200:
             return f"Ollama: HTTP {r.status_code}"
     except Exception as e:

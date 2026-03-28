@@ -1,0 +1,99 @@
+{
+  "phase_repos": {
+    "1": {
+      "label": "Foundation — How the Web Actually Works",
+      "repos": ["How_Web_Works", "Spoon-Knife", "Git_Workflow_Practice-", "lucid-luci"]
+    },
+    "2": {
+      "label": "Python — The Language You're Already Using, Deeply",
+      "repos": ["PythonSynthax", "Python-Data-Structures-Practice", "Python-OO-Practice", "Currency_Converter", "Flask-Greet-and-Calc", "Flask-Madlibs", "flask-survey", "flask_boggle", "flask_bogly", "flask_Feedback", "flask-cupcakes", "flask-bloglypart2", "flask_bloglypart1", "Pet-Adoption-Agency", "playlist-app", "warbler"]
+    },
+    "3": {
+      "label": "Web Development — HTML, CSS, Modern JS",
+      "repos": ["jQuery_DOM_Practice", "GIPHY", "TvMaze", "Hack_or_Snooze", "Jeopardy_Game_Revised", "Connect_4_Game", "Connect_Four_OO", "EightBall", "coin_flipping_counter", "Asynchronous-Code-in-JavaScript", "Asynchronous-Code-in-JavaScript-async-await-"]
+    },
+    "4": {
+      "label": "TypeScript — The Skill That Gets You Hired",
+      "repos": ["lucid-luci"]
+    },
+    "5": {
+      "label": "Databases — SQL and Beyond",
+      "repos": ["sql-querying", "sql-joins", "Data-Modeling-Exercise", "lunchly", "express-biztime"]
+    },
+    "6": {
+      "label": "APIs and Backend — Node, Express, and FastAPI",
+      "repos": ["Express-Shopping-List", "express-statistics", "Node-Files", "Node_Files_Markov", "express-bookstore", "messagely", "Bankly", "Assessment-Node-Express-1", "lucid-luci"]
+    },
+    "7": {
+      "label": "React — Modern Frontend",
+      "repos": ["react_jst_intro", "React-testing", "EightBall", "jobly-frontend", "jobly", "GatherTown"]
+    },
+    "8": {
+      "label": "AI Engineering — The Skill of This Decade",
+      "repos": ["lucid-luci", "GatherTown"]
+    },
+    "9": {
+      "label": "DevOps and Deployment",
+      "repos": ["lucid-luci"]
+    },
+    "10": {
+      "label": "Data Structures and Algorithms — Interview Ready",
+      "repos": ["Big-O_Notation", "dsa-arrays-linked-lists", "dsa-stacks-queues", "dsa-trees", "dsa-recursion", "dsa-bsts", "dsa-graphs", "dsa-sorting", "prob-divide-conquer"]
+    }
+  },
+  "repo_labels": {
+    "lucid-luci": "LUCI (your AI stack)",
+    "GatherTown": "GatherTown",
+    "Big-O_Notation": "Big-O Notation",
+    "dsa-arrays-linked-lists": "Arrays & Linked Lists",
+    "dsa-stacks-queues": "Stacks & Queues",
+    "dsa-trees": "Trees",
+    "dsa-recursion": "Recursion",
+    "dsa-bsts": "Binary Search Trees",
+    "dsa-graphs": "Graphs",
+    "dsa-sorting": "Sorting Algorithms",
+    "prob-divide-conquer": "Divide & Conquer",
+    "Assessment-Node-Express-1": "Express Assessment",
+    "Asynchronous-Code-in-JavaScript": "Async JavaScript",
+    "Asynchronous-Code-in-JavaScript-async-await-": "Async/Await",
+    "Git_Workflow_Practice-": "Git Workflow Practice",
+    "How_Web_Works": "How the Web Works",
+    "jQuery_DOM_Practice": "jQuery & DOM",
+    "Node_Files_Markov": "Node Files & Markov",
+    "Object_Enhancements_Exercise": "Object Enhancements",
+    "Connect_Four_OO": "Connect Four (OOP)",
+    "Connect_4_Game": "Connect Four",
+    "flask_Feedback": "Flask Feedback",
+    "flask-bloglypart2": "Flask Blogly 2",
+    "flask_bloglypart1": "Flask Blogly 1",
+    "flask_bogly": "Flask Bogly",
+    "flask_boggle": "Flask Boggle",
+    "PythonSynthax": "Python Syntax",
+    "Python-Data-Structures-Practice": "Python Data Structures",
+    "Python-OO-Practice": "Python OOP",
+    "jobly-frontend": "Jobly Frontend",
+    "react_jst_intro": "React Intro",
+    "Spoon-Knife": "Git Practice (Spoon-Knife)",
+    "How_Web_Works": "How the Web Works",
+    "Hack_or_Snooze": "Hack or Snooze",
+    "Jeopardy_Game_Revised": "Jeopardy Game",
+    "Express-Shopping-List": "Express Shopping List",
+    "express-statistics": "Express Statistics",
+    "express-bookstore": "Express Bookstore",
+    "express-biztime": "Express Biztime",
+    "flask-cupcakes": "Flask Cupcakes",
+    "flask-survey": "Flask Survey",
+    "Flask-Madlibs": "Flask Madlibs",
+    "Flask-Greet-and-Calc": "Flask Greet & Calc",
+    "Pet-Adoption-Agency": "Pet Adoption Agency",
+    "Currency_Converter": "Currency Converter",
+    "Data-Modeling-Exercise": "Data Modeling",
+    "sql-joins": "SQL Joins",
+    "sql-querying": "SQL Querying",
+    "coin_flipping_counter": "Coin Flip Counter",
+    "React-testing": "React Testing",
+    "Node-Files": "Node Files",
+    "playlist-app": "Playlist App",
+    "warbler": "Warbler (Twitter Clone)"
+  }
+}

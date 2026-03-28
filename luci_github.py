@@ -117,9 +117,9 @@ def clone_or_pull_repo(repo_name: str) -> Path:
     else:
         url = f"https://{GITHUB_TOKEN}@github.com/{username}/{repo_name}.git"
         subprocess.run(
-            ["git", "clone", url, str(local_path)],
+            ["git", "clone", "--depth=1", url, str(local_path)],
             capture_output=True,
-            timeout=120,
+            timeout=30,
             check=True,
         )
     return local_path
@@ -575,3 +575,89 @@ if __name__ == "__main__":
 
     else:
         print("Unknown command. Use: list, scan, scan <repo>, fix <repo> <desc>")
+
+
+# ---------------------------------------------------------------------------
+# 14. Repo-to-lesson bridge (LUCI Learn integration)
+# ---------------------------------------------------------------------------
+
+# File extensions mapped to curriculum topics
+_TOPIC_EXTENSIONS = {
+    "python":     [".py"],
+    "javascript": [".js", ".ts", ".jsx", ".tsx"],
+    "html":       [".html", ".htm", ".css"],
+    "sql":        [".sql"],
+    "flask":      [".py", ".html"],
+    "react":      [".jsx", ".tsx", ".js"],
+    "node":       [".js", ".ts"],
+    "express":    [".js", ".ts"],
+}
+
+_MAX_FILE_CHARS = 3000
+_MAX_FILES      = 4
+
+
+def _pick_relevant_files(repo_path: Path, lesson_title: str) -> list[tuple[str, str]]:
+    """Return [(relative_path, content)] for files most relevant to lesson_title."""
+    lesson_lower = lesson_title.lower()
+
+    # Decide which extensions to prioritise
+    target_exts: list[str] = [".py", ".js"]  # default
+    for topic, exts in _TOPIC_EXTENSIONS.items():
+        if topic in lesson_lower:
+            target_exts = exts
+            break
+
+    candidates: list[Path] = []
+    for root, dirs, files in os.walk(repo_path):
+        dirs[:] = [d for d in dirs if d not in _SKIP_DIRS]
+        for fname in files:
+            fpath = Path(root) / fname
+            if fpath.suffix.lower() in target_exts:
+                candidates.append(fpath)
+
+    # Sort: prefer shorter paths (root-level files first), then by size
+    candidates.sort(key=lambda p: (len(p.parts), p.stat().st_size))
+
+    results: list[tuple[str, str]] = []
+    for fpath in candidates[:_MAX_FILES]:
+        try:
+            content = fpath.read_text(encoding="utf-8", errors="ignore")[:_MAX_FILE_CHARS]
+            rel     = str(fpath.relative_to(repo_path))
+            results.append((rel, content))
+        except Exception:
+            pass
+    return results
+
+
+def get_repo_code_for_lesson(repo_name: str, lesson_title: str) -> str:
+    """
+    Clone/pull repo and return a code snapshot string ready to inject
+    into build_teaching_prompt() or build_quiz_prompt().
+
+    Returns empty string if anything fails (so the lesson still works
+    without repo context).
+    """
+    try:
+        repo_path = clone_or_pull_repo(repo_name)
+    except Exception:
+        raise ValueError(f"Repo '{repo_name}' could not be cloned or does not exist.")
+
+    try:
+        files = _pick_relevant_files(repo_path, lesson_title)
+        if not files:
+            return ""
+
+        sections = [
+            f"=== {rel} ===\n{content}"
+            for rel, content in files
+        ]
+        header = (
+            f"The student's GitHub repo '{repo_name}' contains this code "
+            f"(relevant to the lesson '{lesson_title}'):\n\n"
+        )
+        return header + "\n\n".join(sections)
+    except Exception as e:
+        raise ValueError(f"Could not read repo '{repo_name}': {e}")
+
+
