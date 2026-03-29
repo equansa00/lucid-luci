@@ -413,17 +413,23 @@ function doTeach(){
   var btn=document.getElementById('teachBtn');
   var lesson=le(),phase=ph();
   btn.disabled=true;btn.textContent='Teaching...';
-  document.getElementById('teachOut').innerHTML='<span class="spin"></span> Nova is preparing your lesson...';
+  document.getElementById('teachOut').innerHTML='<span class="spin"></span> Nova is preparing your lesson... <span id="teachTimer" style="color:#2a3840;font-family:monospace;font-size:11px"></span>';
+  var _teachStart = Date.now();
+  var _teachTick = setInterval(function(){
+    var el = document.getElementById('teachTimer');
+    if(el) el.textContent = '(' + Math.round((Date.now()-_teachStart)/1000) + 's)';
+    else clearInterval(_teachTick);
+  }, 1000);
   var prompt='You are Nova, an LCSW exam study partner teaching Ogechi. Teach this lesson with clinical precision:\n\n'+
     'LESSON: '+lesson.title+'\nPHASE: '+phase.title+'\nEXAM WEIGHT: '+phase.exam_weight+'\nTYPE: '+lesson.type+'\n\n'+
-    'Cover: (1) The core concept clearly, (2) How the ASWB exam tests this including first-step logic and traps, '+
-    '(3) A memorable exam rule, (4) One quick exam example. Be warm and clinically grounded. Under 400 words.';
+    'Cover: (1) Core concept in 2-3 sentences, (2) How the ASWB tests this — first step and common trap, '+
+    '(3) One memorable exam rule. Be direct, warm, exam-focused. Under 250 words.';
   fetch('/learn/chat',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({text:prompt,history:[]})})
     .then(function(r){return r.json();})
     .then(function(d){
       document.getElementById('teachOut').innerHTML='<div class="teach-text">'+md(d.response||d.reply||'No response')+'</div>';
-      btn.disabled=false;btn.textContent='\u21ba Re-teach';
+      clearInterval(_teachTick);btn.disabled=false;btn.textContent='\u21ba Re-teach';
       markStarted(lesson.id);
     }).catch(function(e){
       document.getElementById('teachOut').textContent='Error: '+e.message;
