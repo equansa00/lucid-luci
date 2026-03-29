@@ -1024,60 +1024,94 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 
 function renderVideos() {
-  var lesson = le();
-  var vids = NOVA_VIDEOS[lesson.id] || [];
+  var lesson = le(), phase = ph(), mod = mo();
   var panel = document.getElementById('videoContent');
-  document.getElementById('videoTag').textContent = 'Phase ' + ph().id + ' \u00b7 ' + mo().title;
+  document.getElementById('videoTag').textContent = 'Phase ' + phase.id + ' \u00b7 ' + mod.title;
   document.getElementById('videoTitle').textContent = lesson.title;
 
-  if (!vids.length) {
-    panel.innerHTML = '<div class="box"><div class="box-title">Video Resources</div>' +
-      '<div style="color:#2a3840;font-style:italic;font-size:13px;padding:20px 0">' +
-      'No curated videos for this specific lesson yet.<br><br>' +
-      '<span style="color:#4a6070">Try these channels on YouTube for LCSW prep:</span><br><br>' +
-      '<a href="https://www.youtube.com/@MakinWavesSocialWork" target="_blank" style="color:#5a9060;font-family:monospace;font-size:12px;display:block;margin-bottom:6px">&#9654; Makin Waves Social Work</a>' +
-      '<a href="https://www.youtube.com/@SocialWorkTestPrep" target="_blank" style="color:#5a9ac0;font-family:monospace;font-size:12px;display:block;margin-bottom:6px">&#9654; Social Work Exam Prep</a>' +
-      '<a href="https://www.youtube.com/@TherapistAid" target="_blank" style="color:#b09040;font-family:monospace;font-size:12px;display:block;margin-bottom:6px">&#9654; Therapist Aid</a>' +
-      '</div></div>';
-    return;
-  }
+  var title = lesson.title;
+  var tags = (lesson.tags || []).slice(0, 3).join(' ');
 
-  // Group by channel
-  var byChannel = {};
-  vids.forEach(function(v){
-    var ch = v.ch || 'other';
-    if(!byChannel[ch]) byChannel[ch] = [];
-    byChannel[ch].push(v);
-  });
+  // Build targeted search queries for each channel
+  var searches = [
+    {
+      label: 'Agents of Change — ASWB Clinical Prep',
+      ch: 'aoc',
+      q: 'Agents of Change social work ' + title,
+      desc: 'Visual & audio LCSW exam prep — most popular clinical exam channel'
+    },
+    {
+      label: 'Makin Waves Social Work',
+      ch: 'makin',
+      q: 'Makin Waves social work LCSW ' + title,
+      desc: 'Exam strategy and clinical content breakdowns'
+    },
+    {
+      label: 'Social Work Exam Prep — Phillip Luttrell',
+      ch: 'swes',
+      q: 'Phillip Luttrell social work exam ' + title,
+      desc: 'Deep content walkthroughs for LMSW and LCSW'
+    },
+    {
+      label: 'Therapist Aid',
+      ch: 'therapistaid',
+      q: 'Therapist Aid ' + tags,
+      desc: 'Clinical tools, worksheets, and technique explainers'
+    },
+    {
+      label: 'NASW — National Association of Social Workers',
+      ch: 'nasw',
+      q: 'NASW social work ' + tags,
+      desc: 'Professional standards, ethics, and continuing education'
+    }
+  ];
 
   var html = '';
-  Object.entries(byChannel).forEach(function(kv){
-    var ch = kv[0], chVids = kv[1];
-    var chLabel = CHANNEL_LABELS[ch] || ch;
-    html += '<div class="vid-section-title">&#9654; ' + chLabel + '</div>';
-    html += '<div class="vid-grid">';
-    chVids.forEach(function(v){
-      var thumb = 'https://img.youtube.com/vi/' + v.id + '/mqdefault.jpg';
-      html += '<div class="vid-card" onclick="openVid(\'' + v.id + '\',\'' + v.t.replace(/'/g,"\\'") + '\')">';
-      html += '<div class="vid-thumb">';
-      html += '<img src="' + thumb + '" alt="" loading="lazy">';
-      html += '<div class="play-ov"><div class="play-ico">&#9654;</div></div>';
-      html += '</div>';
-      html += '<div class="vid-info">';
-      html += '<div class="vid-title">' + esc(v.t) + '</div>';
-      html += '<div class="vid-src channel-' + ch + '">' + esc(v.s) + '</div>';
-      html += '</div></div>';
-    });
-    html += '</div>';
-  });
 
-  // YouTube search fallback
-  var searchQ = encodeURIComponent('LCSW exam ' + lesson.title);
-  html += '<div class="vid-section-title">&#128269; SEARCH FOR MORE</div>';
-  html += '<a href="https://www.youtube.com/results?search_query=' + searchQ + '" target="_blank" ' +
-    'style="display:inline-block;padding:8px 16px;background:#0d1520;border:1px solid #1e2833;border-radius:6px;' +
-    'color:#3d7fa8;font-family:monospace;font-size:11px;text-decoration:none;margin-bottom:16px">' +
-    '&#9654; Search YouTube: LCSW ' + esc(lesson.title) + ' &#8594;</a>';
+  // Top search bar
+  var topQ = encodeURIComponent('LCSW exam ' + title);
+  html += '<div style="margin-bottom:20px">';
+  html += '<div style="font-size:11px;color:#3a4a56;font-family:monospace;margin-bottom:8px">SEARCH YOUTUBE FOR THIS LESSON</div>';
+  html += '<a href="https://www.youtube.com/results?search_query=' + topQ + '" target="_blank" style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#0d1520;border:1px solid #1e3040;border-radius:8px;text-decoration:none;transition:border-color .15s" onmouseover="this.style.borderColor='#3d7fa8'" onmouseout="this.style.borderColor='#1e3040'">';
+  html += '<span style="font-size:18px">&#128269;</span>';
+  html += '<div><div style="color:#7eb8d4;font-size:13px;font-family:Georgia,serif">LCSW Exam: ' + esc(title) + '</div>';
+  html += '<div style="color:#3a4a56;font-size:11px;font-family:monospace;margin-top:2px">Search on YouTube &#8594;</div></div>';
+  html += '</a></div>';
+
+  // Channel cards
+  html += '<div style="font-size:10px;color:#3a4a56;text-transform:uppercase;letter-spacing:2px;font-family:monospace;margin-bottom:12px">TOP LCSW PREP CHANNELS — SEARCH THIS TOPIC</div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-bottom:20px">';
+
+  searches.forEach(function(s) {
+    var url = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(s.q);
+    var colors = {
+      aoc: {bg:'#0d1a28',border:'#1e3a50',label:'#5a9ac0'},
+      makin: {bg:'#0a1e14',border:'#1a3a20',label:'#5a9060'},
+      swes: {bg:'#140a1e',border:'#2a1040',label:'#9060b0'},
+      therapistaid: {bg:'#1e1408',border:'#3a2a08',label:'#b09040'},
+      nasw: {bg:'#140a0a',border:'#2a1010',label:'#b06060'}
+    };
+    var c = colors[s.ch] || {bg:'#0d1117',border:'#131c25',label:'#6a8898'};
+    html += '<a href="' + url + '" target="_blank" style="display:block;background:' + c.bg + ';border:1px solid ' + c.border + ';border-radius:8px;padding:14px;text-decoration:none;transition:border-color .15s" onmouseover="this.style.borderColor='' + c.label + ''" onmouseout="this.style.borderColor='' + c.border + ''">';
+    html += '<div style="font-size:10px;color:' + c.label + ';font-family:monospace;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">&#9654; ' + esc(s.label) + '</div>';
+    html += '<div style="font-size:12px;color:#6a8898;line-height:1.5;font-family:Georgia,serif">' + esc(s.desc) + '</div>';
+    html += '<div style="font-size:10px;color:#2a3840;font-family:monospace;margin-top:8px">Search: ' + esc(s.q.slice(0,50)) + ' &#8594;</div>';
+    html += '</a>';
+  });
+  html += '</div>';
+
+  // Extra: Therapist Aid worksheets for clinical topics
+  if (lesson.tags && (lesson.tags.indexOf('ethics') >= 0 || lesson.tags.indexOf('cbt') >= 0 ||
+      lesson.tags.indexOf('dbt') >= 0 || lesson.tags.indexOf('trauma_informed') >= 0 ||
+      lesson.tags.indexOf('mi') >= 0 || lesson.tags.indexOf('safety') >= 0)) {
+    var taUrl = 'https://www.therapistaid.com/search#query=' + encodeURIComponent(tags);
+    html += '<div style="font-size:10px;color:#3a4a56;text-transform:uppercase;letter-spacing:2px;font-family:monospace;margin-bottom:10px">FREE WORKSHEETS &amp; VISUAL TOOLS</div>';
+    html += '<a href="' + taUrl + '" target="_blank" style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#1e1408;border:1px solid #3a2a08;border-radius:8px;text-decoration:none;margin-bottom:16px" onmouseover="this.style.borderColor='#b09040'" onmouseout="this.style.borderColor='#3a2a08'">';
+    html += '<span style="font-size:18px">&#128196;</span>';
+    html += '<div><div style="color:#b09040;font-size:13px;font-family:Georgia,serif">Therapist Aid — Free Worksheets</div>';
+    html += '<div style="color:#6a5030;font-size:11px;font-family:monospace;margin-top:2px">Visual handouts for clinical techniques &#8594;</div></div>';
+    html += '</a>';
+  }
 
   panel.innerHTML = html;
 }
