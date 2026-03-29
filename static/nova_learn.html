@@ -752,11 +752,11 @@ async function saveProgress(){
   }catch(e){console.log('Save failed:',e.message);}
 }
 
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function esc(s){return String(s||'').replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>').replace(/"/g,'&quot;');}
 
 function md(text){
   if(!text)return'';
-  var s=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  var s=text.replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>');
   var lines=s.split('\n'),out=[];
   for(var i=0;i<lines.length;i++){
     var line=lines[i];
@@ -1105,7 +1105,7 @@ function renderVideos() {
       lesson.tags.indexOf('dbt') >= 0 || lesson.tags.indexOf('trauma_informed') >= 0 ||
       lesson.tags.indexOf('mi') >= 0 || lesson.tags.indexOf('safety') >= 0)) {
     var taUrl = 'https://www.therapistaid.com/search#query=' + encodeURIComponent(tags);
-    html += '<div style="font-size:10px;color:#3a4a56;text-transform:uppercase;letter-spacing:2px;font-family:monospace;margin-bottom:10px">FREE WORKSHEETS &amp; VISUAL TOOLS</div>';
+    html += '<div style="font-size:10px;color:#3a4a56;text-transform:uppercase;letter-spacing:2px;font-family:monospace;margin-bottom:10px">FREE WORKSHEETS & VISUAL TOOLS</div>';
     html += '<a href="' + taUrl + '" target="_blank" style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#1e1408;border:1px solid #3a2a08;border-radius:8px;text-decoration:none;margin-bottom:16px" onmouseover="this.style.borderColor='#b09040'" onmouseout="this.style.borderColor='#3a2a08'">';
     html += '<span style="font-size:18px">&#128196;</span>';
     html += '<div><div style="color:#b09040;font-size:13px;font-family:Georgia,serif">Therapist Aid — Free Worksheets</div>';
