@@ -134,6 +134,33 @@ body{background:#080b0f;color:#e0ddd8;font-family:'Georgia',serif;height:100vh;o
 .modal-close{background:none;border:1px solid #1e2833;color:#4a6070;padding:6px 12px;border-radius:6px;cursor:pointer;font-family:monospace;font-size:11px}
 .modal-close:hover{border-color:#7eb8d4;color:#7eb8d4}
 .vid-embed{width:100%;aspect-ratio:16/9;border:none;border-radius:8px}
+.visual-map{display:flex;flex-direction:column;gap:12px;padding:4px 0}
+.visual-section{border-radius:8px;padding:14px 16px}
+.visual-section.blue{background:#0d1a28;border:1px solid #1e3a50}
+.visual-section.teal{background:#0a1e1a;border:1px solid #1a4030}
+.visual-section.amber{background:#1a1408;border:1px solid #3a2a08}
+.visual-section.red{background:#1a0a08;border:1px solid #3a1a10}
+.visual-section.purple{background:#140a1e;border:1px solid #2a1040}
+.visual-section-title{font-size:10px;text-transform:uppercase;letter-spacing:2px;font-family:monospace;margin-bottom:8px}
+.blue .visual-section-title{color:#3d7fa8}
+.teal .visual-section-title{color:#3a9070}
+.amber .visual-section-title{color:#b08030}
+.red .visual-section-title{color:#b04030}
+.purple .visual-section-title{color:#8050b0}
+.visual-items{display:flex;flex-wrap:wrap;gap:8px}
+.visual-item{padding:6px 12px;border-radius:5px;font-size:12px;line-height:1.5;font-family:'Georgia',serif}
+.blue .visual-item{background:#1a2a3a;color:#8aaccc}
+.teal .visual-item{background:#0f2820;color:#70b890}
+.amber .visual-item{background:#1e1a08;color:#c09040}
+.red .visual-item{background:#1e0e0a;color:#c06050}
+.purple .visual-item{background:#1a0e28;color:#a070c0}
+.visual-arrow{text-align:center;color:#2a3840;font-size:16px;margin:-4px 0}
+.visual-rule{background:#0d1520;border:1px solid #1e3a50;border-radius:8px;padding:14px 16px;margin-top:4px}
+.visual-rule-label{font-size:10px;color:#3d7fa8;text-transform:uppercase;letter-spacing:2px;font-family:monospace;margin-bottom:6px}
+.visual-rule-text{font-size:14px;color:#9abac8;font-style:italic;line-height:1.6}
+.visual-trap{background:#1a0e08;border:1px solid #3a2010;border-radius:8px;padding:12px 16px;margin-top:4px}
+.visual-trap-label{font-size:10px;color:#b06030;text-transform:uppercase;letter-spacing:2px;font-family:monospace;margin-bottom:6px}
+.visual-trap-text{font-size:13px;color:#c09070;line-height:1.6}
 ::-webkit-scrollbar{width:4px}
 ::-webkit-scrollbar-thumb{background:#1e2833;border-radius:2px}
 </style>
@@ -170,11 +197,17 @@ body{background:#080b0f;color:#e0ddd8;font-family:'Georgia',serif;height:100vh;o
         <button class="btn btn-green" onclick="markLessonCompleted()">&#10003; Complete</button>
         <button class="btn btn-out" onclick="showTab('practice')">&#128203; Practice</button>
         <button class="btn btn-out" onclick="showTab('videos')">&#127909; Videos</button>
+        <button class="btn btn-out" id="vizBtn" onclick="doVisual()">&#128202; Visual Summary</button>
       </div>
       <div class="box">
         <div class="box-title">Nova Teaching</div>
         <div id="teachOut"><span class="teach-placeholder">Click "Start Lesson" — Nova will explain this topic with exam-focused clarity.</span></div>
       </div>
+      <div class="box" id="visualBox" style="display:none">
+        <div class="box-title">&#128202; Visual Summary</div>
+        <div id="visualOut"></div>
+      </div>
+
       <div class="box">
         <div class="box-title">Lesson Details</div>
         <div id="lessonInfo"><span class="teach-placeholder">Loading...</span></div>
@@ -1047,6 +1080,127 @@ function renderVideos() {
     '&#9654; Search YouTube: LCSW ' + esc(lesson.title) + ' &#8594;</a>';
 
   panel.innerHTML = html;
+}
+
+// ── OPTION 2: AI VISUAL SUMMARY ──────────────────────────────────
+function doVisual() {
+  var btn = document.getElementById('vizBtn');
+  var box = document.getElementById('visualBox');
+  var out = document.getElementById('visualOut');
+  var lesson = le(), phase = ph();
+  btn.textContent = '⟳ Building...';
+  btn.disabled = true;
+  box.style.display = 'block';
+  out.innerHTML = '<span class="spin"></span> Nova is building your visual summary...';
+
+  var prompt = 'You are Nova. Create a structured visual summary for the LCSW exam lesson: "' + lesson.title + '"\n\n' +
+    'Return ONLY a JSON object with this exact structure (no markdown, no explanation):\n' +
+    '{\n' +
+    '  "concept": "One sentence definition",\n' +
+    '  "exam_focus": ["key point 1", "key point 2", "key point 3"],\n' +
+    '  "priority_steps": ["Step 1: ...", "Step 2: ...", "Step 3: ..."],\n' +
+    '  "exam_rule": "The single most important rule to remember for the exam",\n' +
+    '  "common_trap": "The most common wrong answer pattern on this topic",\n' +
+    '  "remember": ["memory hook 1", "memory hook 2"]\n' +
+    '}\n\n' +
+    'Be specific to LCSW exam. Keep each item under 15 words. Return only the JSON.';
+
+  fetch('/learn/chat', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({text: prompt, history: []})
+  }).then(function(r){ return r.json(); })
+    .then(function(data) {
+      btn.disabled = false;
+      btn.textContent = '↺ Redraw';
+      var raw = data.response || data.reply || '';
+      // Strip any markdown fences
+      raw = raw.replace(/```json/g,'').replace(/```/g,'').trim();
+      try {
+        var v = JSON.parse(raw);
+        renderVisualMap(v, lesson.title);
+      } catch(e) {
+        // Fallback: render raw as structured text
+        out.innerHTML = '<div class="teach-text">' + md(raw) + '</div>';
+      }
+    }).catch(function(e) {
+      btn.disabled = false;
+      btn.textContent = '📊 Visual Summary';
+      out.innerHTML = '<span style="color:#b06060">Error: ' + esc(e.message) + '</span>';
+    });
+}
+
+function renderVisualMap(v, title) {
+  var out = document.getElementById('visualOut');
+  var html = '<div class="visual-map">';
+
+  // Concept block
+  if (v.concept) {
+    html += '<div class="visual-section blue">';
+    html += '<div class="visual-section-title">&#9670; Core Concept</div>';
+    html += '<div style="font-size:14px;color:#a8cce0;line-height:1.7;font-family:Georgia,serif">' + esc(v.concept) + '</div>';
+    html += '</div>';
+  }
+
+  // Exam focus points
+  if (v.exam_focus && v.exam_focus.length) {
+    html += '<div class="visual-arrow">&#8595;</div>';
+    html += '<div class="visual-section teal">';
+    html += '<div class="visual-section-title">&#128203; What the Exam Tests</div>';
+    html += '<div class="visual-items">';
+    v.exam_focus.forEach(function(item, i) {
+      html += '<div class="visual-item">&#10003; ' + esc(item) + '</div>';
+    });
+    html += '</div></div>';
+  }
+
+  // Priority steps
+  if (v.priority_steps && v.priority_steps.length) {
+    html += '<div class="visual-arrow">&#8595;</div>';
+    html += '<div class="visual-section blue">';
+    html += '<div class="visual-section-title">&#9654; Priority Steps</div>';
+    html += '<div style="display:flex;flex-direction:column;gap:6px">';
+    v.priority_steps.forEach(function(step, i) {
+      html += '<div style="display:flex;align-items:flex-start;gap:10px">';
+      html += '<div style="background:#1e3a50;color:#7eb8d4;font-family:monospace;font-size:11px;padding:2px 7px;border-radius:3px;flex-shrink:0;margin-top:2px">' + (i+1) + '</div>';
+      html += '<div style="font-size:13px;color:#8aacbc;line-height:1.6;font-family:Georgia,serif">' + esc(step.replace(/^Step \d+:\s*/i,'')) + '</div>';
+      html += '</div>';
+    });
+    html += '</div></div>';
+  }
+
+  // Two column: rule + trap
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px">';
+
+  if (v.exam_rule) {
+    html += '<div class="visual-rule">';
+    html += '<div class="visual-rule-label">&#9670; Exam Rule</div>';
+    html += '<div class="visual-rule-text">' + esc(v.exam_rule) + '</div>';
+    html += '</div>';
+  }
+
+  if (v.common_trap) {
+    html += '<div class="visual-trap">';
+    html += '<div class="visual-trap-label">&#9888; Common Trap</div>';
+    html += '<div class="visual-trap-text">' + esc(v.common_trap) + '</div>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+
+  // Memory hooks
+  if (v.remember && v.remember.length) {
+    html += '<div class="visual-section amber">';
+    html += '<div class="visual-section-title">&#128161; Remember</div>';
+    html += '<div class="visual-items">';
+    v.remember.forEach(function(item) {
+      html += '<div class="visual-item">&#128161; ' + esc(item) + '</div>';
+    });
+    html += '</div></div>';
+  }
+
+  html += '</div>';
+  out.innerHTML = html;
 }
 
 </script>
