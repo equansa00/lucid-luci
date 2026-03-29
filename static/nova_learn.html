@@ -1073,7 +1073,7 @@ function renderVideos() {
   var topQ = encodeURIComponent('LCSW exam ' + title);
   html += '<div style="margin-bottom:20px">';
   html += '<div style="font-size:11px;color:#3a4a56;font-family:monospace;margin-bottom:8px">SEARCH YOUTUBE FOR THIS LESSON</div>';
-  html += '<a href="https://www.youtube.com/results?search_query=' + topQ + '" target="_blank" style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#0d1520;border:1px solid #1e3040;border-radius:8px;text-decoration:none;transition:border-color .15s" onmouseover="this.style.borderColor='#3d7fa8'" onmouseout="this.style.borderColor='#1e3040'">';
+  html += '<a href="https://www.youtube.com/results?search_query=' + topQ + '" target="_blank" class="vid-channel-link" style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#0d1520;border:1px solid #1e3040;border-radius:8px;text-decoration:none">';
   html += '<span style="font-size:18px">&#128269;</span>';
   html += '<div><div style="color:#7eb8d4;font-size:13px;font-family:Georgia,serif">LCSW Exam: ' + esc(title) + '</div>';
   html += '<div style="color:#3a4a56;font-size:11px;font-family:monospace;margin-top:2px">Search on YouTube &#8594;</div></div>';
@@ -1093,7 +1093,7 @@ function renderVideos() {
       nasw: {bg:'#140a0a',border:'#2a1010',label:'#b06060'}
     };
     var c = colors[s.ch] || {bg:'#0d1117',border:'#131c25',label:'#6a8898'};
-    html += '<a href="' + url + '" target="_blank" style="display:block;background:' + c.bg + ';border:1px solid ' + c.border + ';border-radius:8px;padding:14px;text-decoration:none;transition:border-color .15s" onmouseover="this.style.borderColor='' + c.label + ''" onmouseout="this.style.borderColor='' + c.border + ''">';
+    html += '<a href="' + url + '" target="_blank" class="vid-channel-link" style="display:block;background:' + c.bg + ';border:1px solid ' + c.border + ';border-radius:8px;padding:14px;text-decoration:none">';
     html += '<div style="font-size:10px;color:' + c.label + ';font-family:monospace;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">&#9654; ' + esc(s.label) + '</div>';
     html += '<div style="font-size:12px;color:#6a8898;line-height:1.5;font-family:Georgia,serif">' + esc(s.desc) + '</div>';
     html += '<div style="font-size:10px;color:#2a3840;font-family:monospace;margin-top:8px">Search: ' + esc(s.q.slice(0,50)) + ' &#8594;</div>';
@@ -1107,7 +1107,7 @@ function renderVideos() {
       lesson.tags.indexOf('mi') >= 0 || lesson.tags.indexOf('safety') >= 0)) {
     var taUrl = 'https://www.therapistaid.com/search#query=' + encodeURIComponent(tags);
     html += '<div style="font-size:10px;color:#3a4a56;text-transform:uppercase;letter-spacing:2px;font-family:monospace;margin-bottom:10px">FREE WORKSHEETS & VISUAL TOOLS</div>';
-    html += '<a href="' + taUrl + '" target="_blank" style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#1e1408;border:1px solid #3a2a08;border-radius:8px;text-decoration:none;margin-bottom:16px" onmouseover="this.style.borderColor='#b09040'" onmouseout="this.style.borderColor='#3a2a08'">';
+    html += '<a href="' + taUrl + '" target="_blank" class="vid-channel-link" style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#1e1408;border:1px solid #3a2a08;border-radius:8px;text-decoration:none;margin-bottom:16px">';
     html += '<span style="font-size:18px">&#128196;</span>';
     html += '<div><div style="color:#b09040;font-size:13px;font-family:Georgia,serif">Therapist Aid — Free Worksheets</div>';
     html += '<div style="color:#6a5030;font-size:11px;font-family:monospace;margin-top:2px">Visual handouts for clinical techniques &#8594;</div></div>';
