@@ -1,0 +1,378 @@
+{
+  "version": "1.0",
+  "assistant_name": "Nova",
+  "student_name": "Ogechi Quansah",
+  "goal": "Pass the New York LCSW Clinical Exam with confidence",
+  "exam": "ASWB Clinical Level Exam — New York State",
+  "daily_time_minutes": 60,
+  "created": "2026-03-29",
+  "current_phase": 1,
+  "current_module": "1.1",
+  "current_lesson": "1.1.1",
+  "phases": [
+    {
+      "id": 1,
+      "title": "Exam Foundations & Test Logic",
+      "goal": "Understand how the ASWB exam thinks — not just what it tests",
+      "exam_weight": "high",
+      "focus": ["exam_logic", "strategy", "judgment"],
+      "modules": [
+        {
+          "id": "1.1",
+          "title": "How the ASWB Clinical Exam Works",
+          "lessons": [
+            {"id": "1.1.1", "title": "Exam structure, format, and scoring", "type": "concept", "estimated_minutes": 20, "tags": ["exam_structure", "scoring", "orientation"], "linked_vignette_categories": [], "prerequisites": []},
+            {"id": "1.1.2", "title": "What 'first,' 'next,' 'best,' and 'most appropriate' really mean", "type": "concept", "estimated_minutes": 25, "tags": ["question_stems", "exam_logic", "priority_words"], "linked_vignette_categories": [], "prerequisites": ["1.1.1"]},
+            {"id": "1.1.3", "title": "The safety-ethics-assessment-intervention priority ladder", "type": "concept", "estimated_minutes": 25, "tags": ["priority_ladder", "safety", "ethics", "assessment"], "linked_vignette_categories": ["exam_priority_logic"], "prerequisites": ["1.1.2"]},
+            {"id": "1.1.4", "title": "How to eliminate distractors systematically", "type": "concept", "estimated_minutes": 20, "tags": ["distractors", "test_strategy", "elimination"], "linked_vignette_categories": ["distractor_recognition"], "prerequisites": ["1.1.2"]},
+            {"id": "1.1.5", "title": "Time management and pacing strategy", "type": "concept", "estimated_minutes": 15, "tags": ["pacing", "time_management", "test_day"], "linked_vignette_categories": [], "prerequisites": []},
+            {"id": "1.1.6", "title": "Using the official ASWB guidebook and practice test", "type": "concept", "estimated_minutes": 15, "tags": ["resources", "practice_test", "guidebook"], "linked_vignette_categories": [], "prerequisites": []}
+          ]
+        },
+        {
+          "id": "1.2",
+          "title": "Exam Logic in Practice",
+          "lessons": [
+            {"id": "1.2.1", "title": "Why the most empathetic answer is often wrong", "type": "concept", "estimated_minutes": 20, "tags": ["empathy_trap", "exam_logic", "clinical_judgment"], "linked_vignette_categories": ["exam_priority_logic"], "prerequisites": ["1.1.3"]},
+            {"id": "1.2.2", "title": "Why the most thorough answer is often premature", "type": "concept", "estimated_minutes": 20, "tags": ["premature_intervention", "assessment_first", "exam_logic"], "linked_vignette_categories": ["assessment_before_action"], "prerequisites": ["1.1.3"]},
+            {"id": "1.2.3", "title": "First step vs best long-term plan — the critical difference", "type": "concept", "estimated_minutes": 25, "tags": ["first_step", "treatment_plan", "priority"], "linked_vignette_categories": ["first_step_vs_best_plan"], "prerequisites": ["1.1.2"]},
+            {"id": "1.2.4", "title": "When 'assess further' beats any intervention", "type": "concept", "estimated_minutes": 20, "tags": ["assessment", "intervention_timing", "clinical_reasoning"], "linked_vignette_categories": ["assessment_before_action"], "prerequisites": ["1.1.3"]},
+            {"id": "1.2.5", "title": "When 'consult supervisor' is the best answer", "type": "concept", "estimated_minutes": 15, "tags": ["consultation", "supervision", "professional_judgment"], "linked_vignette_categories": ["supervision_consultation"], "prerequisites": []},
+            {"id": "1.2.6", "title": "Pearson VUE testing environment and exam day preparation", "type": "concept", "estimated_minutes": 15, "tags": ["pearson_vue", "exam_day", "testing_environment"], "linked_vignette_categories": [], "prerequisites": []}
+          ]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Ethics, Values, Boundaries & Professional Use of Self",
+      "goal": "Make ethical reasoning automatic under exam pressure",
+      "exam_weight": "very_high",
+      "focus": ["ethics", "boundaries", "professional_conduct"],
+      "modules": [
+        {
+          "id": "2.1",
+          "title": "Confidentiality & Informed Consent",
+          "lessons": [
+            {"id": "2.1.1", "title": "Limits of confidentiality — when and how to disclose", "type": "concept", "estimated_minutes": 25, "tags": ["confidentiality", "limits", "disclosure"], "linked_vignette_categories": ["ethics_confidentiality"], "prerequisites": []},
+            {"id": "2.1.2", "title": "Informed consent with adults", "type": "concept", "estimated_minutes": 20, "tags": ["informed_consent", "adults", "ethics"], "linked_vignette_categories": ["ethics_confidentiality"], "prerequisites": []},
+            {"id": "2.1.3", "title": "Informed consent with minors — age, maturity, parent rights", "type": "concept", "estimated_minutes": 25, "tags": ["minors", "consent", "parent_rights"], "linked_vignette_categories": ["minors_consent_confidentiality"], "prerequisites": ["2.1.1"]},
+            {"id": "2.1.4", "title": "HIPAA vs state law — which controls?", "type": "concept", "estimated_minutes": 20, "tags": ["hipaa", "state_law", "privacy"], "linked_vignette_categories": ["privacy_law_records"], "prerequisites": []},
+            {"id": "2.1.5", "title": "Privileged communication vs confidentiality", "type": "concept", "estimated_minutes": 20, "tags": ["privilege", "confidentiality", "legal_ethics"], "linked_vignette_categories": ["privacy_law_records"], "prerequisites": ["2.1.1"]},
+            {"id": "2.1.6", "title": "Records requests and release of information", "type": "concept", "estimated_minutes": 20, "tags": ["records", "release_of_information", "documentation"], "linked_vignette_categories": ["privacy_law_records"], "prerequisites": []}
+          ]
+        },
+        {
+          "id": "2.2",
+          "title": "Boundaries & Dual Relationships",
+          "lessons": [
+            {"id": "2.2.1", "title": "Dual relationships — definition, risk, management", "type": "concept", "estimated_minutes": 20, "tags": ["dual_relationships", "boundaries", "risk_management"], "linked_vignette_categories": ["boundaries_dual_relationships"], "prerequisites": []},
+            {"id": "2.2.2", "title": "Self-disclosure — when appropriate, when harmful", "type": "concept", "estimated_minutes": 20, "tags": ["self_disclosure", "boundaries", "use_of_self"], "linked_vignette_categories": ["boundaries_self_disclosure"], "prerequisites": []},
+            {"id": "2.2.3", "title": "Gifts from clients — policy and ethics", "type": "concept", "estimated_minutes": 15, "tags": ["gifts", "ethics", "boundaries"], "linked_vignette_categories": ["boundaries_dual_relationships"], "prerequisites": []},
+            {"id": "2.2.4", "title": "Social media contact and digital boundaries", "type": "concept", "estimated_minutes": 15, "tags": ["social_media", "digital_boundaries", "ethics"], "linked_vignette_categories": ["digital_boundaries"], "prerequisites": []},
+            {"id": "2.2.5", "title": "Client romantic feelings toward therapist", "type": "concept", "estimated_minutes": 15, "tags": ["transference", "romantic_boundaries", "ethics"], "linked_vignette_categories": ["boundaries_dual_relationships"], "prerequisites": []},
+            {"id": "2.2.6", "title": "Small community practice challenges", "type": "concept", "estimated_minutes": 20, "tags": ["rural_practice", "small_community", "dual_roles"], "linked_vignette_categories": ["small_community_ethics"], "prerequisites": []}
+          ]
+        },
+        {
+          "id": "2.3",
+          "title": "Supervision, Documentation & Professional Conduct",
+          "lessons": [
+            {"id": "2.3.1", "title": "Supervision requirements for LCSW in New York", "type": "concept", "estimated_minutes": 20, "tags": ["supervision", "licensure", "new_york"], "linked_vignette_categories": ["supervision_consultation"], "prerequisites": []},
+            {"id": "2.3.2", "title": "When to seek consultation", "type": "concept", "estimated_minutes": 15, "tags": ["consultation", "professional_judgment", "scope"], "linked_vignette_categories": ["supervision_consultation"], "prerequisites": []},
+            {"id": "2.3.3", "title": "Suspected colleague impairment — duty and steps", "type": "concept", "estimated_minutes": 20, "tags": ["colleague_impairment", "ethics", "professional_conduct"], "linked_vignette_categories": ["professional_impairment"], "prerequisites": []},
+            {"id": "2.3.4", "title": "Documentation standards — factual vs judgmental language", "type": "concept", "estimated_minutes": 20, "tags": ["documentation", "factual_writing", "records"], "linked_vignette_categories": ["documentation_quality"], "prerequisites": []},
+            {"id": "2.3.5", "title": "Agency policy vs professional ethics conflicts", "type": "concept", "estimated_minutes": 20, "tags": ["agency_policy", "ethics_conflict", "professional_duties"], "linked_vignette_categories": ["agency_policy_vs_ethics"], "prerequisites": []},
+            {"id": "2.3.6", "title": "Professional impairment and self-care", "type": "concept", "estimated_minutes": 15, "tags": ["self_care", "impairment", "professional_responsibility"], "linked_vignette_categories": ["professional_impairment"], "prerequisites": []}
+          ]
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Assessment, Diagnosis & Case Formulation",
+      "goal": "Build sharp, systematic clinical thinking at the start of care",
+      "exam_weight": "very_high",
+      "focus": ["assessment", "diagnosis", "risk"],
+      "modules": [
+        {
+          "id": "3.1",
+          "title": "Biopsychosocial Assessment",
+          "lessons": [
+            {"id": "3.1.1", "title": "Components of a complete biopsychosocial assessment", "type": "concept", "estimated_minutes": 25, "tags": ["biopsychosocial", "assessment", "intake"], "linked_vignette_categories": ["assessment_before_action"], "prerequisites": []},
+            {"id": "3.1.2", "title": "Mental status examination", "type": "concept", "estimated_minutes": 20, "tags": ["mental_status_exam", "assessment", "clinical_observation"], "linked_vignette_categories": ["psychosis_mse"], "prerequisites": ["3.1.1"]},
+            {"id": "3.1.3", "title": "Strengths-based formulation", "type": "concept", "estimated_minutes": 15, "tags": ["strengths", "formulation", "client_resources"], "linked_vignette_categories": [], "prerequisites": ["3.1.1"]},
+            {"id": "3.1.4", "title": "Cultural formulation and culturally responsive assessment", "type": "concept", "estimated_minutes": 25, "tags": ["cultural_formulation", "cultural_humility", "assessment"], "linked_vignette_categories": ["culture_assessment"], "prerequisites": ["3.1.1"]},
+            {"id": "3.1.5", "title": "When to gather more information before acting", "type": "concept", "estimated_minutes": 20, "tags": ["assessment_first", "clinical_reasoning", "information_gathering"], "linked_vignette_categories": ["assessment_before_action"], "prerequisites": []},
+            {"id": "3.1.6", "title": "Collateral information — when and how", "type": "concept", "estimated_minutes": 20, "tags": ["collateral", "assessment", "family_information"], "linked_vignette_categories": ["collateral_information"], "prerequisites": []}
+          ]
+        },
+        {
+          "id": "3.2",
+          "title": "Diagnosis & Differential Thinking",
+          "lessons": [
+            {"id": "3.2.1", "title": "DSM-5-TR framework and clinical reasoning", "type": "concept", "estimated_minutes": 25, "tags": ["dsm", "diagnosis", "clinical_reasoning"], "linked_vignette_categories": ["diagnostic_reasoning"], "prerequisites": []},
+            {"id": "3.2.2", "title": "Depression — major, persistent, situational distinctions", "type": "concept", "estimated_minutes": 20, "tags": ["depression", "differential", "mood_disorders"], "linked_vignette_categories": ["depression_differentials"], "prerequisites": ["3.2.1"]},
+            {"id": "3.2.3", "title": "Anxiety disorders — differential diagnosis", "type": "concept", "estimated_minutes": 20, "tags": ["anxiety", "differential", "diagnosis"], "linked_vignette_categories": ["anxiety_differentials"], "prerequisites": ["3.2.1"]},
+            {"id": "3.2.4", "title": "Trauma and stressor-related disorders", "type": "concept", "estimated_minutes": 20, "tags": ["trauma", "ptsd", "stressor_disorders"], "linked_vignette_categories": ["trauma_differentials"], "prerequisites": ["3.2.1"]},
+            {"id": "3.2.5", "title": "Psychotic disorders — assessment and safety", "type": "concept", "estimated_minutes": 20, "tags": ["psychosis", "safety", "assessment"], "linked_vignette_categories": ["psychosis_mse"], "prerequisites": ["3.1.2"]},
+            {"id": "3.2.6", "title": "Bipolar vs unipolar — key distinguishing features", "type": "concept", "estimated_minutes": 20, "tags": ["bipolar", "unipolar", "differential"], "linked_vignette_categories": ["bipolar_vs_unipolar"], "prerequisites": ["3.2.1"]},
+            {"id": "3.2.7", "title": "Personality features vs acute crisis — how to separate", "type": "concept", "estimated_minutes": 20, "tags": ["personality", "acute_crisis", "differential"], "linked_vignette_categories": ["personality_vs_crisis"], "prerequisites": []},
+            {"id": "3.2.8", "title": "Substance use masking or mimicking mood disorders", "type": "concept", "estimated_minutes": 20, "tags": ["substance_use", "mood_disorders", "differential"], "linked_vignette_categories": ["substance_vs_primary_diagnosis"], "prerequisites": []},
+            {"id": "3.2.9", "title": "Bereavement vs depressive disorder", "type": "concept", "estimated_minutes": 15, "tags": ["bereavement", "depression", "differential"], "linked_vignette_categories": ["grief_vs_depression"], "prerequisites": []},
+            {"id": "3.2.10", "title": "When NOT to diagnose — cultural and contextual factors", "type": "concept", "estimated_minutes": 20, "tags": ["overdiagnosis", "culture", "context"], "linked_vignette_categories": ["culture_assessment"], "prerequisites": ["3.1.4"]}
+          ]
+        },
+        {
+          "id": "3.3",
+          "title": "Risk Assessment",
+          "lessons": [
+            {"id": "3.3.1", "title": "Suicide risk assessment — framework and factors", "type": "concept", "estimated_minutes": 25, "tags": ["suicide_risk", "risk_assessment", "safety"], "linked_vignette_categories": ["risk_suicide"], "prerequisites": []},
+            {"id": "3.3.2", "title": "Passive SI vs active SI with plan", "type": "concept", "estimated_minutes": 20, "tags": ["suicidal_ideation", "risk_levels", "assessment"], "linked_vignette_categories": ["risk_suicide"], "prerequisites": ["3.3.1"]},
+            {"id": "3.3.3", "title": "Self-harm without suicidal intent", "type": "concept", "estimated_minutes": 15, "tags": ["self_harm", "nssi", "risk_assessment"], "linked_vignette_categories": ["self_harm_vs_suicidality"], "prerequisites": ["3.3.1"]},
+            {"id": "3.3.4", "title": "Homicidal ideation — assessment and duty", "type": "concept", "estimated_minutes": 20, "tags": ["homicidal_ideation", "duty_to_protect", "assessment"], "linked_vignette_categories": ["duty_to_protect"], "prerequisites": []},
+            {"id": "3.3.5", "title": "Abuse and neglect indicators", "type": "concept", "estimated_minutes": 20, "tags": ["abuse", "neglect", "indicators", "screening"], "linked_vignette_categories": ["child_abuse_reporting", "elder_abuse_reporting"], "prerequisites": []},
+            {"id": "3.3.6", "title": "Documenting risk assessment findings", "type": "concept", "estimated_minutes": 15, "tags": ["risk_documentation", "documentation", "safety"], "linked_vignette_categories": ["documentation_quality"], "prerequisites": ["3.3.1"]}
+          ]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Treatment Planning & Clinical Interventions",
+      "goal": "Know what to do after assessment — and what order to do it in",
+      "exam_weight": "high",
+      "focus": ["treatment_planning", "interventions", "termination"],
+      "modules": [
+        {
+          "id": "4.1",
+          "title": "Treatment Planning",
+          "lessons": [
+            {"id": "4.1.1", "title": "Writing measurable treatment goals", "type": "concept", "estimated_minutes": 20, "tags": ["treatment_goals", "documentation", "planning"], "linked_vignette_categories": ["treatment_planning"], "prerequisites": []},
+            {"id": "4.1.2", "title": "Short-term vs long-term objectives", "type": "concept", "estimated_minutes": 15, "tags": ["short_term", "long_term", "treatment_planning"], "linked_vignette_categories": ["treatment_planning"], "prerequisites": ["4.1.1"]},
+            {"id": "4.1.3", "title": "Matching intervention to presenting problem", "type": "concept", "estimated_minutes": 20, "tags": ["intervention_matching", "presenting_problem", "clinical_fit"], "linked_vignette_categories": ["intervention_selection"], "prerequisites": ["3.1.1"]},
+            {"id": "4.1.4", "title": "Client involvement in treatment planning", "type": "concept", "estimated_minutes": 15, "tags": ["client_collaboration", "engagement", "planning"], "linked_vignette_categories": ["treatment_planning"], "prerequisites": []},
+            {"id": "4.1.5", "title": "Resistant clients — engagement before technique", "type": "concept", "estimated_minutes": 20, "tags": ["resistance", "engagement", "rapport"], "linked_vignette_categories": ["engagement_resistance"], "prerequisites": []},
+            {"id": "4.1.6", "title": "Reviewing and modifying treatment plans", "type": "concept", "estimated_minutes": 15, "tags": ["treatment_review", "plan_revision", "progress"], "linked_vignette_categories": ["treatment_planning"], "prerequisites": ["4.1.1"]}
+          ]
+        },
+        {
+          "id": "4.2",
+          "title": "Individual Interventions",
+          "lessons": [
+            {"id": "4.2.1", "title": "Cognitive Behavioral Therapy — core concepts and applications", "type": "concept", "estimated_minutes": 20, "tags": ["cbt", "individual_therapy", "interventions"], "linked_vignette_categories": ["intervention_selection"], "prerequisites": []},
+            {"id": "4.2.2", "title": "Dialectical Behavior Therapy — skills and use cases", "type": "concept", "estimated_minutes": 20, "tags": ["dbt", "emotion_regulation", "skills"], "linked_vignette_categories": ["self_harm_vs_suicidality"], "prerequisites": []},
+            {"id": "4.2.3", "title": "Psychodynamic approaches — transference, defense mechanisms", "type": "concept", "estimated_minutes": 20, "tags": ["psychodynamic", "transference", "defense_mechanisms"], "linked_vignette_categories": ["boundaries_self_disclosure"], "prerequisites": []},
+            {"id": "4.2.4", "title": "Motivational Interviewing — stages and techniques", "type": "concept", "estimated_minutes": 20, "tags": ["mi", "motivation", "stages_of_change"], "linked_vignette_categories": ["substance_use_treatment", "engagement_resistance"], "prerequisites": []},
+            {"id": "4.2.5", "title": "Trauma-informed practice principles", "type": "concept", "estimated_minutes": 20, "tags": ["trauma_informed", "safety", "empowerment"], "linked_vignette_categories": ["trauma_differentials"], "prerequisites": []},
+            {"id": "4.2.6", "title": "Acceptance and Commitment Therapy basics", "type": "concept", "estimated_minutes": 15, "tags": ["act", "acceptance", "values"], "linked_vignette_categories": ["intervention_selection"], "prerequisites": []},
+            {"id": "4.2.7", "title": "Solution-focused approaches", "type": "concept", "estimated_minutes": 15, "tags": ["solution_focused", "brief_therapy", "strengths"], "linked_vignette_categories": ["intervention_selection"], "prerequisites": []}
+          ]
+        },
+        {
+          "id": "4.3",
+          "title": "Family, Couples & Group Work",
+          "lessons": [
+            {"id": "4.3.1", "title": "Family systems theory — key concepts", "type": "concept", "estimated_minutes": 20, "tags": ["family_systems", "systems_theory", "roles"], "linked_vignette_categories": ["family_systems"], "prerequisites": []},
+            {"id": "4.3.2", "title": "Structural family therapy", "type": "concept", "estimated_minutes": 20, "tags": ["structural_family_therapy", "boundaries", "subsystems"], "linked_vignette_categories": ["family_systems"], "prerequisites": ["4.3.1"]},
+            {"id": "4.3.3", "title": "Couples work — when and how", "type": "concept", "estimated_minutes": 20, "tags": ["couples_therapy", "assessment", "contraindications"], "linked_vignette_categories": ["couples_work"], "prerequisites": []},
+            {"id": "4.3.4", "title": "Group therapy — types, stages, and leader role", "type": "concept", "estimated_minutes": 20, "tags": ["group_therapy", "group_stages", "leadership"], "linked_vignette_categories": ["group_therapy"], "prerequisites": []},
+            {"id": "4.3.5", "title": "Group dynamics and therapeutic factors", "type": "concept", "estimated_minutes": 20, "tags": ["group_dynamics", "therapeutic_factors", "process"], "linked_vignette_categories": ["group_therapy"], "prerequisites": ["4.3.4"]},
+            {"id": "4.3.6", "title": "Working with children and adolescents in families", "type": "concept", "estimated_minutes": 20, "tags": ["children", "adolescents", "families"], "linked_vignette_categories": ["child_family_work"], "prerequisites": []}
+          ]
+        },
+        {
+          "id": "4.4",
+          "title": "Endings & Coordination",
+          "lessons": [
+            {"id": "4.4.1", "title": "Termination — planned and unplanned", "type": "concept", "estimated_minutes": 20, "tags": ["termination", "ending_phase", "treatment_closure"], "linked_vignette_categories": ["termination_referral"], "prerequisites": []},
+            {"id": "4.4.2", "title": "Relapse prevention planning", "type": "concept", "estimated_minutes": 15, "tags": ["relapse_prevention", "maintenance", "planning"], "linked_vignette_categories": ["substance_use_treatment"], "prerequisites": []},
+            {"id": "4.4.3", "title": "Referral — when, how, and to whom", "type": "concept", "estimated_minutes": 20, "tags": ["referral", "scope", "service_matching"], "linked_vignette_categories": ["termination_referral"], "prerequisites": []},
+            {"id": "4.4.4", "title": "Care coordination and case management", "type": "concept", "estimated_minutes": 20, "tags": ["care_coordination", "case_management", "systems"], "linked_vignette_categories": ["care_coordination"], "prerequisites": []},
+            {"id": "4.4.5", "title": "Discharge planning", "type": "concept", "estimated_minutes": 15, "tags": ["discharge", "continuity_of_care", "planning"], "linked_vignette_categories": ["care_coordination"], "prerequisites": []},
+            {"id": "4.4.6", "title": "Community resources and linkage", "type": "concept", "estimated_minutes": 15, "tags": ["community_resources", "linkage", "resource_navigation"], "linked_vignette_categories": ["care_coordination"], "prerequisites": []}
+          ]
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Risk, Crisis, Abuse & Safety",
+      "goal": "Build calm, fast, correct judgment in high-stakes situations",
+      "exam_weight": "very_high",
+      "focus": ["crisis", "safety", "mandated_reporting"],
+      "modules": [
+        {
+          "id": "5.1",
+          "title": "Suicidality & Self-Harm",
+          "lessons": [
+            {"id": "5.1.1", "title": "Suicide risk levels and response thresholds", "type": "concept", "estimated_minutes": 25, "tags": ["suicide_risk", "response_thresholds", "safety"], "linked_vignette_categories": ["risk_suicide"], "prerequisites": ["3.3.1"]},
+            {"id": "5.1.2", "title": "Safety planning — components and process", "type": "concept", "estimated_minutes": 20, "tags": ["safety_plan", "crisis_response", "suicide_prevention"], "linked_vignette_categories": ["risk_suicide"], "prerequisites": ["5.1.1"]},
+            {"id": "5.1.3", "title": "Hospitalization — voluntary vs involuntary criteria", "type": "concept", "estimated_minutes": 20, "tags": ["hospitalization", "voluntary", "involuntary", "criteria"], "linked_vignette_categories": ["hospitalization_decisions"], "prerequisites": ["5.1.1"]},
+            {"id": "5.1.4", "title": "Self-harm vs suicidal behavior — assessment and response", "type": "concept", "estimated_minutes": 20, "tags": ["self_harm", "suicidal_behavior", "differential_response"], "linked_vignette_categories": ["self_harm_vs_suicidality"], "prerequisites": ["3.3.3"]},
+            {"id": "5.1.5", "title": "Documentation after a safety event", "type": "concept", "estimated_minutes": 15, "tags": ["safety_documentation", "risk_notes", "crisis"], "linked_vignette_categories": ["documentation_quality"], "prerequisites": ["3.3.6"]},
+            {"id": "5.1.6", "title": "Follow-up after crisis", "type": "concept", "estimated_minutes": 15, "tags": ["follow_up", "continuity", "crisis_care"], "linked_vignette_categories": ["risk_suicide"], "prerequisites": ["5.1.2"]}
+          ]
+        },
+        {
+          "id": "5.2",
+          "title": "Danger to Others & Duty to Protect",
+          "lessons": [
+            {"id": "5.2.1", "title": "Homicidal ideation — assessment framework", "type": "concept", "estimated_minutes": 20, "tags": ["homicidal_ideation", "risk_assessment", "violence_risk"], "linked_vignette_categories": ["duty_to_protect"], "prerequisites": ["3.3.4"]},
+            {"id": "5.2.2", "title": "Duty to warn vs duty to protect", "type": "concept", "estimated_minutes": 20, "tags": ["duty_to_warn", "duty_to_protect", "legal_ethics"], "linked_vignette_categories": ["duty_to_protect"], "prerequisites": ["5.2.1"]},
+            {"id": "5.2.3", "title": "Tarasoff and New York practice context", "type": "concept", "estimated_minutes": 15, "tags": ["tarasoff", "new_york_context", "practice_duties"], "linked_vignette_categories": ["duty_to_protect"], "prerequisites": ["5.2.2"]},
+            {"id": "5.2.4", "title": "Steps when a client makes a threat", "type": "concept", "estimated_minutes": 20, "tags": ["threat_assessment", "immediate_steps", "safety"], "linked_vignette_categories": ["duty_to_protect"], "prerequisites": ["5.2.1"]},
+            {"id": "5.2.5", "title": "Balancing confidentiality with safety duty", "type": "concept", "estimated_minutes": 20, "tags": ["confidentiality", "public_safety", "ethical_balance"], "linked_vignette_categories": ["duty_to_protect"], "prerequisites": ["2.1.1", "5.2.2"]}
+          ]
+        },
+        {
+          "id": "5.3",
+          "title": "Abuse, Neglect & Mandated Reporting",
+          "lessons": [
+            {"id": "5.3.1", "title": "Child abuse — types, indicators, reporting", "type": "concept", "estimated_minutes": 25, "tags": ["child_abuse", "indicators", "mandated_reporting"], "linked_vignette_categories": ["child_abuse_reporting"], "prerequisites": []},
+            {"id": "5.3.2", "title": "Mandated reporter obligations in New York", "type": "concept", "estimated_minutes": 20, "tags": ["mandated_reporting", "new_york", "legal_duties"], "linked_vignette_categories": ["child_abuse_reporting", "elder_abuse_reporting"], "prerequisites": ["5.3.1"]},
+            {"id": "5.3.3", "title": "Elder abuse and vulnerable adult mistreatment", "type": "concept", "estimated_minutes": 20, "tags": ["elder_abuse", "vulnerable_adults", "mistreatment"], "linked_vignette_categories": ["elder_abuse_reporting"], "prerequisites": []},
+            {"id": "5.3.4", "title": "Domestic violence — assessment and safety planning", "type": "concept", "estimated_minutes": 20, "tags": ["domestic_violence", "safety_planning", "assessment"], "linked_vignette_categories": ["domestic_violence"], "prerequisites": []},
+            {"id": "5.3.5", "title": "Reporting when client does not want you to", "type": "concept", "estimated_minutes": 20, "tags": ["mandated_reporting", "client_refusal", "ethics"], "linked_vignette_categories": ["child_abuse_reporting", "elder_abuse_reporting"], "prerequisites": ["5.3.1"]},
+            {"id": "5.3.6", "title": "Documentation in abuse cases", "type": "concept", "estimated_minutes": 15, "tags": ["abuse_documentation", "records", "factual_writing"], "linked_vignette_categories": ["documentation_quality"], "prerequisites": ["2.3.4"]}
+          ]
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Populations, Human Development & Practice Context",
+      "goal": "Apply clinical judgment across different clients, settings, and contexts",
+      "exam_weight": "medium",
+      "focus": ["populations", "development", "culture"],
+      "modules": [
+        {
+          "id": "6.1",
+          "title": "Human Development Across the Lifespan",
+          "lessons": [
+            {"id": "6.1.1", "title": "Erikson's psychosocial stages — clinical applications", "type": "concept", "estimated_minutes": 20, "tags": ["erikson", "development", "lifespan"], "linked_vignette_categories": ["lifespan_development"], "prerequisites": []},
+            {"id": "6.1.2", "title": "Piaget's cognitive development", "type": "concept", "estimated_minutes": 15, "tags": ["piaget", "cognitive_development", "children"], "linked_vignette_categories": ["lifespan_development"], "prerequisites": []},
+            {"id": "6.1.3", "title": "Attachment theory — Bowlby and Ainsworth", "type": "concept", "estimated_minutes": 20, "tags": ["attachment", "child_development", "relationships"], "linked_vignette_categories": ["attachment_family"], "prerequisites": []},
+            {"id": "6.1.4", "title": "Adolescent development and identity", "type": "concept", "estimated_minutes": 20, "tags": ["adolescence", "identity", "development"], "linked_vignette_categories": ["adolescent_identity"], "prerequisites": []},
+            {"id": "6.1.5", "title": "Older adult development and late-life issues", "type": "concept", "estimated_minutes": 20, "tags": ["older_adults", "aging", "late_life"], "linked_vignette_categories": ["older_adult_practice"], "prerequisites": []},
+            {"id": "6.1.6", "title": "Grief, loss, and bereavement across ages", "type": "concept", "estimated_minutes": 20, "tags": ["grief", "loss", "bereavement"], "linked_vignette_categories": ["grief_vs_depression"], "prerequisites": []}
+          ]
+        },
+        {
+          "id": "6.2",
+          "title": "Special Populations",
+          "lessons": [
+            {"id": "6.2.1", "title": "Children and adolescents in clinical practice", "type": "concept", "estimated_minutes": 20, "tags": ["children", "adolescents", "clinical_practice"], "linked_vignette_categories": ["child_family_work"], "prerequisites": []},
+            {"id": "6.2.2", "title": "Older adults — assessment and intervention", "type": "concept", "estimated_minutes": 20, "tags": ["older_adults", "assessment", "intervention"], "linked_vignette_categories": ["older_adult_practice"], "prerequisites": []},
+            {"id": "6.2.3", "title": "Substance use disorders — treatment and recovery", "type": "concept", "estimated_minutes": 20, "tags": ["substance_use", "recovery", "treatment"], "linked_vignette_categories": ["substance_use_treatment"], "prerequisites": []},
+            {"id": "6.2.4", "title": "Serious mental illness — community practice", "type": "concept", "estimated_minutes": 20, "tags": ["smi", "community_mental_health", "case_management"], "linked_vignette_categories": ["serious_mental_illness"], "prerequisites": []},
+            {"id": "6.2.5", "title": "Disability and chronic illness", "type": "concept", "estimated_minutes": 15, "tags": ["disability", "chronic_illness", "adaptation"], "linked_vignette_categories": ["disability_chronic_illness"], "prerequisites": []},
+            {"id": "6.2.6", "title": "LGBTQ+ clients — affirming practice", "type": "concept", "estimated_minutes": 20, "tags": ["lgbtq", "affirming_practice", "cultural_humility"], "linked_vignette_categories": ["affirming_practice"], "prerequisites": []}
+          ]
+        },
+        {
+          "id": "6.3",
+          "title": "Culture, Diversity & Systemic Context",
+          "lessons": [
+            {"id": "6.3.1", "title": "Cultural competence and cultural humility", "type": "concept", "estimated_minutes": 20, "tags": ["cultural_humility", "competence", "diversity"], "linked_vignette_categories": ["culture_assessment"], "prerequisites": []},
+            {"id": "6.3.2", "title": "Intersectionality in clinical assessment", "type": "concept", "estimated_minutes": 20, "tags": ["intersectionality", "assessment", "identity"], "linked_vignette_categories": ["culture_assessment"], "prerequisites": ["6.3.1"]},
+            {"id": "6.3.3", "title": "Race, ethnicity, and mental health disparities", "type": "concept", "estimated_minutes": 20, "tags": ["disparities", "race", "ethnicity", "mental_health"], "linked_vignette_categories": ["systemic_barriers"], "prerequisites": []},
+            {"id": "6.3.4", "title": "Immigration, acculturation, and practice", "type": "concept", "estimated_minutes": 20, "tags": ["immigration", "acculturation", "cultural_context"], "linked_vignette_categories": ["immigration_acculturation"], "prerequisites": []},
+            {"id": "6.3.5", "title": "Oppression, privilege, and clinical impact", "type": "concept", "estimated_minutes": 20, "tags": ["oppression", "privilege", "systemic_context"], "linked_vignette_categories": ["systemic_barriers"], "prerequisites": []},
+            {"id": "6.3.6", "title": "Access barriers and social determinants of health", "type": "concept", "estimated_minutes": 20, "tags": ["social_determinants", "access", "barriers"], "linked_vignette_categories": ["systemic_barriers", "care_coordination"], "prerequisites": []}
+          ]
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Law, Regulation, Documentation & New York Context",
+      "goal": "Understand scope, legal duties, and New York-specific practice requirements",
+      "exam_weight": "medium",
+      "focus": ["law", "regulation", "documentation"],
+      "modules": [
+        {
+          "id": "7.1",
+          "title": "New York LCSW Scope & Licensure",
+          "lessons": [
+            {"id": "7.1.1", "title": "LCSW scope of practice in New York", "type": "concept", "estimated_minutes": 20, "tags": ["scope_of_practice", "new_york", "lcsw"], "linked_vignette_categories": ["scope_and_referral"], "prerequisites": []},
+            {"id": "7.1.2", "title": "Diagnosis, psychosocial assessment, treatment planning, psychotherapy", "type": "concept", "estimated_minutes": 20, "tags": ["core_functions", "assessment", "treatment"], "linked_vignette_categories": ["scope_and_referral"], "prerequisites": ["7.1.1"]},
+            {"id": "7.1.3", "title": "Supervision requirements for licensure", "type": "concept", "estimated_minutes": 15, "tags": ["licensure", "supervision", "requirements"], "linked_vignette_categories": ["supervision_consultation"], "prerequisites": []},
+            {"id": "7.1.4", "title": "Continuing education and license maintenance", "type": "concept", "estimated_minutes": 15, "tags": ["continuing_education", "license_maintenance"], "linked_vignette_categories": [], "prerequisites": []},
+            {"id": "7.1.5", "title": "Scope boundaries — when physician or specialist consultation is needed", "type": "concept", "estimated_minutes": 20, "tags": ["scope_boundaries", "consultation", "referral"], "linked_vignette_categories": ["scope_and_referral"], "prerequisites": ["7.1.1"]},
+            {"id": "7.1.6", "title": "Telehealth practice in New York", "type": "concept", "estimated_minutes": 20, "tags": ["telehealth", "new_york", "practice_context"], "linked_vignette_categories": ["telehealth_ethics"], "prerequisites": []}
+          ]
+        },
+        {
+          "id": "7.2",
+          "title": "Legal & Regulatory Duties",
+          "lessons": [
+            {"id": "7.2.1", "title": "Mandated reporting — child, elder, vulnerable adult", "type": "concept", "estimated_minutes": 20, "tags": ["mandated_reporting", "legal_duties", "abuse"], "linked_vignette_categories": ["child_abuse_reporting", "elder_abuse_reporting"], "prerequisites": []},
+            {"id": "7.2.2", "title": "Privacy law — HIPAA, 42 CFR Part 2, and New York practice context", "type": "concept", "estimated_minutes": 20, "tags": ["hipaa", "42_cfr_part_2", "privacy"], "linked_vignette_categories": ["privacy_law_records"], "prerequisites": []},
+            {"id": "7.2.3", "title": "Court-ordered treatment and forensic contexts", "type": "concept", "estimated_minutes": 20, "tags": ["forensic", "court_ordered", "legal_context"], "linked_vignette_categories": ["forensic_contexts"], "prerequisites": []},
+            {"id": "7.2.4", "title": "Subpoenas and records in legal proceedings", "type": "concept", "estimated_minutes": 20, "tags": ["subpoenas", "records", "legal_proceedings"], "linked_vignette_categories": ["privacy_law_records"], "prerequisites": []},
+            {"id": "7.2.5", "title": "Capacity and involuntary commitment criteria in exam practice context", "type": "concept", "estimated_minutes": 20, "tags": ["capacity", "involuntary_commitment", "exam_context"], "linked_vignette_categories": ["hospitalization_decisions"], "prerequisites": []},
+            {"id": "7.2.6", "title": "Professional liability and malpractice basics", "type": "concept", "estimated_minutes": 15, "tags": ["malpractice", "liability", "risk_management"], "linked_vignette_categories": ["documentation_quality"], "prerequisites": []}
+          ]
+        },
+        {
+          "id": "7.3",
+          "title": "Documentation & Workplace Practice",
+          "lessons": [
+            {"id": "7.3.1", "title": "Progress note standards", "type": "concept", "estimated_minutes": 15, "tags": ["progress_notes", "documentation", "standards"], "linked_vignette_categories": ["documentation_quality"], "prerequisites": []},
+            {"id": "7.3.2", "title": "Treatment plan documentation", "type": "concept", "estimated_minutes": 15, "tags": ["treatment_plan", "documentation", "goals"], "linked_vignette_categories": ["treatment_planning"], "prerequisites": []},
+            {"id": "7.3.3", "title": "Incident documentation", "type": "concept", "estimated_minutes": 15, "tags": ["incident_reports", "documentation", "risk_events"], "linked_vignette_categories": ["documentation_quality"], "prerequisites": []},
+            {"id": "7.3.4", "title": "Agency policy vs professional ethics", "type": "concept", "estimated_minutes": 20, "tags": ["agency_policy", "ethics", "conflict_resolution"], "linked_vignette_categories": ["agency_policy_vs_ethics"], "prerequisites": []},
+            {"id": "7.3.5", "title": "Electronic health records and privacy", "type": "concept", "estimated_minutes": 15, "tags": ["ehr", "privacy", "documentation"], "linked_vignette_categories": ["privacy_law_records"], "prerequisites": []},
+            {"id": "7.3.6", "title": "Supervision documentation requirements", "type": "concept", "estimated_minutes": 15, "tags": ["supervision", "documentation", "compliance"], "linked_vignette_categories": ["supervision_consultation"], "prerequisites": []}
+          ]
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Full Clinical Exam Simulations & Weakness Repair",
+      "goal": "Convert knowledge into passing performance under exam conditions",
+      "exam_weight": "critical",
+      "focus": ["simulation", "weakness_repair", "readiness"],
+      "modules": [
+        {
+          "id": "8.1",
+          "title": "Timed Practice Sets",
+          "lessons": [
+            {"id": "8.1.1", "title": "25-question timed block — mixed domains", "type": "timed_set", "estimated_minutes": 30, "tags": ["timed_set", "mixed_domains", "practice_block"], "linked_vignette_categories": ["mixed_domain_timed_set"], "prerequisites": ["1.1.3"]},
+            {"id": "8.1.2", "title": "Ethics and safety focused set", "type": "timed_set", "estimated_minutes": 30, "tags": ["timed_set", "ethics", "safety"], "linked_vignette_categories": ["ethics_safety_timed_set"], "prerequisites": ["2.1.1", "5.1.1"]},
+            {"id": "8.1.3", "title": "Assessment and diagnosis focused set", "type": "timed_set", "estimated_minutes": 30, "tags": ["timed_set", "assessment", "diagnosis"], "linked_vignette_categories": ["assessment_diagnosis_timed_set"], "prerequisites": ["3.1.1", "3.2.1"]},
+            {"id": "8.1.4", "title": "Intervention and treatment planning set", "type": "timed_set", "estimated_minutes": 30, "tags": ["timed_set", "intervention", "treatment_planning"], "linked_vignette_categories": ["intervention_treatment_timed_set"], "prerequisites": ["4.1.1"]},
+            {"id": "8.1.5", "title": "Crisis and risk focused set", "type": "timed_set", "estimated_minutes": 30, "tags": ["timed_set", "crisis", "risk"], "linked_vignette_categories": ["crisis_risk_timed_set"], "prerequisites": ["5.1.1", "5.2.1"]},
+            {"id": "8.1.6", "title": "Full 170-question simulation", "type": "simulation", "estimated_minutes": 240, "tags": ["full_exam", "simulation", "endurance"], "linked_vignette_categories": ["full_exam_simulation"], "prerequisites": ["8.1.1", "8.1.2", "8.1.3", "8.1.4", "8.1.5"]}
+          ]
+        },
+        {
+          "id": "8.2",
+          "title": "Weakness Repair & Pattern Recognition",
+          "lessons": [
+            {"id": "8.2.1", "title": "Miss autopsy — what the stem was really asking", "type": "review", "estimated_minutes": 20, "tags": ["miss_review", "stem_analysis", "error_repair"], "linked_vignette_categories": ["miss_pattern_repair"], "prerequisites": []},
+            {"id": "8.2.2", "title": "Overthinking pattern detection", "type": "review", "estimated_minutes": 15, "tags": ["overthinking", "pattern_detection", "review"], "linked_vignette_categories": ["miss_pattern_repair"], "prerequisites": []},
+            {"id": "8.2.3", "title": "First step vs best plan confusion repair", "type": "review", "estimated_minutes": 15, "tags": ["first_step", "best_plan", "confusion_repair"], "linked_vignette_categories": ["first_step_vs_best_plan"], "prerequisites": []},
+            {"id": "8.2.4", "title": "Ethics vs law vs clinical judgment confusion repair", "type": "review", "estimated_minutes": 20, "tags": ["ethics", "law", "clinical_judgment", "review"], "linked_vignette_categories": ["ethics_law_judgment"], "prerequisites": []},
+            {"id": "8.2.5", "title": "Distractor recognition training", "type": "review", "estimated_minutes": 15, "tags": ["distractors", "test_strategy", "review"], "linked_vignette_categories": ["distractor_recognition"], "prerequisites": []},
+            {"id": "8.2.6", "title": "Confidence calibration — trust your training", "type": "review", "estimated_minutes": 15, "tags": ["confidence", "calibration", "exam_readiness"], "linked_vignette_categories": ["confidence_repair"], "prerequisites": []}
+          ]
+        },
+        {
+          "id": "8.3",
+          "title": "Exam Readiness",
+          "lessons": [
+            {"id": "8.3.1", "title": "Last week review strategy", "type": "simulation", "estimated_minutes": 20, "tags": ["last_week", "review_strategy", "exam_readiness"], "linked_vignette_categories": [], "prerequisites": []},
+            {"id": "8.3.2", "title": "Exam day routine and mindset", "type": "simulation", "estimated_minutes": 15, "tags": ["exam_day", "mindset", "routine"], "linked_vignette_categories": [], "prerequisites": []},
+            {"id": "8.3.3", "title": "Pearson VUE environment preparation", "type": "simulation", "estimated_minutes": 15, "tags": ["pearson_vue", "environment", "prep"], "linked_vignette_categories": [], "prerequisites": []},
+            {"id": "8.3.4", "title": "What to do when you feel stuck on a question", "type": "simulation", "estimated_minutes": 15, "tags": ["getting_stuck", "exam_strategy", "decision_making"], "linked_vignette_categories": ["confidence_repair"], "prerequisites": []},
+            {"id": "8.3.5", "title": "Post-exam self-care and next steps", "type": "simulation", "estimated_minutes": 10, "tags": ["post_exam", "self_care", "closure"], "linked_vignette_categories": [], "prerequisites": []},
+            {"id": "8.3.6", "title": "New York licensure next steps after passing", "type": "simulation", "estimated_minutes": 10, "tags": ["licensure", "new_york", "after_passing"], "linked_vignette_categories": [], "prerequisites": []}
+          ]
+        }
+      ]
+    }
+  ]
+}
