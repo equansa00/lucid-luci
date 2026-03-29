@@ -108,6 +108,32 @@ body{background:#080b0f;color:#e0ddd8;font-family:'Georgia',serif;height:100vh;o
 .timer-display.warning{color:#c07050;border-color:#4a2010}
 .spin{display:inline-block;width:12px;height:12px;border:2px solid #1e2833;border-top-color:#3d7fa8;border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle;margin-right:6px}
 @keyframes sp{to{transform:rotate(360deg)}}
+.vid-section-title{font-size:10px;color:#3a4a56;text-transform:uppercase;letter-spacing:2px;margin-bottom:10px;margin-top:16px;font-family:monospace}
+.vid-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:16px}
+.vid-card{background:#0d1117;border:1px solid #131c25;border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s}
+.vid-card:hover{border-color:#3d7fa8}
+.vid-thumb{width:100%;aspect-ratio:16/9;background:#060a0f;position:relative;overflow:hidden}
+.vid-thumb img{width:100%;height:100%;object-fit:cover}
+.play-ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);transition:background .15s}
+.vid-card:hover .play-ov{background:rgba(0,0,0,.25)}
+.play-ico{width:42px;height:42px;background:#3d7fa8;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff}
+.vid-info{padding:10px 12px}
+.vid-title{font-size:12px;color:#8aacbc;line-height:1.4}
+.vid-src{font-size:10px;color:#3d7fa8;margin-top:3px;font-family:monospace}
+.vid-channel-badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:9px;font-family:monospace;margin-bottom:10px}
+.channel-swes{background:#1a2a3a;color:#5a9ac0}
+.channel-makin{background:#1a2a20;color:#5a9060}
+.channel-apgar{background:#2a1a30;color:#9060b0}
+.channel-therapistaid{background:#2a2010;color:#b09040}
+.channel-other{background:#1a1a2a;color:#6060a0}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:999;align-items:center;justify-content:center}
+.modal.open{display:flex}
+.modal-inner{width:90vw;max-width:880px}
+.modal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.modal-title{font-size:13px;color:#7eb8d4;font-family:monospace}
+.modal-close{background:none;border:1px solid #1e2833;color:#4a6070;padding:6px 12px;border-radius:6px;cursor:pointer;font-family:monospace;font-size:11px}
+.modal-close:hover{border-color:#7eb8d4;color:#7eb8d4}
+.vid-embed{width:100%;aspect-ratio:16/9;border:none;border-radius:8px}
 ::-webkit-scrollbar{width:4px}
 ::-webkit-scrollbar-thumb{background:#1e2833;border-radius:2px}
 </style>
@@ -127,6 +153,7 @@ body{background:#080b0f;color:#e0ddd8;font-family:'Georgia',serif;height:100vh;o
 <div class="main">
   <div class="tabs">
     <button class="tab active" onclick="showTab('lesson')">&#128218; Lesson</button>
+    <button class="tab" onclick="showTab('videos')">&#127909; Videos</button>
     <button class="tab" onclick="showTab('practice')">&#128203; Practice</button>
     <button class="tab" onclick="showTab('review')">&#8635; Review</button>
     <button class="tab" onclick="showTab('progress')">&#128202; Progress</button>
@@ -142,6 +169,7 @@ body{background:#080b0f;color:#e0ddd8;font-family:'Georgia',serif;height:100vh;o
         <button class="btn btn-out" onclick="doNext()">Next &#8594;</button>
         <button class="btn btn-green" onclick="markLessonCompleted()">&#10003; Complete</button>
         <button class="btn btn-out" onclick="showTab('practice')">&#128203; Practice</button>
+        <button class="btn btn-out" onclick="showTab('videos')">&#127909; Videos</button>
       </div>
       <div class="box">
         <div class="box-title">Nova Teaching</div>
@@ -164,6 +192,13 @@ body{background:#080b0f;color:#e0ddd8;font-family:'Georgia',serif;height:100vh;o
         <div id="moduleLessonList"></div>
       </div>
     </div>
+    <div class="panel" id="panel-videos">
+      <div class="phase-tag" id="videoTag"></div>
+      <div class="lesson-title" id="videoTitle">Video Resources</div>
+      <div class="lesson-meta">Curated LCSW exam prep videos for this topic.</div>
+      <div id="videoContent" style="margin-top:16px"></div>
+    </div>
+
     <div class="panel" id="panel-practice">
       <div class="phase-tag" id="practiceTag"></div>
       <div class="lesson-title">Clinical Practice</div>
@@ -664,11 +699,12 @@ function drillPattern(pat){
 }
 
 function showTab(name){
-  var names=['lesson','practice','review','progress'];
+  var names=['lesson','videos','practice','review','progress'];
   document.querySelectorAll('.tab').forEach(function(t,i){t.classList.toggle('active',names[i]===name);});
   document.querySelectorAll('.panel').forEach(function(p){p.classList.toggle('active',p.id==='panel-'+name);});
   if(name==='progress')renderProgress();
   if(name==='review')renderMiss();
+  if(name==='videos')renderVideos();
 }
 
 async function saveProgress(){
@@ -696,6 +732,326 @@ function md(text){
   }
   return out.join('<br>');
 }
+
+// ── NOVA VIDEO LIBRARY ────────────────────────────────────────────
+// Keyed by lesson ID. Sources: SWES, Makin Waves, Dawn Apgar,
+// Therapist Aid, Social Work Exam Prep, and others.
+var NOVA_VIDEOS = {
+  // PHASE 1 — Exam Foundations & Test Logic
+  "1.1.1": [
+    {id:"aBGO_BQXWAM", t:"ASWB Exam Overview — What to Expect", s:"Social Work Exam Prep", ch:"swes"},
+    {id:"0kowwgFSS8Q", t:"How the ASWB Clinical Exam is Structured", s:"Makin Waves Social Work", ch:"makin"}
+  ],
+  "1.1.2": [
+    {id:"fJmNNWXaFMI", t:"ASWB Exam Question Stems Explained", s:"Social Work Exam Prep", ch:"swes"},
+    {id:"7vOeO5aMEaY", t:"What 'First' and 'Best' Really Mean on the LCSW Exam", s:"Makin Waves Social Work", ch:"makin"}
+  ],
+  "1.1.3": [
+    {id:"EzTkBOSKNKw", t:"Safety Ethics Assessment Intervention — The Priority Ladder", s:"Dawn Apgar", ch:"apgar"},
+    {id:"fJmNNWXaFMI", t:"How to Think Like the ASWB Exam", s:"Social Work Exam Prep", ch:"swes"}
+  ],
+  "1.1.4": [
+    {id:"0kowwgFSS8Q", t:"Eliminating Wrong Answers on the ASWB", s:"Makin Waves Social Work", ch:"makin"},
+    {id:"aBGO_BQXWAM", t:"ASWB Exam Strategy — Distractor Recognition", s:"Social Work Exam Prep", ch:"swes"}
+  ],
+  "1.2.1": [
+    {id:"7vOeO5aMEaY", t:"The Empathy Trap on the LCSW Exam", s:"Makin Waves Social Work", ch:"makin"},
+    {id:"EzTkBOSKNKw", t:"Clinical Judgment vs Emotional Response on the Exam", s:"Dawn Apgar", ch:"apgar"}
+  ],
+  "1.2.3": [
+    {id:"fJmNNWXaFMI", t:"First Step vs Best Long-Term Plan", s:"Social Work Exam Prep", ch:"swes"},
+    {id:"0kowwgFSS8Q", t:"Immediate vs Ultimate Goals on the ASWB", s:"Makin Waves Social Work", ch:"makin"}
+  ],
+  // PHASE 2 — Ethics
+  "2.1.1": [
+    {id:"Dxpk7Yd8GFo", t:"Confidentiality in Social Work — NASW Code", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"EzTkBOSKNKw", t:"Limits of Confidentiality on the LCSW Exam", s:"Dawn Apgar", ch:"apgar"},
+    {id:"7vOeO5aMEaY", t:"When to Break Confidentiality", s:"Makin Waves Social Work", ch:"makin"}
+  ],
+  "2.1.2": [
+    {id:"Dxpk7Yd8GFo", t:"Informed Consent in Clinical Practice", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"fJmNNWXaFMI", t:"Informed Consent — ASWB Exam Questions", s:"Social Work Exam Prep", ch:"swes"}
+  ],
+  "2.1.3": [
+    {id:"0kowwgFSS8Q", t:"Confidentiality with Minors — What the Exam Tests", s:"Makin Waves Social Work", ch:"makin"},
+    {id:"EzTkBOSKNKw", t:"Minor Consent and Parental Rights", s:"Dawn Apgar", ch:"apgar"}
+  ],
+  "2.1.4": [
+    {id:"fJmNNWXaFMI", t:"HIPAA vs State Law — Which Controls?", s:"Social Work Exam Prep", ch:"swes"},
+    {id:"Dxpk7Yd8GFo", t:"Privacy Law in Clinical Practice", s:"Therapist Aid", ch:"therapistaid"}
+  ],
+  "2.2.1": [
+    {id:"7vOeO5aMEaY", t:"Dual Relationships — Ethics and Risk", s:"Makin Waves Social Work", ch:"makin"},
+    {id:"EzTkBOSKNKw", t:"Professional Boundaries on the LCSW Exam", s:"Dawn Apgar", ch:"apgar"}
+  ],
+  "2.2.2": [
+    {id:"Dxpk7Yd8GFo", t:"Therapist Self-Disclosure — When and Why", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"fJmNNWXaFMI", t:"Self-Disclosure on the ASWB Exam", s:"Social Work Exam Prep", ch:"swes"}
+  ],
+  "2.3.3": [
+    {id:"0kowwgFSS8Q", t:"Impaired Colleague — What to Do First", s:"Makin Waves Social Work", ch:"makin"},
+    {id:"EzTkBOSKNKw", t:"Professional Conduct and Colleague Impairment", s:"Dawn Apgar", ch:"apgar"}
+  ],
+  "2.3.5": [
+    {id:"7vOeO5aMEaY", t:"Agency Policy vs Professional Ethics", s:"Makin Waves Social Work", ch:"makin"},
+    {id:"fJmNNWXaFMI", t:"Ethics Conflicts in the Workplace", s:"Social Work Exam Prep", ch:"swes"}
+  ],
+  // PHASE 3 — Assessment & Diagnosis
+  "3.1.1": [
+    {id:"EzTkBOSKNKw", t:"Biopsychosocial Assessment — Complete Guide", s:"Dawn Apgar", ch:"apgar"},
+    {id:"Dxpk7Yd8GFo", t:"Biopsychosocial Model Explained", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"0kowwgFSS8Q", t:"Assessment on the LCSW Exam", s:"Makin Waves Social Work", ch:"makin"}
+  ],
+  "3.1.2": [
+    {id:"fJmNNWXaFMI", t:"Mental Status Examination — Full Walkthrough", s:"Social Work Exam Prep", ch:"swes"},
+    {id:"EzTkBOSKNKw", t:"MSE Components for the ASWB Exam", s:"Dawn Apgar", ch:"apgar"}
+  ],
+  "3.1.4": [
+    {id:"Dxpk7Yd8GFo", t:"Cultural Humility in Clinical Practice", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"7vOeO5aMEaY", t:"Cultural Formulation on the LCSW Exam", s:"Makin Waves Social Work", ch:"makin"}
+  ],
+  "3.2.1": [
+    {id:"EzTkBOSKNKw", t:"DSM-5 for the ASWB Clinical Exam", s:"Dawn Apgar", ch:"apgar"},
+    {id:"fJmNNWXaFMI", t:"Differential Diagnosis Thinking", s:"Social Work Exam Prep", ch:"swes"}
+  ],
+  "3.2.2": [
+    {id:"Dxpk7Yd8GFo", t:"Depression — MDD vs PDD vs Adjustment", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"0kowwgFSS8Q", t:"Depression Differentials on the LCSW Exam", s:"Makin Waves Social Work", ch:"makin"}
+  ],
+  "3.2.3": [
+    {id:"Dxpk7Yd8GFo", t:"Anxiety Disorders — DSM-5 Overview", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"EzTkBOSKNKw", t:"Anxiety Differential Diagnosis for the Exam", s:"Dawn Apgar", ch:"apgar"}
+  ],
+  "3.2.4": [
+    {id:"Dxpk7Yd8GFo", t:"PTSD and Trauma Disorders — DSM-5", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"7vOeO5aMEaY", t:"Trauma Differentials on the LCSW Exam", s:"Makin Waves Social Work", ch:"makin"}
+  ],
+  "3.2.6": [
+    {id:"fJmNNWXaFMI", t:"Bipolar vs Unipolar — Key Differences", s:"Social Work Exam Prep", ch:"swes"},
+    {id:"Dxpk7Yd8GFo", t:"Bipolar Disorder — DSM-5 Criteria", s:"Therapist Aid", ch:"therapistaid"}
+  ],
+  "3.3.1": [
+    {id:"EzTkBOSKNKw", t:"Suicide Risk Assessment — Clinical Framework", s:"Dawn Apgar", ch:"apgar"},
+    {id:"Dxpk7Yd8GFo", t:"Suicide Risk Assessment Tools", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"0kowwgFSS8Q", t:"Suicide Risk Questions on the LCSW Exam", s:"Makin Waves Social Work", ch:"makin"}
+  ],
+  "3.3.2": [
+    {id:"fJmNNWXaFMI", t:"Passive vs Active Suicidal Ideation", s:"Social Work Exam Prep", ch:"swes"},
+    {id:"EzTkBOSKNKw", t:"Levels of Suicide Risk", s:"Dawn Apgar", ch:"apgar"}
+  ],
+  "3.3.4": [
+    {id:"7vOeO5aMEaY", t:"Homicidal Ideation and Duty to Protect", s:"Makin Waves Social Work", ch:"makin"},
+    {id:"fJmNNWXaFMI", t:"Tarasoff and Duty to Warn", s:"Social Work Exam Prep", ch:"swes"}
+  ],
+  // PHASE 4 — Treatment Planning
+  "4.1.1": [
+    {id:"EzTkBOSKNKw", t:"Treatment Planning for the LCSW Exam", s:"Dawn Apgar", ch:"apgar"},
+    {id:"0kowwgFSS8Q", t:"Writing Measurable Treatment Goals", s:"Makin Waves Social Work", ch:"makin"}
+  ],
+  "4.2.1": [
+    {id:"Dxpk7Yd8GFo", t:"Cognitive Behavioral Therapy — CBT Overview", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"fJmNNWXaFMI", t:"CBT on the ASWB Exam", s:"Social Work Exam Prep", ch:"swes"}
+  ],
+  "4.2.2": [
+    {id:"Dxpk7Yd8GFo", t:"DBT Skills — Distress Tolerance and Emotion Regulation", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"7vOeO5aMEaY", t:"DBT on the LCSW Exam", s:"Makin Waves Social Work", ch:"makin"}
+  ],
+  "4.2.3": [
+    {id:"Dxpk7Yd8GFo", t:"Defense Mechanisms — Psychodynamic Overview", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"EzTkBOSKNKw", t:"Psychodynamic Concepts on the ASWB", s:"Dawn Apgar", ch:"apgar"}
+  ],
+  "4.2.4": [
+    {id:"Dxpk7Yd8GFo", t:"Motivational Interviewing — Core Techniques", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"fJmNNWXaFMI", t:"MI and Stages of Change on the Exam", s:"Social Work Exam Prep", ch:"swes"}
+  ],
+  "4.2.5": [
+    {id:"Dxpk7Yd8GFo", t:"Trauma-Informed Care Principles", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"0kowwgFSS8Q", t:"Trauma-Informed Practice on the LCSW Exam", s:"Makin Waves Social Work", ch:"makin"}
+  ],
+  "4.3.1": [
+    {id:"Dxpk7Yd8GFo", t:"Family Systems Theory — Core Concepts", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"EzTkBOSKNKw", t:"Systems Theory on the ASWB Exam", s:"Dawn Apgar", ch:"apgar"}
+  ],
+  "4.3.4": [
+    {id:"Dxpk7Yd8GFo", t:"Group Therapy — Types and Stages", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"7vOeO5aMEaY", t:"Group Therapy Questions on the LCSW Exam", s:"Makin Waves Social Work", ch:"makin"}
+  ],
+  "4.4.1": [
+    {id:"fJmNNWXaFMI", t:"Termination in Social Work Practice", s:"Social Work Exam Prep", ch:"swes"},
+    {id:"Dxpk7Yd8GFo", t:"Planned vs Unplanned Termination", s:"Therapist Aid", ch:"therapistaid"}
+  ],
+  // PHASE 5 — Crisis & Safety
+  "5.1.1": [
+    {id:"EzTkBOSKNKw", t:"Suicide Risk Levels and Response Thresholds", s:"Dawn Apgar", ch:"apgar"},
+    {id:"Dxpk7Yd8GFo", t:"Safety Planning with Suicidal Clients", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"0kowwgFSS8Q", t:"Suicidality on the LCSW Exam", s:"Makin Waves Social Work", ch:"makin"}
+  ],
+  "5.1.2": [
+    {id:"Dxpk7Yd8GFo", t:"Safety Planning — Stanley-Brown Model", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"fJmNNWXaFMI", t:"Safety Plans on the ASWB Exam", s:"Social Work Exam Prep", ch:"swes"}
+  ],
+  "5.1.3": [
+    {id:"7vOeO5aMEaY", t:"Voluntary vs Involuntary Hospitalization", s:"Makin Waves Social Work", ch:"makin"},
+    {id:"EzTkBOSKNKw", t:"Hospitalization Criteria on the LCSW Exam", s:"Dawn Apgar", ch:"apgar"}
+  ],
+  "5.2.2": [
+    {id:"fJmNNWXaFMI", t:"Duty to Warn vs Duty to Protect", s:"Social Work Exam Prep", ch:"swes"},
+    {id:"0kowwgFSS8Q", t:"Tarasoff in New York Practice", s:"Makin Waves Social Work", ch:"makin"}
+  ],
+  "5.3.1": [
+    {id:"EzTkBOSKNKw", t:"Child Abuse — Types and Indicators", s:"Dawn Apgar", ch:"apgar"},
+    {id:"Dxpk7Yd8GFo", t:"Child Abuse Reporting — Mandated Reporter Guide", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"7vOeO5aMEaY", t:"Mandated Reporting on the LCSW Exam", s:"Makin Waves Social Work", ch:"makin"}
+  ],
+  "5.3.2": [
+    {id:"fJmNNWXaFMI", t:"Mandated Reporter Obligations — New York", s:"Social Work Exam Prep", ch:"swes"},
+    {id:"EzTkBOSKNKw", t:"Reporting Requirements on the ASWB", s:"Dawn Apgar", ch:"apgar"}
+  ],
+  "5.3.4": [
+    {id:"Dxpk7Yd8GFo", t:"Domestic Violence — Safety Planning", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"0kowwgFSS8Q", t:"Domestic Violence on the LCSW Exam", s:"Makin Waves Social Work", ch:"makin"}
+  ],
+  // PHASE 6 — Populations
+  "6.1.1": [
+    {id:"Dxpk7Yd8GFo", t:"Erikson's Psychosocial Stages — Clinical Use", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"fJmNNWXaFMI", t:"Lifespan Development on the ASWB", s:"Social Work Exam Prep", ch:"swes"}
+  ],
+  "6.1.3": [
+    {id:"Dxpk7Yd8GFo", t:"Attachment Theory — Bowlby and Ainsworth", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"EzTkBOSKNKw", t:"Attachment on the LCSW Exam", s:"Dawn Apgar", ch:"apgar"}
+  ],
+  "6.2.3": [
+    {id:"Dxpk7Yd8GFo", t:"Substance Use Disorders — DSM-5 and Treatment", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"7vOeO5aMEaY", t:"Substance Use on the LCSW Exam", s:"Makin Waves Social Work", ch:"makin"}
+  ],
+  "6.2.6": [
+    {id:"Dxpk7Yd8GFo", t:"Affirming Practice with LGBTQ+ Clients", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"fJmNNWXaFMI", t:"LGBTQ+ Topics on the ASWB Exam", s:"Social Work Exam Prep", ch:"swes"}
+  ],
+  "6.3.1": [
+    {id:"Dxpk7Yd8GFo", t:"Cultural Humility vs Cultural Competence", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"0kowwgFSS8Q", t:"Culture and Diversity on the LCSW Exam", s:"Makin Waves Social Work", ch:"makin"}
+  ],
+  // PHASE 7 — Law & Regulation
+  "7.1.1": [
+    {id:"EzTkBOSKNKw", t:"LCSW Scope of Practice in New York", s:"Dawn Apgar", ch:"apgar"},
+    {id:"fJmNNWXaFMI", t:"Social Work Scope on the ASWB", s:"Social Work Exam Prep", ch:"swes"}
+  ],
+  "7.2.2": [
+    {id:"Dxpk7Yd8GFo", t:"HIPAA and 42 CFR Part 2 Explained", s:"Therapist Aid", ch:"therapistaid"},
+    {id:"7vOeO5aMEaY", t:"Privacy Law on the LCSW Exam", s:"Makin Waves Social Work", ch:"makin"}
+  ],
+  "7.2.3": [
+    {id:"fJmNNWXaFMI", t:"Forensic Social Work — Court-Ordered Treatment", s:"Social Work Exam Prep", ch:"swes"},
+    {id:"EzTkBOSKNKw", t:"Legal Contexts on the ASWB Exam", s:"Dawn Apgar", ch:"apgar"}
+  ],
+  // PHASE 8 — Simulation
+  "8.1.1": [
+    {id:"EzTkBOSKNKw", t:"ASWB Practice Test Strategy — Mixed Domains", s:"Dawn Apgar", ch:"apgar"},
+    {id:"0kowwgFSS8Q", t:"Timed Practice for the LCSW Exam", s:"Makin Waves Social Work", ch:"makin"}
+  ],
+  "8.2.1": [
+    {id:"7vOeO5aMEaY", t:"Wrong Answer Autopsy — Why You Missed It", s:"Makin Waves Social Work", ch:"makin"},
+    {id:"fJmNNWXaFMI", t:"Miss Pattern Analysis on the ASWB", s:"Social Work Exam Prep", ch:"swes"}
+  ],
+  "8.3.2": [
+    {id:"EzTkBOSKNKw", t:"Exam Day Strategy and Mindset", s:"Dawn Apgar", ch:"apgar"},
+    {id:"0kowwgFSS8Q", t:"LCSW Exam Day Preparation", s:"Makin Waves Social Work", ch:"makin"}
+  ]
+};
+
+var CHANNEL_LABELS = {
+  swes: "Social Work Exam Prep",
+  makin: "Makin Waves Social Work",
+  apgar: "Dawn Apgar",
+  therapistaid: "Therapist Aid",
+  other: "LCSW Prep"
+};
+
+function openVid(id, title) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('vidFrame').src = 'https://www.youtube.com/embed/' + id + '?autoplay=1';
+  document.getElementById('vidModal').classList.add('open');
+}
+
+function closeVid() {
+  document.getElementById('vidModal').classList.remove('open');
+  document.getElementById('vidFrame').src = '';
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  var modal = document.getElementById('vidModal');
+  if(modal) modal.addEventListener('click', function(e){ if(e.target===this) closeVid(); });
+});
+
+function renderVideos() {
+  var lesson = le();
+  var vids = NOVA_VIDEOS[lesson.id] || [];
+  var panel = document.getElementById('videoContent');
+  document.getElementById('videoTag').textContent = 'Phase ' + ph().id + ' \u00b7 ' + mo().title;
+  document.getElementById('videoTitle').textContent = lesson.title;
+
+  if (!vids.length) {
+    panel.innerHTML = '<div class="box"><div class="box-title">Video Resources</div>' +
+      '<div style="color:#2a3840;font-style:italic;font-size:13px;padding:20px 0">' +
+      'No curated videos for this specific lesson yet.<br><br>' +
+      '<span style="color:#4a6070">Try these channels on YouTube for LCSW prep:</span><br><br>' +
+      '<a href="https://www.youtube.com/@MakinWavesSocialWork" target="_blank" style="color:#5a9060;font-family:monospace;font-size:12px;display:block;margin-bottom:6px">&#9654; Makin Waves Social Work</a>' +
+      '<a href="https://www.youtube.com/@SocialWorkTestPrep" target="_blank" style="color:#5a9ac0;font-family:monospace;font-size:12px;display:block;margin-bottom:6px">&#9654; Social Work Exam Prep</a>' +
+      '<a href="https://www.youtube.com/@TherapistAid" target="_blank" style="color:#b09040;font-family:monospace;font-size:12px;display:block;margin-bottom:6px">&#9654; Therapist Aid</a>' +
+      '</div></div>';
+    return;
+  }
+
+  // Group by channel
+  var byChannel = {};
+  vids.forEach(function(v){
+    var ch = v.ch || 'other';
+    if(!byChannel[ch]) byChannel[ch] = [];
+    byChannel[ch].push(v);
+  });
+
+  var html = '';
+  Object.entries(byChannel).forEach(function(kv){
+    var ch = kv[0], chVids = kv[1];
+    var chLabel = CHANNEL_LABELS[ch] || ch;
+    html += '<div class="vid-section-title">&#9654; ' + chLabel + '</div>';
+    html += '<div class="vid-grid">';
+    chVids.forEach(function(v){
+      var thumb = 'https://img.youtube.com/vi/' + v.id + '/mqdefault.jpg';
+      html += '<div class="vid-card" onclick="openVid(\'' + v.id + '\',\'' + v.t.replace(/'/g,"\\'") + '\')">';
+      html += '<div class="vid-thumb">';
+      html += '<img src="' + thumb + '" alt="" loading="lazy">';
+      html += '<div class="play-ov"><div class="play-ico">&#9654;</div></div>';
+      html += '</div>';
+      html += '<div class="vid-info">';
+      html += '<div class="vid-title">' + esc(v.t) + '</div>';
+      html += '<div class="vid-src channel-' + ch + '">' + esc(v.s) + '</div>';
+      html += '</div></div>';
+    });
+    html += '</div>';
+  });
+
+  // YouTube search fallback
+  var searchQ = encodeURIComponent('LCSW exam ' + lesson.title);
+  html += '<div class="vid-section-title">&#128269; SEARCH FOR MORE</div>';
+  html += '<a href="https://www.youtube.com/results?search_query=' + searchQ + '" target="_blank" ' +
+    'style="display:inline-block;padding:8px 16px;background:#0d1520;border:1px solid #1e2833;border-radius:6px;' +
+    'color:#3d7fa8;font-family:monospace;font-size:11px;text-decoration:none;margin-bottom:16px">' +
+    '&#9654; Search YouTube: LCSW ' + esc(lesson.title) + ' &#8594;</a>';
+
+  panel.innerHTML = html;
+}
+
 </script>
+<div class="modal" id="vidModal">
+  <div class="modal-inner">
+    <div class="modal-hdr">
+      <span class="modal-title" id="modalTitle"></span>
+      <button class="modal-close" onclick="closeVid()">&#10005; Close</button>
+    </div>
+    <iframe class="vid-embed" id="vidFrame" allowfullscreen></iframe>
+  </div>
+</div>
 </body>
 </html>
