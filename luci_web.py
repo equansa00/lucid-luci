@@ -3514,6 +3514,36 @@ async def audit_ui_endpoint(request: Request) -> HTMLResponse:
 #  LUCI LEARN — Web-based curriculum + quiz endpoints
 # ══════════════════════════════════════════════════════
 
+@app.get("/nova", response_class=HTMLResponse)
+async def nova_learn_page():
+    """Nova Learn — LCSW exam prep for Ogechi."""
+    from pathlib import Path
+    html = (Path(__file__).parent / "static" / "nova_learn.html").read_text(encoding="utf-8")
+    return HTMLResponse(html)
+
+@app.post("/api/nova/progress")
+async def save_nova_progress(request: Request):
+    """Save Nova progress state."""
+    import json
+    from pathlib import Path
+    body = await request.json()
+    progress_path = Path(__file__).parent / "nova_progress.json"
+    progress_path.write_text(json.dumps(body, indent=2), encoding="utf-8")
+    return {"ok": True}
+
+@app.get("/workspace/{filename}")
+async def serve_workspace_json(filename: str):
+    """Serve Nova JSON data files."""
+    from pathlib import Path
+    allowed = ["nova_curriculum.json", "nova_progress.json", "nova_vignettes.json"]
+    if filename not in allowed:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    filepath = Path(__file__).parent / filename
+    if not filepath.exists():
+        return JSONResponse({"error": "file not found"}, status_code=404)
+    import json
+    return JSONResponse(json.loads(filepath.read_text(encoding="utf-8")))
+
 @app.get("/learn", response_class=HTMLResponse)
 async def learn_page(request: Request) -> HTMLResponse:
     """Serve the LUCI Learn dashboard."""

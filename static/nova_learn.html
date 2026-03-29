@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nova Learn — LCSW Exam Prep</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#080b0f;color:#e0ddd8;font-family:'Georgia',serif;height:100vh;overflow:hidden}
+.layout{display:grid;grid-template-columns:270px 1fr;grid-template-rows:56px 1fr;height:100vh}
+.header{grid-column:1/-1;background:#0d1117;border-bottom:1px solid #1e2833;display:flex;align-items:center;padding:0 20px;gap:16px}
+.header h1{font-size:14px;color:#7eb8d4;letter-spacing:3px;font-style:italic}
+.prog-wrap{flex:1;height:3px;background:#1a2030;border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;background:linear-gradient(90deg,#3d7fa8,#7eb8d4);transition:width .6s}
+.prog-lbl{font-size:11px;color:#4a6070;white-space:nowrap;font-family:monospace}
+.back{background:none;border:1px solid #1e2833;color:#4a6070;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-family:monospace;text-decoration:none;display:inline-flex;align-items:center}
+.back:hover{border-color:#3d7fa8;color:#7eb8d4}
+.sidebar{background:#090d12;border-right:1px solid #131c25;overflow-y:auto;padding:8px 0}
+.sidebar-label{padding:12px 16px 4px;font-size:10px;color:#2a3840;text-transform:uppercase;letter-spacing:2px;font-family:monospace}
+.phase-btn{display:block;width:100%;text-align:left;padding:10px 16px;background:none;border:none;border-left:3px solid transparent;cursor:pointer;font-family:'Georgia',serif;color:#4a6070;font-size:12px;line-height:1.4;transition:all .15s}
+.phase-btn:hover{background:#0d1520;border-left-color:#1e3040;color:#8aacbc}
+.phase-btn.active{background:#0d1a28;border-left-color:#3d7fa8;color:#7eb8d4}
+.phase-btn .meta{font-size:10px;color:#2a3840;margin-top:2px;font-family:monospace}
+.phase-btn.active .meta{color:#2d5870}
+.weight-badge{display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;font-family:monospace;margin-left:5px;vertical-align:middle}
+.weight-critical{background:#3a1a1a;color:#e06060}
+.weight-very_high{background:#2a1a30;color:#c070d0}
+.weight-high{background:#1a2a30;color:#3d7fa8}
+.weight-medium{background:#1a2020;color:#4a8070}
+.main{display:flex;flex-direction:column;overflow:hidden}
+.tabs{display:flex;background:#090d12;border-bottom:1px solid #131c25;padding:0 20px}
+.tab{padding:12px 16px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-family:monospace;font-size:11px;color:#2a3840;transition:all .15s;letter-spacing:.5px}
+.tab:hover{color:#6a9ab0}
+.tab.active{color:#7eb8d4;border-bottom-color:#3d7fa8}
+.panels{flex:1;overflow:hidden;position:relative}
+.panel{display:none;height:100%;overflow-y:auto;padding:24px}
+.panel.active{display:block}
+.phase-tag{font-size:10px;color:#3d7fa8;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;font-family:monospace}
+.lesson-title{font-size:20px;color:#d4cfc8;margin-bottom:6px;line-height:1.3}
+.lesson-meta{font-size:11px;color:#3a4a56;margin-bottom:20px;font-family:monospace}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+.btn{padding:8px 16px;border-radius:6px;cursor:pointer;font-family:monospace;font-size:11px;font-weight:bold;letter-spacing:.5px;transition:all .15s;border:none}
+.btn-teal{background:#1a3d52;color:#7eb8d4;border:1px solid #2a5a78}.btn-teal:hover{background:#1f4d66}
+.btn-out{background:none;border:1px solid #1e2833;color:#4a6070}.btn-out:hover{border-color:#3d7fa8;color:#7eb8d4}
+.btn-green{background:#1a3028;color:#60c080;border:1px solid #2a5040}.btn-green:hover{background:#1f3a30}
+.btn-amber{background:#3a2a10;color:#d4a040;border:1px solid #5a4020}.btn-amber:hover{background:#4a3418}
+.btn-red{background:none;border:1px solid #3a2020;color:#b06060}.btn-red:hover{border-color:#c06060;color:#e08080}
+.box{background:#090d12;border:1px solid #131c25;border-radius:8px;padding:18px;margin-bottom:16px}
+.box-title{font-size:10px;color:#3d7fa8;text-transform:uppercase;letter-spacing:2px;margin-bottom:12px;font-family:monospace}
+.teach-text{font-size:13px;color:#b8c8d0;line-height:1.9;white-space:pre-wrap}
+.teach-text strong{color:#d4cfc8}
+.teach-text em{color:#7eb8d4;font-style:italic}
+.teach-text code{background:#131c25;padding:1px 5px;border-radius:3px;color:#7eb8d4;font-family:monospace;font-size:11px}
+.teach-placeholder{color:#2a3840;font-style:italic;font-size:13px}
+.chat-msgs{display:flex;flex-direction:column;gap:10px;max-height:320px;overflow-y:auto;margin-bottom:12px}
+.msg-user{background:#0d1520;border:1px solid #1e2a3a;color:#8aacbc;padding:10px 14px;border-radius:6px;font-size:13px;line-height:1.7;align-self:flex-end;max-width:85%}
+.msg-nova{background:#090e14;border:1px solid #131c25;color:#a8c8b0;padding:10px 14px;border-radius:6px;font-size:13px;line-height:1.7}
+.chat-row{display:flex;gap:10px}
+.chat-in{flex:1;background:#0d1117;border:1px solid #1e2833;color:#d4cfc8;padding:9px 13px;border-radius:6px;font-family:'Georgia',serif;font-size:13px;resize:none;min-height:42px}
+.chat-in:focus{outline:none;border-color:#3d7fa8}
+.scenario-box{background:#090e14;border:1px solid #1a2a3a;border-radius:8px;padding:20px;margin-bottom:16px;font-size:14px;color:#b0c0cc;line-height:1.9}
+.scenario-label{font-size:10px;color:#3d7fa8;text-transform:uppercase;letter-spacing:2px;margin-bottom:12px;font-family:monospace}
+.option-btn{display:block;width:100%;text-align:left;padding:12px 16px;margin-bottom:8px;background:#0d1520;border:1px solid #1e2833;color:#8aacbc;border-radius:6px;cursor:pointer;font-family:'Georgia',serif;font-size:13px;line-height:1.5;transition:all .15s}
+.option-btn:hover{background:#0d1a28;border-color:#3d7fa8;color:#a8c8d8}
+.option-btn.correct{background:#0d2018;border-color:#2a6040;color:#60c080}
+.option-btn.incorrect{background:#1a0d0d;border-color:#502020;color:#b06060}
+.option-btn.disabled{cursor:default;opacity:.8}
+.feedback-box{border-radius:8px;padding:16px;margin-top:12px;font-size:13px;line-height:1.8}
+.feedback-correct{background:#0a1e14;border:1px solid #2a5030;color:#80c898}
+.feedback-incorrect{background:#140a0a;border:1px solid #402020;color:#c88080}
+.feedback-label{font-size:10px;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;font-family:monospace}
+.exam-logic{background:#090d12;border:1px solid #1e2833;border-radius:6px;padding:12px;margin-top:10px;font-size:12px;color:#4a8a9a;font-family:monospace;line-height:1.6}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:20px}
+.stat-card{background:#0d1117;border:1px solid #131c25;border-radius:8px;padding:14px;text-align:center}
+.stat-val{font-size:26px;font-weight:bold;color:#7eb8d4;font-family:monospace}
+.stat-lbl{font-size:10px;color:#2a3840;margin-top:4px;text-transform:uppercase;letter-spacing:1px;font-family:monospace}
+.miss-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-top:12px}
+.miss-card{background:#0d1117;border:1px solid #131c25;border-radius:6px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center}
+.miss-name{font-size:11px;color:#4a6070;font-family:monospace}
+.miss-count{font-size:16px;font-weight:bold;color:#c07050;font-family:monospace}
+.miss-count.zero{color:#2a3840}
+.phase-progress-row{display:flex;align-items:center;gap:12px;padding:10px 14px;background:#090d12;border-radius:6px;border:1px solid #131c25;margin-bottom:6px}
+.phase-progress-row.current{border-color:#1e3a50}
+.ppr-num{font-size:11px;color:#2a3840;width:20px;font-family:monospace}
+.ppr-num.cur{color:#3d7fa8}
+.ppr-title{flex:1;font-size:13px;color:#6a8898}
+.ppr-title.cur{color:#9abac8}
+.ppr-stat{font-size:11px;color:#2a3840;font-family:monospace}
+.type-badge{display:inline-block;padding:2px 6px;border-radius:3px;font-size:9px;font-family:monospace;letter-spacing:.5px;margin-left:6px;vertical-align:middle}
+.type-concept{background:#1a2030;color:#4a7a9a}
+.type-case{background:#2a1a30;color:#8a5a9a}
+.type-review{background:#3a2a10;color:#9a7a30}
+.type-timed_set{background:#1a3020;color:#4a8a60}
+.type-simulation{background:#3a1a10;color:#c06040}
+.lesson-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:5px;cursor:pointer;transition:all .1s;margin-bottom:3px}
+.lesson-item:hover{background:#0d1520}
+.lesson-item.active-lesson{background:#0d1a28;border-left:2px solid #3d7fa8}
+.lesson-check{width:14px;height:14px;border:1px solid #2a3840;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:transparent}
+.lesson-check.done{border-color:#2a5040;background:#0d1e14;color:#40a060}
+.lesson-item-title{font-size:12px;color:#4a6070;flex:1;line-height:1.3}
+.lesson-item.active-lesson .lesson-item-title{color:#7eb8d4}
+.lesson-mins{font-size:9px;color:#2a3840;font-family:monospace}
+.tags-row{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.tag{padding:2px 7px;background:#131c25;border:1px solid #1e2833;border-radius:3px;font-size:10px;color:#3a5060;font-family:monospace}
+.cat-pill{padding:3px 10px;background:#0d1a28;border:1px solid #1e3040;border-radius:12px;font-size:10px;color:#3d6a88;font-family:monospace;cursor:pointer;transition:all .1s;display:inline-block;margin:2px}
+.cat-pill:hover{border-color:#3d7fa8;color:#7eb8d4}
+.timer-display{font-size:28px;font-family:monospace;color:#7eb8d4;text-align:center;padding:10px;border:1px solid #1e3a50;border-radius:8px;background:#090e14;margin-bottom:16px}
+.timer-display.warning{color:#c07050;border-color:#4a2010}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid #1e2833;border-top-color:#3d7fa8;border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:#1e2833;border-radius:2px}
+</style>
+</head>
+<body>
+<div class="layout">
+<div class="header">
+  <a href="/" class="back">&#8592; LUCI</a>
+  <h1>&#9670; NOVA LEARN</h1>
+  <div class="prog-wrap"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+  <span class="prog-lbl" id="progLbl">Loading...</span>
+</div>
+<div class="sidebar">
+  <div class="sidebar-label">Phases</div>
+  <div id="phaseList"></div>
+</div>
+<div class="main">
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('lesson')">&#128218; Lesson</button>
+    <button class="tab" onclick="showTab('practice')">&#128203; Practice</button>
+    <button class="tab" onclick="showTab('review')">&#8635; Review</button>
+    <button class="tab" onclick="showTab('progress')">&#128202; Progress</button>
+  </div>
+  <div class="panels">
+    <div class="panel active" id="panel-lesson">
+      <div class="phase-tag" id="lessonTag">Loading...</div>
+      <div class="lesson-title" id="lessonTitle">Loading curriculum...</div>
+      <div class="lesson-meta" id="lessonMeta"></div>
+      <div class="actions">
+        <button class="btn btn-teal" id="teachBtn" onclick="doTeach()">&#9654; Start Lesson</button>
+        <button class="btn btn-out" onclick="doPrev()">&#8592; Prev</button>
+        <button class="btn btn-out" onclick="doNext()">Next &#8594;</button>
+        <button class="btn btn-green" onclick="markLessonCompleted()">&#10003; Complete</button>
+        <button class="btn btn-out" onclick="showTab('practice')">&#128203; Practice</button>
+      </div>
+      <div class="box">
+        <div class="box-title">Nova Teaching</div>
+        <div id="teachOut"><span class="teach-placeholder">Click "Start Lesson" — Nova will explain this topic with exam-focused clarity.</span></div>
+      </div>
+      <div class="box">
+        <div class="box-title">Lesson Details</div>
+        <div id="lessonInfo"><span class="teach-placeholder">Loading...</span></div>
+      </div>
+      <div class="box">
+        <div class="box-title">Ask Nova</div>
+        <div class="chat-msgs" id="chatMsgs"></div>
+        <div class="chat-row">
+          <textarea class="chat-in" id="chatIn" rows="2" placeholder="Ask a follow-up question..."></textarea>
+          <button class="btn btn-teal" onclick="doChat()">Send</button>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-title">Module Lessons</div>
+        <div id="moduleLessonList"></div>
+      </div>
+    </div>
+    <div class="panel" id="panel-practice">
+      <div class="phase-tag" id="practiceTag"></div>
+      <div class="lesson-title">Clinical Practice</div>
+      <div class="lesson-meta">Exam-style vignettes. One best answer.</div>
+      <div class="actions" style="margin-top:12px">
+        <button class="btn btn-teal" onclick="loadVignette('random')">&#127922; Random</button>
+        <button class="btn btn-out" onclick="loadVignette('linked')">From This Lesson</button>
+        <button class="btn btn-amber" onclick="loadVignette('weak')">&#9888; Weak Areas</button>
+        <button class="btn btn-red" onclick="startTimedSet()">&#9201; Timed Set (5Q)</button>
+      </div>
+      <div id="vignetteArea"></div>
+    </div>
+    <div class="panel" id="panel-review">
+      <div class="lesson-title" style="margin-bottom:6px">Miss Pattern Review</div>
+      <div class="lesson-meta" style="margin-bottom:20px">Fix the pattern, not just the answer.</div>
+      <div class="box">
+        <div class="box-title">Your Miss Patterns</div>
+        <div id="missPatternGrid"></div>
+      </div>
+      <div class="box" id="reviewVignetteBox" style="display:none">
+        <div class="box-title">Drill Your Weakness</div>
+        <div id="reviewVignetteArea"></div>
+      </div>
+      <div class="box">
+        <div class="box-title">Ask Nova — Pattern Analysis</div>
+        <div class="chat-msgs" id="reviewChatMsgs"></div>
+        <div class="chat-row">
+          <textarea class="chat-in" id="reviewChatIn" rows="2" placeholder="Ask Nova why you keep missing this type..."></textarea>
+          <button class="btn btn-teal" onclick="doReviewChat()">Ask</button>
+        </div>
+      </div>
+    </div>
+    <div class="panel" id="panel-progress">
+      <div class="lesson-title" style="margin-bottom:18px">Ogechi's Progress</div>
+      <div class="stat-grid" id="statGrid"></div>
+      <div style="font-size:10px;color:#2a3840;text-transform:uppercase;letter-spacing:2px;margin:16px 0 10px;font-family:monospace">Study Phases</div>
+      <div id="allPhases"></div>
+      <div style="font-size:10px;color:#2a3840;text-transform:uppercase;letter-spacing:2px;margin:16px 0 10px;font-family:monospace">Miss Patterns</div>
+      <div class="miss-grid" id="missGridProgress"></div>
+    </div>
+  </div>
+</div>
+</div>
+<script>
+var curriculum=null,progress=null,vignettes=null;
+var curPh=0,curMod=0,curLes=0;
+var _chatHist=[],_reviewChatHist=[],_curVig=null,_vigAnswered=false;
+var _allVigs=[],_timedSet=[],_timedIdx=0,_timedScore=0,_timedTimer=null,_timedSecs=0;
+
+window.addEventListener('DOMContentLoaded',loadData);
+
+async function loadData(){
+  try{
+    var[cr,pr,vr]=await Promise.all([
+      fetch('/workspace/nova_curriculum.json'),
+      fetch('/workspace/nova_progress.json'),
+      fetch('/workspace/nova_vignettes.json')
+    ]);
+    curriculum=await cr.json();
+    progress=await pr.json();
+    vignettes=await vr.json();
+    _allVigs=[];
+    vignettes.categories.forEach(function(cat){
+      cat.vignettes.forEach(function(v){
+        _allVigs.push(Object.assign({},v,{cat_title:cat.title,cat_id:cat.id}));
+      });
+    });
+    syncPos();
+    renderPhases();
+    renderLesson();
+    renderProgress();
+    renderMiss();
+  }catch(e){
+    document.getElementById('lessonTitle').textContent='Error: '+e.message;
+  }
+}
+
+function syncPos(){
+  var id=progress.current_lesson;
+  if(!id)return;
+  for(var p=0;p<curriculum.phases.length;p++){
+    var ph=curriculum.phases[p];
+    for(var m=0;m<ph.modules.length;m++){
+      var mo=ph.modules[m];
+      for(var l=0;l<mo.lessons.length;l++){
+        if(mo.lessons[l].id===id){curPh=p;curMod=m;curLes=l;return;}
+      }
+    }
+  }
+}
+
+function ph(){return curriculum.phases[curPh];}
+function mo(){return curriculum.phases[curPh].modules[curMod];}
+function le(){return curriculum.phases[curPh].modules[curMod].lessons[curLes];}
+
+function doNext(){
+  var p=ph(),m=mo();
+  if(curLes<m.lessons.length-1)curLes++;
+  else if(curMod<p.modules.length-1){curMod++;curLes=0;}
+  else if(curPh<curriculum.phases.length-1){curPh++;curMod=0;curLes=0;}
+  renderPhases();renderLesson();
+  document.getElementById('teachOut').innerHTML='<span class="teach-placeholder">Click Start Lesson to begin.</span>';
+  _chatHist=[];
+}
+
+function doPrev(){
+  if(curLes>0)curLes--;
+  else if(curMod>0){curMod--;curLes=mo().lessons.length-1;}
+  else if(curPh>0){curPh--;curMod=ph().modules.length-1;curLes=mo().lessons.length-1;}
+  renderPhases();renderLesson();
+  document.getElementById('teachOut').innerHTML='<span class="teach-placeholder">Click Start Lesson to begin.</span>';
+  _chatHist=[];
+}
+
+function gotoLesson(pi,mi,li){
+  curPh=pi;curMod=mi;curLes=li;
+  renderPhases();renderLesson();
+  document.getElementById('teachOut').innerHTML='<span class="teach-placeholder">Click Start Lesson to begin.</span>';
+  _chatHist=[];showTab('lesson');
+}
+
+function renderPhases(){
+  var list=document.getElementById('phaseList');
+  list.innerHTML='';
+  curriculum.phases.forEach(function(phase,idx){
+    var btn=document.createElement('button');
+    btn.className='phase-btn'+(idx===curPh?' active':'');
+    var done=0,tot=0;
+    phase.modules.forEach(function(m){m.lessons.forEach(function(l){
+      tot++;if(progress.completed_lessons.indexOf(l.id)>=0)done++;
+    });});
+    var wc='weight-'+(phase.exam_weight||'medium');
+    btn.innerHTML='<div>'+phase.id+'. '+esc(phase.title)+
+      '<span class="weight-badge '+wc+'">'+(phase.exam_weight||'')+'</span></div>'+
+      '<div class="meta">'+done+'/'+tot+' done</div>';
+    btn.onclick=(function(i){return function(){
+      curPh=i;curMod=0;curLes=0;renderPhases();renderLesson();
+      document.getElementById('teachOut').innerHTML='<span class="teach-placeholder">Click Start Lesson to begin.</span>';
+      _chatHist=[];
+    };})(idx);
+    list.appendChild(btn);
+  });
+}
+
+function renderLesson(){
+  var phase=ph(),mod=mo(),lesson=le();
+  document.getElementById('lessonTag').textContent='Phase '+phase.id+' \u00b7 '+mod.title;
+  document.getElementById('lessonTitle').textContent=lesson.title;
+  var done=progress.completed_lessons.indexOf(lesson.id)>=0;
+  document.getElementById('lessonMeta').innerHTML=
+    '<span style="font-family:monospace">'+lesson.id+' \u00b7 '+lesson.estimated_minutes+'min'+
+    ' <span class="type-badge type-'+lesson.type+'">'+lesson.type+'</span>'+
+    (done?' <span style="color:#40a060">\u2713 completed</span>':'')+'</span>';
+  document.getElementById('practiceTag').textContent='Phase '+phase.id+' \u00b7 Practice';
+
+  var info='<div style="font-size:13px;color:#6a8898;line-height:1.8">';
+  info+='<strong style="color:#9abac8">Phase goal:</strong> '+esc(phase.goal)+'<br><br>';
+  info+='<strong style="color:#9abac8">Exam weight:</strong> <span style="font-family:monospace;color:#7eb8d4">'+phase.exam_weight+'</span><br>';
+  info+='<strong style="color:#9abac8">Study approach:</strong> '+getApproach(lesson.type)+'<br>';
+  if(lesson.linked_vignette_categories&&lesson.linked_vignette_categories.length){
+    info+='<br><strong style="color:#9abac8">Linked practice:</strong><br>';
+    lesson.linked_vignette_categories.forEach(function(cat){
+      info+='<span class="cat-pill" onclick="goToPractice(\''+cat+'\')">'+cat.replace(/_/g,' ')+'</span>';
+    });
+  }
+  if(lesson.tags&&lesson.tags.length){
+    info+='<div class="tags-row">';
+    lesson.tags.forEach(function(t){info+='<span class="tag">'+t+'</span>';});
+    info+='</div>';
+  }
+  info+='</div>';
+  document.getElementById('lessonInfo').innerHTML=info;
+
+  renderModuleList();
+  markStarted(lesson.id);
+  updateBar();
+}
+
+function renderModuleList(){
+  var mod=mo();
+  var html='';
+  mod.lessons.forEach(function(lesson,li){
+    var isActive=li===curLes;
+    var isDone=progress.completed_lessons.indexOf(lesson.id)>=0;
+    html+='<div class="lesson-item'+(isActive?' active-lesson':'')+'" onclick="gotoLesson('+curPh+','+curMod+','+li+')">';
+    html+='<div class="lesson-check'+(isDone?' done':'')+'">'+( isDone?'\u2713':'' )+'</div>';
+    html+='<div class="lesson-item-title">'+esc(lesson.title)+'</div>';
+    html+='<span class="lesson-mins">'+lesson.estimated_minutes+'m</span>';
+    html+='</div>';
+  });
+  document.getElementById('moduleLessonList').innerHTML=html;
+}
+
+function getApproach(type){
+  var a={concept:'Read and identify the priority logic and first-step reasoning.',
+    case:'Work through the vignette. Justify why the correct answer is best.',
+    review:'Focus on your miss patterns. Build a rule to remember.',
+    timed_set:'Answer under time pressure. Aim for 1.5 min per question.',
+    simulation:'Full exam-mode: priority ladder, pacing, confidence.'};
+  return a[type]||'Study carefully.';
+}
+
+function goToPractice(catId){
+  var pool=_allVigs.filter(function(v){return v.cat_id===catId;});
+  if(!pool.length)return;
+  var v=pool[Math.floor(Math.random()*pool.length)];
+  showTab('practice');
+  renderVig(v,'vignetteArea');
+}
+
+function doTeach(){
+  var btn=document.getElementById('teachBtn');
+  var lesson=le(),phase=ph();
+  btn.disabled=true;btn.textContent='Teaching...';
+  document.getElementById('teachOut').innerHTML='<span class="spin"></span> Nova is preparing your lesson...';
+  var prompt='You are Nova, an LCSW exam study partner teaching Ogechi. Teach this lesson with clinical precision:\n\n'+
+    'LESSON: '+lesson.title+'\nPHASE: '+phase.title+'\nEXAM WEIGHT: '+phase.exam_weight+'\nTYPE: '+lesson.type+'\n\n'+
+    'Cover: (1) The core concept clearly, (2) How the ASWB exam tests this including first-step logic and traps, '+
+    '(3) A memorable exam rule, (4) One quick exam example. Be warm and clinically grounded. Under 400 words.';
+  fetch('/learn/chat',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({text:prompt,history:[]})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      document.getElementById('teachOut').innerHTML='<div class="teach-text">'+md(d.response||d.reply||'No response')+'</div>';
+      btn.disabled=false;btn.textContent='\u21ba Re-teach';
+      markStarted(lesson.id);
+    }).catch(function(e){
+      document.getElementById('teachOut').textContent='Error: '+e.message;
+      btn.disabled=false;btn.textContent='\u25b6 Start Lesson';
+    });
+}
+
+document.addEventListener('DOMContentLoaded',function(){
+  document.getElementById('chatIn').addEventListener('keydown',function(e){
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();doChat();}
+  });
+  document.getElementById('reviewChatIn').addEventListener('keydown',function(e){
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();doReviewChat();}
+  });
+});
+
+function doChat(){
+  var inp=document.getElementById('chatIn');
+  var text=inp.value.trim();if(!text)return;
+  inp.value='';
+  var lesson=le();
+  var msgs=document.getElementById('chatMsgs');
+  msgs.innerHTML+='<div class="msg-user">'+esc(text)+'</div>';
+  msgs.innerHTML+='<div class="msg-nova" id="cw"><span class="spin"></span> Thinking...</div>';
+  msgs.scrollTop=msgs.scrollHeight;
+  _chatHist.push({role:'user',content:text});
+  var ctx='You are Nova teaching Ogechi for the LCSW exam. Current lesson: '+lesson.title+'. Be clinically precise and exam-focused.\n\nOgechi asks: '+text;
+  fetch('/learn/chat',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({text:ctx,history:_chatHist.slice(-6)})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var el=document.getElementById('cw');
+      if(el){el.removeAttribute('id');el.innerHTML='<div class="teach-text">'+md(d.response||'')+'</div>';}
+      _chatHist.push({role:'assistant',content:d.response||''});
+      msgs.scrollTop=msgs.scrollHeight;
+    });
+}
+
+function doReviewChat(){
+  var inp=document.getElementById('reviewChatIn');
+  var text=inp.value.trim();if(!text)return;
+  inp.value='';
+  var msgs=document.getElementById('reviewChatMsgs');
+  msgs.innerHTML+='<div class="msg-user">'+esc(text)+'</div>';
+  msgs.innerHTML+='<div class="msg-nova" id="rw"><span class="spin"></span> Analyzing...</div>';
+  msgs.scrollTop=msgs.scrollHeight;
+  var ctx='You are Nova. Ogechi is reviewing her LCSW exam miss patterns: '+JSON.stringify(progress.miss_patterns)+'. Help her understand and fix the pattern.\n\nOgechi asks: '+text;
+  fetch('/learn/chat',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({text:ctx,history:_reviewChatHist.slice(-6)})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var el=document.getElementById('rw');
+      if(el){el.removeAttribute('id');el.innerHTML='<div class="teach-text">'+md(d.response||'')+'</div>';}
+      _reviewChatHist.push({role:'assistant',content:d.response||''});
+      msgs.scrollTop=msgs.scrollHeight;
+    });
+}
+
+function loadVignette(mode){
+  var pool=[];
+  if(mode==='linked'){
+    var cats=le().linked_vignette_categories||[];
+    pool=_allVigs.filter(function(v){return cats.indexOf(v.cat_id)>=0;});
+    if(!pool.length)pool=_allVigs;
+  }else if(mode==='weak'){
+    var top=Object.entries(progress.miss_patterns).filter(function(kv){return kv[1]>0;})
+      .sort(function(a,b){return b[1]-a[1];}).map(function(kv){return kv[0];});
+    if(top.length)pool=_allVigs.filter(function(v){return v.miss_patterns&&v.miss_patterns.some(function(p){return top.indexOf(p)>=0;});});
+    if(!pool.length)pool=_allVigs;
+  }else{pool=_allVigs;}
+  if(!pool.length){document.getElementById('vignetteArea').innerHTML='<div class="scenario-box">No vignettes available.</div>';return;}
+  renderVig(pool[Math.floor(Math.random()*pool.length)],'vignetteArea');
+}
+
+function renderVig(v,cid){
+  _curVig=v;_vigAnswered=false;
+  var diff=v.difficulty||'medium';
+  var dc=diff==='easy'?'#40a060':diff==='hard'?'#c06040':'#7eb8d4';
+  var html='<div class="box">';
+  html+='<div class="scenario-label">'+esc(v.cat_title)+' \u00b7 <span style="color:'+dc+';font-family:monospace">'+diff+'</span></div>';
+  html+='<div class="lesson-title" style="font-size:15px;margin-bottom:12px">'+esc(v.title)+'</div>';
+  html+='<div class="scenario-box">'+esc(v.stem)+'</div>';
+  html+='<div id="opts-'+cid+'">';
+  (v.options||[]).forEach(function(opt,i){
+    html+='<button class="option-btn" id="opt-'+cid+'-'+i+'" onclick="submitAns(\''+cid+'\','+i+')">'+
+      String.fromCharCode(65+i)+'. '+esc(opt)+'</button>';
+  });
+  html+='</div><div id="fb-'+cid+'"></div>';
+  html+='<div style="margin-top:12px"><button class="btn btn-out" onclick="loadVignette(\'random\')">Next Vignette &#8594;</button></div>';
+  html+='</div>';
+  document.getElementById(cid).innerHTML=html;
+}
+
+function submitAns(cid,sel){
+  if(_vigAnswered)return;
+  _vigAnswered=true;
+  var v=_curVig;
+  var correct=sel===v.correct_index;
+  (v.options||[]).forEach(function(opt,i){
+    var btn=document.getElementById('opt-'+cid+'-'+i);
+    if(!btn)return;
+    btn.classList.add('disabled');
+    if(i===v.correct_index)btn.classList.add('correct');
+    else if(i===sel&&!correct)btn.classList.add('incorrect');
+  });
+  progress.vignette_scores[v.id]=correct?1:0;
+  if(!correct&&v.miss_patterns)v.miss_patterns.forEach(function(p){
+    if(progress.miss_patterns.hasOwnProperty(p))progress.miss_patterns[p]++;
+  });
+  var fb=document.getElementById('fb-'+cid);
+  if(fb){
+    fb.innerHTML='<div class="feedback-box '+(correct?'feedback-correct':'feedback-incorrect')+'">'
+      +'<div class="feedback-label">'+(correct?'\u2713 Correct':'\u2717 Incorrect')+'</div>'
+      +'<div class="teach-text">'+esc(v.rationale)+'</div>'
+      +'<div class="exam-logic">Exam logic: '+esc(v.exam_logic)+'</div>'
+      +(!correct&&v.miss_patterns&&v.miss_patterns.length?'<div style="margin-top:8px;font-size:11px;color:#a07050;font-family:monospace">Pattern: '+v.miss_patterns.join(', ')+'</div>':'')
+      +'</div>';
+  }
+  saveProgress();renderMiss();
+}
+
+function startTimedSet(){
+  var pool=_allVigs.slice();
+  for(var i=pool.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=pool[i];pool[i]=pool[j];pool[j]=t;}
+  _timedSet=pool.slice(0,5);_timedIdx=0;_timedScore=0;
+  showTab('practice');renderTimedQ();
+}
+
+function renderTimedQ(){
+  if(_timedIdx>=_timedSet.length){
+    clearInterval(_timedTimer);
+    var pct=Math.round(_timedScore/_timedSet.length*100);
+    document.getElementById('vignetteArea').innerHTML='<div class="box"><div class="box-title">Timed Set Complete</div>'
+      +'<div class="stat-grid"><div class="stat-card"><div class="stat-val">'+_timedScore+'/'+_timedSet.length+'</div><div class="stat-lbl">Score</div></div>'
+      +'<div class="stat-card"><div class="stat-val">'+pct+'%</div><div class="stat-lbl">Correct</div></div></div>'
+      +'<button class="btn btn-teal" onclick="startTimedSet()" style="margin-top:12px">Try Again</button></div>';
+    return;
+  }
+  clearInterval(_timedTimer);_timedSecs=90;
+  var v=_timedSet[_timedIdx];_curVig=v;_vigAnswered=false;
+  var html='<div class="box"><div id="timerDisp" class="timer-display">1:30</div>';
+  html+='<div class="scenario-label">Q'+(_timedIdx+1)+' of '+_timedSet.length+' \u00b7 '+esc(v.cat_title)+'</div>';
+  html+='<div class="scenario-box">'+esc(v.stem)+'</div><div id="opts-vignetteArea">';
+  v.options.forEach(function(opt,i){
+    html+='<button class="option-btn" id="opt-vignetteArea-'+i+'" onclick="submitTimed('+i+')">'+String.fromCharCode(65+i)+'. '+esc(opt)+'</button>';
+  });
+  html+='</div><div id="fb-vignetteArea"></div></div>';
+  document.getElementById('vignetteArea').innerHTML=html;
+  _timedTimer=setInterval(function(){
+    _timedSecs--;
+    var m=Math.floor(_timedSecs/60),s=_timedSecs%60;
+    var d=document.getElementById('timerDisp');
+    if(d){d.textContent=m+':'+(s<10?'0':'')+s;if(_timedSecs<=20)d.classList.add('warning');}
+    if(_timedSecs<=0){clearInterval(_timedTimer);submitTimed(-1);}
+  },1000);
+}
+
+function submitTimed(sel){
+  if(_vigAnswered)return;_vigAnswered=true;clearInterval(_timedTimer);
+  var v=_curVig,correct=sel===v.correct_index;
+  if(correct)_timedScore++;
+  v.options.forEach(function(opt,i){
+    var btn=document.getElementById('opt-vignetteArea-'+i);
+    if(!btn)return;btn.classList.add('disabled');
+    if(i===v.correct_index)btn.classList.add('correct');
+    else if(i===sel)btn.classList.add('incorrect');
+  });
+  var fb=document.getElementById('fb-vignetteArea');
+  if(fb)fb.innerHTML='<div class="feedback-box '+(correct?'feedback-correct':'feedback-incorrect')+'">'
+    +'<div class="feedback-label">'+(sel<0?'\u23f1 Time Up':correct?'\u2713 Correct':'\u2717 Incorrect')+'</div>'
+    +'<div class="teach-text">'+esc(v.rationale)+'</div>'
+    +'<div class="exam-logic">Exam logic: '+esc(v.exam_logic)+'</div>'
+    +'<button class="btn btn-teal" onclick="_timedIdx++;renderTimedQ()" style="margin-top:12px">Next &#8594;</button></div>';
+  if(!correct&&v.miss_patterns)v.miss_patterns.forEach(function(p){if(progress.miss_patterns.hasOwnProperty(p))progress.miss_patterns[p]++;});
+  progress.vignette_scores[v.id]=correct?1:0;
+  saveProgress();
+}
+
+function markStarted(id){
+  if(progress.started_lessons.indexOf(id)<0)progress.started_lessons.push(id);
+  progress.lesson_status[id]=progress.lesson_status[id]||'in_progress';
+  progress.current_lesson=id;
+  progress.current_module=mo().id;
+  progress.current_phase=ph().id;
+  saveProgress();
+}
+
+function markLessonCompleted(){
+  var lesson=le();
+  if(progress.completed_lessons.indexOf(lesson.id)<0)progress.completed_lessons.push(lesson.id);
+  progress.lesson_status[lesson.id]='completed';
+  progress.last_completed_lesson=lesson.id;
+  progress.total_study_minutes+=lesson.estimated_minutes||0;
+  var today=new Date().toISOString().slice(0,10);
+  progress.last_study_date=today;
+  progress.study_history.push({date:today,lesson_id:lesson.id,activity_type:'lesson',duration_minutes:lesson.estimated_minutes,result:'completed'});
+  saveProgress();renderLesson();renderProgress();updateBar();
+}
+
+function updateBar(){
+  if(!curriculum||!progress)return;
+  var tot=0,done=0;
+  curriculum.phases.forEach(function(p){p.modules.forEach(function(m){m.lessons.forEach(function(l){
+    tot++;if(progress.completed_lessons.indexOf(l.id)>=0)done++;
+  });});});
+  var pct=tot?Math.round(done/tot*100):0;
+  document.getElementById('progFill').style.width=pct+'%';
+  document.getElementById('progLbl').textContent=done+'/'+tot+' ('+pct+'%)';
+}
+
+function renderProgress(){
+  if(!curriculum||!progress)return;
+  var tot=0,done=0;
+  curriculum.phases.forEach(function(p){p.modules.forEach(function(m){m.lessons.forEach(function(l){
+    tot++;if(progress.completed_lessons.indexOf(l.id)>=0)done++;
+  });});});
+  var va=Object.keys(progress.vignette_scores).length;
+  var vc=Object.values(progress.vignette_scores).filter(function(v){return v===1;}).length;
+  var vp=va?Math.round(vc/va*100):0;
+  document.getElementById('statGrid').innerHTML=
+    '<div class="stat-card"><div class="stat-val">'+done+'</div><div class="stat-lbl">Done</div></div>'+
+    '<div class="stat-card"><div class="stat-val">'+tot+'</div><div class="stat-lbl">Total</div></div>'+
+    '<div class="stat-card"><div class="stat-val">'+va+'</div><div class="stat-lbl">Vignettes</div></div>'+
+    '<div class="stat-card"><div class="stat-val">'+vp+'%</div><div class="stat-lbl">Correct</div></div>'+
+    '<div class="stat-card"><div class="stat-val">'+progress.total_study_minutes+'</div><div class="stat-lbl">Mins</div></div>'+
+    '<div class="stat-card"><div class="stat-val">'+progress.streak_days+'</div><div class="stat-lbl">Streak</div></div>';
+  var ph2='';
+  curriculum.phases.forEach(function(phase){
+    var pt=0,pd=0;
+    phase.modules.forEach(function(m){m.lessons.forEach(function(l){pt++;if(progress.completed_lessons.indexOf(l.id)>=0)pd++;});});
+    var cur=progress.current_phase===phase.id;
+    ph2+='<div class="phase-progress-row'+(cur?' current':'')+'">'+
+      '<div class="ppr-num'+(cur?' cur':'')+'">'+phase.id+'</div>'+
+      '<div class="ppr-title'+(cur?' cur':'')+'">'+esc(phase.title)+'</div>'+
+      '<div class="ppr-stat">'+pd+'/'+pt+(cur?' \u00b7 current':'')+'</div></div>';
+  });
+  document.getElementById('allPhases').innerHTML=ph2;
+  var mg='';
+  Object.entries(progress.miss_patterns).forEach(function(kv){
+    mg+='<div class="miss-card"><span class="miss-name">'+kv[0].replace(/_/g,' ')+'</span>'+
+      '<span class="miss-count'+(kv[1]===0?' zero':'')+'">'+kv[1]+'</span></div>';
+  });
+  document.getElementById('missGridProgress').innerHTML=mg;
+}
+
+function renderMiss(){
+  var grid=document.getElementById('missPatternGrid');
+  if(!grid)return;
+  var patterns=progress.miss_patterns||{};
+  var html='<div class="miss-grid">';
+  Object.entries(patterns).forEach(function(kv){
+    html+='<div class="miss-card"><span class="miss-name">'+kv[0].replace(/_/g,' ')+'</span>'+
+      '<span class="miss-count'+(kv[1]===0?' zero':'')+'">'+kv[1]+'</span></div>';
+  });
+  html+='</div>';
+  var sorted=Object.entries(patterns).filter(function(kv){return kv[1]>0;}).sort(function(a,b){return b[1]-a[1];});
+  if(sorted.length){
+    var top=sorted[0][0];
+    var pool=_allVigs.filter(function(v){return v.miss_patterns&&v.miss_patterns.indexOf(top)>=0;});
+    if(pool.length){
+      html+='<div style="margin-top:14px"><button class="btn btn-amber" onclick="drillPattern(\''+top+'\')">Drill: '+
+        top.replace(/_/g,' ')+' ('+sorted[0][1]+' misses)</button></div>';
+    }
+  }
+  grid.innerHTML=html;
+}
+
+function drillPattern(pat){
+  var pool=_allVigs.filter(function(v){return v.miss_patterns&&v.miss_patterns.indexOf(pat)>=0;});
+  if(!pool.length)return;
+  document.getElementById('reviewVignetteBox').style.display='block';
+  renderVig(pool[Math.floor(Math.random()*pool.length)],'reviewVignetteArea');
+}
+
+function showTab(name){
+  var names=['lesson','practice','review','progress'];
+  document.querySelectorAll('.tab').forEach(function(t,i){t.classList.toggle('active',names[i]===name);});
+  document.querySelectorAll('.panel').forEach(function(p){p.classList.toggle('active',p.id==='panel-'+name);});
+  if(name==='progress')renderProgress();
+  if(name==='review')renderMiss();
+}
+
+async function saveProgress(){
+  try{
+    await fetch('/api/nova/progress',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(progress)});
+  }catch(e){console.log('Save failed:',e.message);}
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function md(text){
+  if(!text)return'';
+  var s=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  var lines=s.split('\n'),out=[];
+  for(var i=0;i<lines.length;i++){
+    var line=lines[i];
+    if(line.indexOf('### ')===0){out.push('<h3 style="color:#7eb8d4;margin:10px 0 4px;font-size:13px">'+line.slice(4)+'</h3>');continue;}
+    if(line.indexOf('## ')===0){out.push('<h2 style="color:#7eb8d4;margin:12px 0 6px;font-size:15px">'+line.slice(3)+'</h2>');continue;}
+    if(line.indexOf('# ')===0){out.push('<h1 style="color:#7eb8d4;margin:14px 0 6px;font-size:17px">'+line.slice(2)+'</h1>');continue;}
+    if(line.indexOf('- ')===0)line='<span style="color:#3d7fa8">&#8226;</span> '+line.slice(2);
+    line=line.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+    line=line.replace(/\*([^*]+)\*/g,'<em>$1</em>');
+    line=line.replace(/`([^`]+)`/g,'<code style="background:#131c25;padding:1px 5px;border-radius:3px;color:#7eb8d4;font-family:monospace;font-size:11px">$1</code>');
+    out.push(line);
+  }
+  return out.join('<br>');
+}
+</script>
+</body>
+</html>
