@@ -3514,6 +3514,27 @@ async def audit_ui_endpoint(request: Request) -> HTMLResponse:
 #  LUCI LEARN — Web-based curriculum + quiz endpoints
 # ══════════════════════════════════════════════════════
 
+@app.get("/static/nova-manifest.json")
+async def nova_manifest():
+    from fastapi.responses import FileResponse
+    from pathlib import Path
+    return FileResponse(Path(__file__).parent / "static" / "nova-manifest.json",
+                       media_type="application/manifest+json")
+
+@app.get("/static/nova-sw.js")
+async def nova_sw():
+    from fastapi.responses import FileResponse
+    from pathlib import Path
+    return FileResponse(Path(__file__).parent / "static" / "nova-sw.js",
+                       media_type="application/javascript")
+
+@app.get("/static/nova-icon.png")
+async def nova_icon():
+    from fastapi.responses import FileResponse
+    from pathlib import Path
+    return FileResponse(Path(__file__).parent / "static" / "nova-icon.png",
+                       media_type="image/png")
+
 @app.get("/nova", response_class=HTMLResponse)
 async def nova_learn_page():
     """Nova Learn — LCSW exam prep for Ogechi."""

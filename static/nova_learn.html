@@ -2,12 +2,44 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Nova Learn">
+<meta name="theme-color" content="#6c3483">
+<link rel="apple-touch-icon" href="/static/nova-icon.png">
+<link rel="manifest" href="/static/nova-manifest.json">
 <title>Nova Learn — LCSW Exam Prep</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#f7f5fb;color:#1a1a2e;font-family:'Georgia',serif;height:100vh;overflow:hidden;font-size:15px}
 .layout{display:grid;grid-template-columns:272px 1fr;grid-template-rows:58px 1fr;height:100vh}
+@media(max-width:768px){
+  body{font-size:16px}
+  .layout{grid-template-columns:1fr;grid-template-rows:56px 1fr 52px}
+  .sidebar{display:none;position:fixed;inset:56px 0 52px 0;z-index:100;overflow-y:auto;box-shadow:4px 0 20px rgba(108,52,131,.15)}
+  .sidebar.open{display:block}
+  .header h1{font-size:13px;letter-spacing:2px}
+  .tabs{display:none}
+  .main{grid-column:1;grid-row:2}
+  .panel{padding:16px}
+  .lesson-title{font-size:22px}
+  .actions{gap:8px}
+  .btn{padding:10px 14px;font-size:12px}
+  .box{padding:16px;border-radius:10px}
+  .scenario-box{padding:16px;font-size:15px}
+  .option-btn{padding:14px 16px;font-size:15px;margin-bottom:10px}
+  .stat-grid{grid-template-columns:repeat(3,1fr);gap:8px}
+  .stat-val{font-size:24px}
+  .miss-grid{grid-template-columns:1fr 1fr}
+  .chat-in{font-size:16px}
+  .vid-grid{grid-template-columns:1fr}
+  .timer-display{font-size:26px}
+  .mobile-nav{display:flex}
+  .phase-progress-row{padding:10px 12px}
+  .ppr-title{font-size:13px}
+}
+@media(min-width:769px){.mobile-nav{display:none}}
 
 /* ── Header ── */
 .header{grid-column:1/-1;background:#ffffff;border-bottom:2px solid #e8e0f4;display:flex;align-items:center;padding:0 22px;gap:16px;box-shadow:0 2px 8px rgba(108,52,131,.07)}
@@ -191,6 +223,7 @@ body{background:#f7f5fb;color:#1a1a2e;font-family:'Georgia',serif;height:100vh;o
 <div class="layout">
 <div class="header">
   <a href="/" class="back">&#8592; LUCI</a>
+  <button onclick="toggleSidebar()" id="menuBtn" style="display:none;background:none;border:1px solid #e0d8f0;color:#6c3483;padding:6px 11px;border-radius:6px;cursor:pointer;font-size:16px;line-height:1" class="mobile-only">&#9776;</button>
   <h1>&#9670; NOVA LEARN</h1>
   <div class="prog-wrap"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
   <span class="prog-lbl" id="progLbl">Loading...</span>
@@ -1259,7 +1292,90 @@ function renderVisualMap(v, title) {
   out.innerHTML = html;
 }
 
+// ── Mobile navigation ─────────────────────────────────────────────
+var _mobileMenuOpen = false;
+
+function toggleSidebar() {
+  var sb = document.querySelector('.sidebar');
+  _mobileMenuOpen = !_mobileMenuOpen;
+  sb.classList.toggle('open', _mobileMenuOpen);
+  document.getElementById('menuBtn').textContent = _mobileMenuOpen ? '✕' : '☰';
+}
+
+function mobileTab(name) {
+  // Close sidebar if open
+  if (_mobileMenuOpen) {
+    document.querySelector('.sidebar').classList.remove('open');
+    _mobileMenuOpen = false;
+    var mb = document.getElementById('menuBtn');
+    if (mb) mb.textContent = '☰';
+  }
+  // Switch tab
+  showTab(name);
+  // Update mobile nav highlight
+  var tabs = ['lesson','videos','practice','review','progress'];
+  tabs.forEach(function(t) {
+    var btn = document.getElementById('mnav-' + t);
+    if (!btn) return;
+    var active = t === name;
+    btn.style.color = active ? '#6c3483' : '#9b8ab0';
+    btn.style.borderTopColor = active ? '#6c3483' : 'transparent';
+  });
+}
+
+// Show hamburger only on mobile
+function checkMobile() {
+  var isMobile = window.innerWidth <= 768;
+  var menuBtn = document.getElementById('menuBtn');
+  if (menuBtn) menuBtn.style.display = isMobile ? 'block' : 'none';
+}
+window.addEventListener('resize', checkMobile);
+window.addEventListener('DOMContentLoaded', checkMobile);
+
+// Close sidebar when clicking outside on mobile
+document.addEventListener('click', function(e) {
+  if (!_mobileMenuOpen) return;
+  var sb = document.querySelector('.sidebar');
+  var mb = document.getElementById('menuBtn');
+  if (sb && !sb.contains(e.target) && mb && !mb.contains(e.target)) {
+    sb.classList.remove('open');
+    _mobileMenuOpen = false;
+    if (mb) mb.textContent = '☰';
+  }
+});
+
+// Register service worker for PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/static/nova-sw.js').then(function(reg) {
+      console.log('Nova SW registered:', reg.scope);
+    }).catch(function(e) {
+      console.log('Nova SW failed:', e);
+    });
+  });
+}
+
 </script>
+<!-- Mobile bottom navigation -->
+<nav class="mobile-nav" style="position:fixed;bottom:0;left:0;right:0;height:52px;background:#fff;border-top:1px solid #e8e0f4;display:none;align-items:stretch;z-index:200;box-shadow:0 -2px 12px rgba(108,52,131,.1);padding-bottom:env(safe-area-inset-bottom)">
+  <button onclick="mobileTab('lesson')" id="mnav-lesson" style="flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-family:monospace;font-size:9px;letter-spacing:.5px;color:#6c3483;border-top:2px solid #6c3483">
+    <span style="font-size:18px">📚</span>LESSON
+  </button>
+  <button onclick="mobileTab('videos')" id="mnav-videos" style="flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-family:monospace;font-size:9px;letter-spacing:.5px;color:#9b8ab0;border-top:2px solid transparent">
+    <span style="font-size:18px">🎬</span>VIDEOS
+  </button>
+  <button onclick="mobileTab('practice')" id="mnav-practice" style="flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-family:monospace;font-size:9px;letter-spacing:.5px;color:#9b8ab0;border-top:2px solid transparent">
+    <span style="font-size:18px">📝</span>PRACTICE
+  </button>
+  <button onclick="mobileTab('review')" id="mnav-review" style="flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-family:monospace;font-size:9px;letter-spacing:.5px;color:#9b8ab0;border-top:2px solid transparent">
+    <span style="font-size:18px">🔁</span>REVIEW
+  </button>
+  <button onclick="mobileTab('progress')" id="mnav-progress" style="flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-family:monospace;font-size:9px;letter-spacing:.5px;color:#9b8ab0;border-top:2px solid transparent">
+    <span style="font-size:18px">📊</span>PROGRESS
+  </button>
+</nav>
+
+<!-- Mobile menu button in header -->
 <div class="modal" id="vidModal">
   <div class="modal-inner">
     <div class="modal-hdr">

@@ -1,0 +1,25 @@
+{
+  "name": "Nova Learn — LCSW Exam Prep",
+  "short_name": "Nova Learn",
+  "description": "Ogechi's LCSW exam study companion",
+  "start_url": "/nova",
+  "display": "standalone",
+  "background_color": "#f7f5fb",
+  "theme_color": "#6c3483",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/static/nova-icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/nova-icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["education", "medical"],
+  "lang": "en-US"
+}
