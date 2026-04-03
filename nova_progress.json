@@ -2,16 +2,28 @@
   "version": "1.0",
   "student_name": "Ogechi Quansah",
   "assistant_name": "Nova",
-  "current_phase": 1,
-  "current_module": "1.1",
-  "current_lesson": "1.1.1",
+  "current_phase": 2,
+  "current_module": "2.1",
+  "current_lesson": "2.1.1",
   "last_completed_lesson": null,
   "recommended_next": "1.1.1",
-  "started_lessons": [],
+  "started_lessons": [
+    "1.1.1",
+    "5.1.1",
+    "2.1.1"
+  ],
   "completed_lessons": [],
-  "lesson_status": {},
+  "lesson_status": {
+    "1.1.1": "in_progress",
+    "5.1.1": "in_progress",
+    "2.1.1": "in_progress"
+  },
   "lesson_scores": {},
-  "vignette_scores": {},
+  "vignette_scores": {
+    "assess_001": 1,
+    "doc_001": 1,
+    "systemic_002": 1
+  },
   "total_study_minutes": 0,
   "streak_days": 0,
   "last_study_date": null,

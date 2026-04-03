@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LUCI Learn</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0a0a;color:#e0e0e0;font-family:'SF Mono','Fira Code',monospace;height:100vh;overflow:hidden}
+.layout{display:grid;grid-template-columns:260px 1fr;grid-template-rows:56px 1fr;height:100vh}
+.header{grid-column:1/-1;background:#111;border-bottom:1px solid #222;display:flex;align-items:center;padding:0 20px;gap:16px}
+.header h1{font-size:15px;color:#D4AF37;letter-spacing:2px}
+.prog-wrap{flex:1;height:4px;background:#222;border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;background:linear-gradient(90deg,#D4AF37,#f0c840);transition:width .5s}
+.prog-lbl{font-size:11px;color:#666;white-space:nowrap}
+.back{background:none;border:1px solid #333;color:#888;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:inherit;text-decoration:none;display:inline-flex;align-items:center}
+.back:hover{border-color:#D4AF37;color:#D4AF37}
+.sidebar{background:#0d0d0d;border-right:1px solid #1a1a1a;overflow-y:auto;padding:8px 0}
+.sidebar-label{padding:12px 16px 4px;font-size:10px;color:#444;text-transform:uppercase;letter-spacing:2px}
+.phase-btn{display:block;width:100%;text-align:left;padding:10px 16px;background:none;border:none;border-left:3px solid transparent;cursor:pointer;font-family:inherit;color:#888;font-size:12px;line-height:1.4;transition:all .15s}
+.phase-btn:hover{background:#111;border-left-color:#333;color:#ccc}
+.phase-btn.active{background:#141414;border-left-color:#D4AF37;color:#D4AF37}
+.phase-btn .meta{font-size:10px;color:#444;margin-top:2px}
+.phase-btn.active .meta{color:#8a7020}
+.main{display:flex;flex-direction:column;overflow:hidden}
+.tabs{display:flex;background:#0d0d0d;border-bottom:1px solid #1a1a1a;padding:0 20px}
+.tab{padding:12px 18px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-family:inherit;font-size:12px;color:#555;transition:all .15s}
+.tab:hover{color:#aaa}
+.tab.active{color:#D4AF37;border-bottom-color:#D4AF37}
+.panels{flex:1;overflow:hidden;position:relative}
+.panel{display:none;height:100%;overflow-y:auto;padding:24px}
+.panel.active{display:block}
+.phase-tag{font-size:10px;color:#D4AF37;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px}
+.lesson-title{font-size:20px;color:#fff;margin-bottom:6px;line-height:1.3}
+.lesson-meta{font-size:12px;color:#555;margin-bottom:20px}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+.btn{padding:9px 18px;border-radius:7px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:bold;letter-spacing:.5px;transition:all .15s;border:none}
+.btn-gold{background:#D4AF37;color:#000}.btn-gold:hover{background:#f0c840}
+.btn-out{background:none;border:1px solid #333;color:#888}.btn-out:hover{border-color:#D4AF37;color:#D4AF37}
+.box{background:#0d0d0d;border:1px solid #1a1a1a;border-radius:10px;padding:18px;margin-bottom:18px}
+.box-title{font-size:10px;color:#D4AF37;text-transform:uppercase;letter-spacing:2px;margin-bottom:12px}
+.teach-text{font-size:13px;color:#ccc;line-height:1.8;white-space:pre-wrap}
+.teach-text strong{color:#fff;font-weight:bold}
+.teach-text em{color:#D4AF37;font-style:italic}
+.teach-text code{background:#1a1a1a;padding:1px 5px;border-radius:3px;color:#D4AF37;font-family:monospace;font-size:12px}
+.teach-placeholder{color:#333;font-style:italic;font-size:13px}
+.chat-msgs{display:flex;flex-direction:column;gap:10px;max-height:350px;overflow-y:auto;margin-bottom:12px}
+.msg-user{background:#1a1a2e;border:1px solid #2a2a4e;color:#aab4e8;padding:10px 14px;border-radius:8px;font-size:13px;line-height:1.6;align-self:flex-end;max-width:85%}
+.msg-luci{background:#0d1a0d;border:1px solid #1a2e1a;color:#aae8aa;padding:10px 14px;border-radius:8px;font-size:13px;line-height:1.6}
+.chat-row{display:flex;gap:10px}
+.chat-in{flex:1;background:#111;border:1px solid #222;color:#e0e0e0;padding:9px 13px;border-radius:7px;font-family:inherit;font-size:13px;resize:none;min-height:42px}
+.chat-in:focus{outline:none;border-color:#D4AF37}
+/* Videos */
+.vid-section-title{font-size:10px;color:#555;text-transform:uppercase;letter-spacing:2px;margin-bottom:10px;margin-top:16px}
+.vid-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:16px}
+.vid-card{background:#111;border:1px solid #1a1a1a;border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s}
+.vid-card:hover{border-color:#D4AF37}
+.vid-thumb{width:100%;aspect-ratio:16/9;background:#000;position:relative;overflow:hidden}
+.vid-thumb img{width:100%;height:100%;object-fit:cover}
+.play-ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4);transition:background .15s}
+.vid-card:hover .play-ov{background:rgba(0,0,0,.2)}
+.play-ico{width:44px;height:44px;background:#D4AF37;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;color:#000}
+.vid-info{padding:10px 12px}
+.vid-title{font-size:12px;color:#ccc;line-height:1.4}
+.vid-src{font-size:10px;color:#D4AF37;margin-top:3px}
+.ref-link{display:block;padding:10px 14px;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:6px;margin-bottom:8px;color:#88ccff;font-size:13px;text-decoration:none}
+.ref-link:hover{border-color:#88ccff}
+/* Quiz */
+.scenario-box{background:#0d0d1a;border:1px solid #1a1a3a;border-radius:10px;padding:18px;margin-bottom:14px;font-size:13px;color:#aab4e8;line-height:1.8}
+/* Progress */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:20px}
+.stat-card{background:#111;border:1px solid #1a1a1a;border-radius:8px;padding:14px;text-align:center}
+.stat-val{font-size:26px;font-weight:bold;color:#D4AF37}
+.stat-lbl{font-size:10px;color:#555;margin-top:4px;text-transform:uppercase;letter-spacing:1px}
+.phase-row{display:flex;align-items:center;gap:12px;padding:10px 14px;background:#0d0d0d;border-radius:6px;border:1px solid #1a1a1a;margin-bottom:6px}
+.phase-row.cur{border-color:#D4AF37}
+.phase-row-n{font-size:11px;color:#555;width:20px}
+.phase-row.cur .phase-row-n{color:#D4AF37}
+.phase-row-t{flex:1;font-size:13px;color:#ccc}
+.phase-row-s{font-size:11px;color:#555}
+/* Modal */
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:999;align-items:center;justify-content:center}
+.modal.open{display:flex}
+.modal-inner{width:90vw;max-width:880px}
+.modal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.modal-title{font-size:13px;color:#D4AF37}
+.modal-close{background:none;border:1px solid #333;color:#888;padding:6px 12px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:12px}
+.modal-close:hover{border-color:#fff;color:#fff}
+.vid-embed{width:100%;aspect-ratio:16/9;border:none;border-radius:8px}
+/* Spinner */
+.spin{display:inline-block;width:14px;height:14px;border:2px solid #333;border-top-color:#D4AF37;border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:#222;border-radius:2px}
+</style>
+<script src="/static/luci-nav.js"></script>
+</head>
+<body>
+<div class="layout">
+
+<div class="header">
+  <a href="/" class="back">&#8592; LUCI</a>
+  <h1>&#128218; LEARN</h1>
+  <div class="prog-wrap"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+  <span class="prog-lbl" id="progLbl">Loading...</span>
+</div>
+
+<div class="sidebar">
+  <div class="sidebar-label">Phases</div>
+  <div id="phaseList"></div>
+</div>
+
+<div class="main">
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('lesson')">&#128214; Lesson</button>
+    <button class="tab" onclick="showTab('videos')">&#127909; Videos</button>
+    <button class="tab" onclick="showTab('quiz')">&#127919; Quiz</button>
+    <button class="tab" onclick="showTab('progress')">&#128202; Progress</button>
+    <button class="tab" onclick="showTab('code')">&#128187; Code</button>
+  </div>
+  <div class="panels">
+
+    <div class="panel active" id="panel-lesson">
+      <div class="phase-tag" id="lessonTag">Loading...</div>
+      <div class="lesson-title" id="lessonTitle">Loading curriculum...</div>
+      <div class="lesson-meta" id="lessonMeta"></div>
+      <div class="actions">
+        <div id="repo-picker" style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+  <span style="font-size:11px;color:#D4AF37;text-transform:uppercase;letter-spacing:1px">Teach from repo:</span>
+  <select id="repo-select" style="background:#111;border:1px solid #333;color:#e0e0e0;padding:6px 10px;border-radius:6px;font-family:inherit;font-size:12px;min-width:220px">
+    <option value="">— generic lesson —</option>
+  </select>
+  <button id="explore-toggle" onclick="toggleExplore()" style="background:none;border:1px solid #333;color:#555;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:11px">Explore all</button>
+  <span id="repo-load-status" style="font-size:11px;color:#555"></span>
+</div>
+<button class="btn btn-gold" id="teachBtn" onclick="doTeach()">&#9654; Start Lesson</button>
+        <button class="btn btn-out" onclick="doPrev()">&#8592; Prev</button>
+        <button class="btn btn-out" onclick="doNext()">Next Lesson &#8594;</button>
+        <button class="btn btn-out" onclick="showTab('videos')">&#127909; Videos</button>
+        <button class="btn btn-out" onclick="showTab('quiz')">&#127919; Quiz</button>
+      </div>
+      <div class="box">
+        <div class="box-title">LUCI Teaching</div>
+        <div id="teachOut"><span class="teach-placeholder">Click "Start Lesson" to have LUCI teach this topic.</span></div>
+      </div>
+      <div class="box">
+        <div class="box-title">Ask LUCI</div>
+        <div class="chat-msgs" id="chatMsgs"></div>
+        <div class="chat-row">
+          <textarea class="chat-in" id="chatIn" rows="2" placeholder="Ask a follow-up question..."></textarea>
+          <button class="btn btn-gold" onclick="doChat()">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-videos">
+      <div class="phase-tag" id="vidTag"></div>
+      <div class="lesson-title" id="vidTitle">Videos</div>
+      <div id="vidContent"></div>
+    </div>
+
+    <div class="panel" id="panel-quiz">
+      <div class="phase-tag" id="quizTag"></div>
+      <div class="lesson-title" id="quizTitle">Quiz</div>
+      <div class="lesson-meta">Real-world scenarios. No multiple choice.</div>
+      <div class="actions" style="margin-top:16px">
+        <button class="btn btn-gold" onclick="doQuiz(-1)">&#127922; Random</button>
+        <button class="btn btn-out" onclick="doQuiz(0)">Scenario 1</button>
+        <button class="btn btn-out" onclick="doQuiz(1)">Scenario 2</button>
+        <button class="btn btn-out" onclick="doQuiz(2)">Scenario 3</button>
+        <button class="btn btn-out" onclick="doExam()" style="border-color:#ff6644;color:#ff6644">&#128221; Phase Exam</button>
+      </div>
+      <div id="quizArea"></div>
+      <div class="box" style="margin-top:16px" id="statsBox">
+        <div class="box-title">Quiz Stats</div>
+        <div id="statsOut" style="color:#555;font-size:13px">Loading...</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-code">
+      <div class="phase-tag" id="codeTag"></div>
+      <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+        <select id="code-lang" style="background:#111;border:1px solid #333;color:#e0e0e0;padding:5px 8px;border-radius:6px;font-family:inherit;font-size:12px">
+          <option value="javascript">JavaScript</option>
+          <option value="python">Python</option>
+          <option value="html">HTML</option>
+          <option value="css">CSS</option>
+          <option value="sql">SQL</option>
+          <option value="typescript">TypeScript</option>
+        </select>
+        <button class="btn btn-out" onclick="clearEditor()" style="font-size:11px;padding:5px 10px">Clear</button>
+        <button class="btn btn-out" onclick="loadRepoFile()" style="font-size:11px;padding:5px 10px">&#128194; Load from Repo</button>
+        <button class="btn btn-out" onclick="showPushPanel()" id="push-btn" style="display:none;border-color:#44cc88;color:#44cc88;font-size:11px;padding:5px 10px">&#8679; Push to GitHub</button>
+        <span id="code-status" style="font-size:11px;color:#555"></span>
+      </div>
+      <div id="push-panel" style="display:none;margin-bottom:8px;background:#0d1a0d;border:1px solid #1a3a1a;border-radius:8px;padding:10px;display:none;gap:8px;flex-wrap:wrap;align-items:center">
+        <input id="commit-msg" type="text" placeholder="Commit message..." style="flex:1;min-width:180px;background:#111;border:1px solid #333;color:#e0e0e0;padding:5px 8px;border-radius:6px;font-family:inherit;font-size:12px">
+        <button class="btn" onclick="doPush()" style="background:#44cc88;color:#000;font-weight:bold;padding:5px 12px">&#10003; Push</button>
+        <button class="btn btn-out" onclick="hidePushPanel()" style="padding:5px 10px;font-size:11px">Cancel</button>
+        <span id="push-status" style="font-size:11px;color:#555;width:100%"></span>
+      </div>
+
+      <!-- Two column layout: editor + chat sidebar (resizable) -->
+      <style>
+        .monaco-editor .suggest-widget { background:#1a1a1a !important; border:1px solid #333 !important; }
+        .monaco-editor .suggest-widget .monaco-list-row { color:#e0e0e0 !important; }
+        .monaco-editor .suggest-widget .monaco-list-row.focused { background:#2a2a2a !important; color:#fff !important; }
+        .monaco-editor .suggest-widget .details { background:#111 !important; color:#ccc !important; }
+        .monaco-editor .suggest-widget .monaco-list-row .icon { filter: brightness(2); }
+        .resizer { width:5px; cursor:col-resize; background:#1a1a1a; flex-shrink:0; transition:background .15s; }
+        .resizer:hover, .resizer.dragging { background:#D4AF37; }
+      </style>
+      <div id="code-split" style="display:flex;gap:0;height:calc(100vh - 280px);min-height:400px">
+
+        <!-- Left: editor -->
+        <div id="code-editor-panel" style="display:flex;flex-direction:column;gap:8px;flex:1;min-width:200px;overflow:hidden">
+          <div id="editor-container" style="flex:1;border:1px solid #222;border-radius:8px;overflow:hidden"></div>
+          <div id="live-hint-bar" style="padding:6px 12px;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:6px;font-size:12px;color:#888;font-family:inherit;flex-shrink:0">
+            <span id="live-hint-text" style="white-space:pre-wrap;line-height:1.5">&#9679; LUCI is watching...</span>
+          </div>
+          <div style="display:flex;gap:8px;flex-shrink:0">
+            <button class="btn btn-gold" onclick="runCodeReview()" style="font-size:12px">&#129302; Ask LUCI to Review</button>
+          </div>
+          <div id="commit-intel-panel" style="display:none;background:#0d1a0d;border:1px solid #1a3a1a;border-radius:8px;padding:14px;overflow-y:auto;max-height:200px;flex-shrink:0">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <span style="font-size:10px;color:#44cc88;text-transform:uppercase;letter-spacing:2px">&#129302; Commit Intelligence</span>
+              <button onclick="document.getElementById('commit-intel-panel').style.display='none'" style="background:none;border:none;color:#555;cursor:pointer;font-size:16px;line-height:1">&#10005;</button>
+            </div>
+            <div id="commitIntelOut" class="teach-text" style="font-size:12px;line-height:1.7"></div>
+          </div>
+          <div id="code-review-panel" style="display:none;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:8px;padding:14px;overflow-y:auto;max-height:180px;flex-shrink:0">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <span style="font-size:10px;color:#D4AF37;text-transform:uppercase;letter-spacing:2px">LUCI Review</span>
+              <button onclick="document.getElementById('code-review-panel').style.display='none'" style="background:none;border:none;color:#555;cursor:pointer;font-size:16px;line-height:1">&#10005;</button>
+            </div>
+            <div id="codeReviewOut"><span class="teach-placeholder">Click "Ask LUCI to Review" to get feedback.</span></div>
+          </div>
+        </div>
+
+        <!-- Resizer -->
+        <div class="resizer" id="code-resizer"></div>
+
+        <!-- Right: LUCI chat -->
+        <div id="code-chat-panel" style="display:flex;flex-direction:column;background:#0a0a0a;border:1px solid #1a1a1a;border-radius:8px;overflow:hidden;width:280px;flex-shrink:0">
+          <div style="padding:10px 14px;border-bottom:1px solid #1a1a1a;font-size:10px;color:#D4AF37;text-transform:uppercase;letter-spacing:2px;flex-shrink:0">Ask LUCI</div>
+          <div style="padding:4px 14px 6px;font-size:10px;color:#444;flex-shrink:0">Explains — won't write code for you</div>
+          <div id="codeChatMsgs" style="flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px"></div>
+          <div style="padding:8px;border-top:1px solid #1a1a1a;display:flex;gap:6px;flex-shrink:0">
+            <textarea id="codeChatIn" class="chat-in" rows="2" placeholder="Why does this need a colon?" style="flex:1;font-size:12px;resize:none"></textarea>
+            <button class="btn btn-gold" onclick="doCodeChat()" style="align-self:flex-end;padding:7px 10px;font-size:12px">Ask</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="panel" id="panel-progress">
+      <div class="lesson-title" style="margin-bottom:18px">Your Progress</div>
+      <div class="stat-grid" id="statGrid"></div>
+      <div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:2px;margin:16px 0 10px">All Phases</div>
+      <div id="allPhases"></div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<div class="modal" id="vidModal">
+  <div class="modal-inner">
+    <div class="modal-hdr">
+      <span class="modal-title" id="modalTitle"></span>
+      <button class="modal-close" onclick="closeVid()">&#10005; Close</button>
+    </div>
+    <iframe class="vid-embed" id="vidFrame" allowfullscreen></iframe>
+  </div>
+</div>
+
+<script>
+// ── Self-diagnosis error reporter ────────────────────────────────────────
+window.onerror = function(message, source, lineno, colno, error) {
+  fetch('/learn/error', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      page: 'learn',
+      message: message,
+      source: source,
+      lineno: lineno,
+      colno: colno,
+      stack: error ? error.stack : null,
+      url: window.location.href
+    })
+  }).catch(function(){});  // never let this crash the page
+  return false;  // let browser also handle it
+};
+
+window.addEventListener('unhandledrejection', function(e) {
+  fetch('/learn/error', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      page: 'learn',
+      message: 'Unhandled promise rejection: ' + String(e.reason),
+      source: 'promise',
+      stack: e.reason && e.reason.stack ? e.reason.stack : null,
+      url: window.location.href
+    })
+  }).catch(function(){});
+});
+
+var _cur = null;
+var _scenarios = [];
+var _curScenario = null;
+var _chatHist = [];
+
+var VIDEOS = {
+  "p1_m1_l1": [
+    {id:"7_LPdttKXPc", t:"How The Internet Works in 5 Minutes", s:"Aaron"},
+    {id:"iYM2zFP3Zn0", t:"HTTP Crash Course", s:"Traversy Media"},
+    {id:"bzZQMCWcPqs", t:"How HTTP Requests Work", s:"Academind"}
+  ],
+  "p1_m1_l2": [
+    {id:"tkfVQK6UxDI", t:"REST API Concepts", s:"WebConcepts"},
+    {id:"guYMSP7JVTA", t:"HTTP Methods Explained", s:"Traversy Media"}
+  ],
+  "p1_m1_l3": [
+    {id:"GrNrcmD6HLA", t:"HTTP Status Codes In 10 Minutes", s:"Traversy Media"},
+    {id:"LJYGpkLN7OM", t:"HTTP Status Codes Explained", s:"Codevolution"}
+  ],
+  "p1_m1_l4": [
+    {id:"UMc2gFSbqaU", t:"HTTP Headers Explained", s:"ByteByteGo"},
+    {id:"FAnuh0_BU4c", t:"JSON Explained", s:"Programming with Mosh"}
+  ],
+  "p1_m1_l5": [
+    {id:"6sUbt-wD3J0", t:"What is REST?", s:"TechWorld with Nana"},
+    {id:"lsMQRaeKNDk", t:"RESTful API Explained", s:"Traversy Media"}
+  ],
+  "p1_m1_l6": [
+    {id:"Xy4ov_GRPBM", t:"curl Tutorial", s:"Luke Smith"},
+    {id:"7XUibDYw4mc", t:"REST Client Tools", s:"Traversy Media"}
+  ],
+  "p1_m2_l1": [
+    {id:"ZtqBQ68cfJc", t:"50 Linux Commands", s:"freeCodeCamp"},
+    {id:"yz7nYlnXLfU", t:"Linux Command Line Full Course", s:"Traversy Media"}
+  ],
+  "p1_m2_l2": [
+    {id:"uaj8Akm9MdQ", t:"stdin stdout stderr Explained", s:"Engineer Man"},
+    {id:"s3ii48qYBxA", t:"Linux Pipes Explained", s:"Joe Collins"}
+  ],
+  "p1_m2_l3": [
+    {id:"4XC_O3MQJNM", t:"Linux Environment Variables", s:"ProgrammingKnowledge"},
+    {id:"5iWhQWVXosU", t:".env Files Explained", s:"Traversy Media"}
+  ],
+  "p1_m2_l4": [
+    {id:"jTnLkjSQIpM", t:"Linux Processes Explained", s:"DorianDotSlash"},
+    {id:"N1vgvhiyq0E", t:"systemd Explained", s:"TechWorld with Nana"}
+  ],
+  "p1_m2_l5": [
+    {id:"qWKK_PNHnnA", t:"SSH Explained", s:"NetworkChuck"},
+    {id:"hQWRgGGtZK8", t:"SSH Keys Setup", s:"Traversy Media"}
+  ],
+  "p1_m2_l6": [
+    {id:"tK9Oc0f4EuM", t:"Bash Scripting Full Course", s:"Joe Collins"},
+    {id:"v-F3YLd6oMw", t:"Shell Scripting Crash Course", s:"Traversy Media"}
+  ],
+  "p1_m3_l1": [
+    {id:"hwP7WQkmECE", t:"Git Explained in 100 Seconds", s:"Fireship"},
+    {id:"2sjqTHE0zok", t:"Git Tutorial for Beginners", s:"Programming with Mosh"}
+  ],
+  "p1_m3_l2": [
+    {id:"HVsySz-h9r4", t:"Git Tutorial Full Course", s:"Traversy Media"},
+    {id:"8JJ101D3knE", t:"Git and GitHub Crash Course", s:"freeCodeCamp"}
+  ],
+  "p1_m3_l3": [
+    {id:"RGOj5yH7evk", t:"Git Log and History", s:"Traversy Media"}
+  ],
+  "p1_m3_l4": [
+    {id:"lX9hsdsAeTk", t:"Git Reset Explained", s:"The Coding Train"},
+    {id:"RGOj5yH7evk", t:"Git Stash Tutorial", s:"Traversy Media"}
+  ],
+  "p1_m3_l5": [
+    {id:"QV0kVNvkMxc", t:"Git Branches Tutorial", s:"Traversy Media"},
+    {id:"e2IbNHi5uEk", t:"GitHub Pull Requests", s:"Fireship"}
+  ],
+  "p1_m3_l6": [
+    {id:"SONAFMnFQI8", t:".gitignore Explained", s:"Traversy Media"}
+  ],
+  "p2_m4_l1": [
+    {id:"_uQrJ0TkZlc", t:"Python Full Course", s:"Programming with Mosh"},
+    {id:"kqtD5dpn9C8", t:"Python Data Types", s:"Corey Schafer"}
+  ],
+  "p2_m5_l1": [
+    {id:"ZDa-Z5JzLYM", t:"Python OOP Explained", s:"Corey Schafer"},
+    {id:"jCzT9XFZ5bw", t:"Python Decorators", s:"Corey Schafer"}
+  ],
+  "p2_m5_l4": [
+    {id:"iG2e8LtGHVc", t:"Python Async Await", s:"Traversy Media"},
+    {id:"t5Bo1Je9EmE", t:"Python Asyncio Tutorial", s:"Tech With Tim"}
+  ],
+  "p3_m7_l1": [
+    {id:"UB1O30fR-EE", t:"HTML Full Course", s:"freeCodeCamp"},
+    {id:"pQN-pnXPaVg", t:"HTML Tutorial for Beginners", s:"Programming with Mosh"}
+  ],
+  "p3_m8_l1": [
+    {id:"yfoY53QXEnI", t:"CSS Crash Course", s:"Traversy Media"},
+    {id:"1PnVor36_40", t:"CSS Full Course", s:"freeCodeCamp"}
+  ],
+  "p3_m8_l2": [
+    {id:"u044iM9xsWU", t:"Flexbox in 100 Seconds", s:"Fireship"},
+    {id:"3YW65K6LcIA", t:"Flexbox Crash Course", s:"Traversy Media"}
+  ],
+  "p3_m9_l1": [
+    {id:"hdI2bqOjy3c", t:"JavaScript Crash Course", s:"Traversy Media"},
+    {id:"W6NZfCO5SIk", t:"JavaScript Full Course", s:"Programming with Mosh"}
+  ],
+  "p3_m9_l3": [
+    {id:"vn3tm0quoqE", t:"Async Await JavaScript", s:"Fireship"},
+    {id:"PoRJizFvM7s", t:"Promises vs Async Await", s:"Traversy Media"}
+  ],
+  "p5_m11_l1": [
+    {id:"HXV3zeQKqGY", t:"SQL Full Course", s:"freeCodeCamp"},
+    {id:"7S_tz1z_5bA", t:"MySQL Tutorial", s:"Programming with Mosh"}
+  ],
+  "p7_m15_l1": [
+    {id:"bMknfKXIFA8", t:"React in 100 Seconds", s:"Fireship"},
+    {id:"w7ejDZ8SWv8", t:"React Tutorial", s:"Programming with Mosh"}
+  ],
+  "p8_m18_l1": [
+    {id:"zjkBMFhNj_g", t:"Intro to Large Language Models", s:"Andrej Karpathy"},
+    {id:"LPZh9BOjkQs", t:"LLMs Explained", s:"Andrej Karpathy"}
+  ],
+  "p8_m18_l2": [
+    {id:"T9aRN5JkmL8", t:"Prompt Engineering Guide", s:"freeCodeCamp"}
+  ]
+};
+
+var REFS = {
+  "p1_m1_l1": [{t:"MDN: HTTP Overview", u:"https://developer.mozilla.org/en-US/docs/Web/HTTP/Overview"},{t:"How HTTPS Works (comic)", u:"https://howhttps.works"}],
+  "p1_m1_l2": [{t:"MDN: HTTP Methods", u:"https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods"}],
+  "p1_m3_l1": [{t:"Oh Shit Git", u:"https://ohshitgit.com"},{t:"Git Docs", u:"https://git-scm.com/doc"}],
+  "p8_m18_l1": [{t:"Anthropic Prompt Engineering Guide", u:"https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview"}]
+};
+
+var COLT = {
+  3: {t:"Web Developer Bootcamp 2026 — Colt Steele", u:"https://www.udemy.com/course/the-web-developer-bootcamp/"},
+  7: {t:"Web Developer Bootcamp 2026 — React Section", u:"https://www.udemy.com/course/the-web-developer-bootcamp/"}
+};
+
+function lkey(l) { return "p"+l.phase+"_m"+l.module+"_l"+l.lesson; }
+
+function esc(s) {
+  return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function md(text) {
+  if (!text) return "";
+  // Step 1: escape HTML entities first
+  var s = text
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;");
+  // Step 2: simple line-by-line processing (avoid complex regex on Unicode)
+  var lines = s.split("\n");
+  var out = [];
+  for (var i=0; i<lines.length; i++) {
+    var line = lines[i];
+    // Headers
+    if (line.indexOf("### ") === 0) {
+      out.push('<h3 style="color:#D4AF37;margin:10px 0 4px;font-size:13px">'+line.slice(4)+'</h3>');
+      continue;
+    }
+    if (line.indexOf("## ") === 0) {
+      out.push('<h2 style="color:#D4AF37;margin:12px 0 6px;font-size:15px">'+line.slice(3)+'</h2>');
+      continue;
+    }
+    if (line.indexOf("# ") === 0) {
+      out.push('<h1 style="color:#D4AF37;margin:14px 0 6px;font-size:17px">'+line.slice(2)+'</h1>');
+      continue;
+    }
+    // Bullet
+    if (line.indexOf("- ") === 0) {
+      line = '<span style="color:#D4AF37">&#8226;</span> ' + line.slice(2);
+    }
+    // Inline: bold **text**
+    line = line.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    // Inline: italic *text*
+    line = line.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+    // Inline: code `text`
+    line = line.replace(/`([^`]+)`/g, '<code style="background:#1a1a1a;padding:1px 5px;border-radius:3px;color:#D4AF37;font-family:monospace;font-size:12px">$1</code>');
+    out.push(line);
+  }
+  return out.join("<br>");
+}
+
+function showTab(name) {
+  var tabs = document.querySelectorAll(".tab");
+  var names = ["lesson","videos","quiz","progress","code"];
+  tabs.forEach(function(t,i){ t.classList.toggle("active", names[i]===name); });
+  document.querySelectorAll(".panel").forEach(function(p){
+    p.classList.toggle("active", p.id==="panel-"+name);
+  });
+  if (name==="videos") renderVideos();
+  if (name==="quiz") { renderQuizStats(); }
+  if (name==="progress") renderProgress();
+}
+
+function openVid(id, title) {
+  document.getElementById("modalTitle").textContent = title;
+  document.getElementById("vidFrame").src = "https://www.youtube.com/embed/"+id+"?autoplay=1";
+  document.getElementById("vidModal").classList.add("open");
+}
+
+function closeVid() {
+  document.getElementById("vidModal").classList.remove("open");
+  document.getElementById("vidFrame").src = "";
+}
+
+document.getElementById("vidModal").addEventListener("click", function(e){
+  if (e.target === this) closeVid();
+});
+
+function loadCurriculum() {
+  // Load GitHub repos into picker
+var _exploreMode = false;
+function loadRepoPicker(explore){
+  var url = explore ? "/learn/repos?all=1" : "/learn/repos";
+  fetch(url).then(function(r){ return r.json(); }).then(function(d){
+    var sel = document.getElementById("repo-select");
+    if(!sel) return;
+    var cur = sel.value;
+    sel.innerHTML = '<option value="">— generic lesson —</option>';
+    if(d.repos){
+      d.repos.forEach(function(r){
+        var o = document.createElement("option");
+        o.value = r.name;
+        o.textContent = r.label || r.name;
+        sel.appendChild(o);
+      });
+      if(cur) sel.value = cur;
+    }
+    var st = document.getElementById("repo-load-status");
+    var tb = document.getElementById("explore-toggle");
+    if(st){
+      st.textContent = explore
+        ? (d.all_count||d.repos.length) + " repos (all)"
+        : (d.repos ? d.repos.length : 0) + " repos for this phase";
+      setTimeout(function(){ st.textContent=""; }, 3000);
+    }
+    if(tb){
+      tb.textContent    = explore ? "Focus mode" : "Explore all";
+      tb.style.borderColor = explore ? "#D4AF37" : "#333";
+      tb.style.color       = explore ? "#D4AF37" : "#555";
+    }
+  }).catch(function(){});
+}
+function toggleExplore(){ _exploreMode = !_exploreMode; loadRepoPicker(_exploreMode); }
+loadRepoPicker(false);
+
+fetch("/learn/curriculum").then(function(r){ return r.json(); }).then(function(data){
+    console.log("curriculum loaded", data);
+    _cur = data.current_lesson;
+    var pct = data.progress_pct || 0;
+    document.getElementById("progFill").style.width = pct+"%";
+    document.getElementById("progLbl").textContent = data.completed+"/"+data.total_lessons+" ("+pct+"%)";
+    if (_cur) {
+      document.getElementById("lessonTag").textContent = "Phase "+_cur.phase+": "+_cur.phase_title+" \u00b7 Module "+_cur.module;
+      document.getElementById("lessonTitle").textContent = _cur.lesson_title;
+      document.getElementById("lessonMeta").textContent = "Lesson "+_cur.lesson+" of "+_cur.total_lessons+" in this module";
+      document.getElementById("vidTag").textContent = "Phase "+_cur.phase+": "+_cur.phase_title;
+      document.getElementById("vidTitle").textContent = _cur.lesson_title;
+      document.getElementById("quizTag").textContent = "Phase "+_cur.phase+": "+_cur.phase_title;
+      document.getElementById("quizTitle").textContent = "Quiz: "+_cur.lesson_title;
+    }
+    var list = document.getElementById("phaseList");
+    list.innerHTML = "";
+    (data.phases||[]).forEach(function(p){
+      var btn = document.createElement("button");
+      btn.className = "phase-btn" + ((_cur && p.phase===_cur.phase)?" active":"");
+      btn.innerHTML = '<div>'+(p.phase)+'. '+esc(p.title)+'</div><div class="meta">'+esc(p.duration)+' \u00b7 '+p.module_count+' modules</div>';
+      btn.onclick = (function(ph){ return function(){ gotoPhase(ph); }; })(p.phase);
+      list.appendChild(btn);
+    });
+  }).catch(function(e){ 
+    console.error("curriculum error",e); 
+    document.getElementById("lessonTag").textContent = "Error: "+e.message;
+    document.getElementById("lessonTitle").textContent = e.message;
+  });
+}
+
+function doTeach() {
+  var btn = document.getElementById("teachBtn");
+  btn.disabled = true;
+  btn.textContent = "Teaching...";
+  document.getElementById("teachOut").innerHTML = '<span class="spin"></span> LUCI is preparing your lesson...';
+  (function(){
+  var repo = (document.getElementById("repo-select")||{}).value||"";
+  var url  = repo ? "/learn/repo-lesson" : "/learn/teach";
+  var body = repo ? JSON.stringify({repo_name:repo}) : "{}";
+  return fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:body});
+})()
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      document.getElementById("teachOut").innerHTML = '<div class="teach-text">'+md(data.reply||data.response||"No response")+'</div>';
+      btn.disabled = false;
+      btn.textContent = "\u21ba Re-teach";
+    })
+    .catch(function(e){
+      document.getElementById("teachOut").textContent = "Error: "+e.message;
+      btn.disabled = false;
+      btn.textContent = "\u25b6 Start Lesson";
+    });
+}
+
+document.getElementById("chatIn").addEventListener("keydown", function(e){
+  if (e.key==="Enter" && !e.shiftKey) { e.preventDefault(); doChat(); }
+});
+
+function doChat() {
+  var inp = document.getElementById("chatIn");
+  var text = inp.value.trim();
+  if (!text) return;
+  inp.value = "";
+  var msgs = document.getElementById("chatMsgs");
+  msgs.innerHTML += '<div class="msg-user">'+esc(text)+'</div>';
+  msgs.innerHTML += '<div class="msg-luci" id="chatWaiting"><span class="spin"></span> Thinking...</div>';
+  msgs.scrollTop = msgs.scrollHeight;
+  _chatHist.push({role:"user",content:text});
+  fetch("/learn/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:text,history:_chatHist.slice(-6)})})
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var el = document.getElementById("chatWaiting");
+      if (el) { el.removeAttribute("id"); el.innerHTML = md(data.response||""); }
+      _chatHist.push({role:"assistant",content:data.response||""});
+      msgs.scrollTop = msgs.scrollHeight;
+    });
+}
+
+function renderVideos() {
+  if (!_cur) return;
+  var key = lkey(_cur);
+  var vids = VIDEOS[key] || [];
+  var refs = REFS[key] || [];
+  var colt = COLT[_cur.phase];
+  var html = "";
+  if (colt) {
+    html += '<div class="vid-section-title">&#127891; COLT STEELE &mdash; UDEMY</div>';
+    html += '<div style="background:#111;border:1px solid #D4AF3766;border-radius:8px;padding:16px;margin-bottom:16px">';
+    html += '<div style="color:#D4AF37;font-size:12px;font-weight:bold;margin-bottom:8px">'+esc(colt.t)+'</div>';
+    html += '<a href="'+colt.u+'" target="_blank" style="background:#D4AF37;color:#000;padding:7px 14px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:bold">Open on Udemy &#8594;</a>';
+    html += '<div style="color:#555;font-size:11px;margin-top:8px">Paid (~$15 on sale) &mdash; best for this phase</div></div>';
+  }
+  if (vids.length) {
+    html += '<div class="vid-section-title">&#9654; FREE YOUTUBE VIDEOS</div><div class="vid-grid">';
+    vids.forEach(function(v){
+      var searchUrl = "https://www.youtube.com/results?search_query="+encodeURIComponent(v.t+" "+v.s);
+      var thumbUrl  = "https://img.youtube.com/vi/"+v.id+"/mqdefault.jpg";
+      html += '<div class="vid-card" data-vid-id="'+v.id+'" data-vid-title="'+v.t.replace(/"/g,"&quot;")+'" style="cursor:pointer">';
+      html += '<div class="vid-thumb">';
+      html += '<img src="'+thumbUrl+'" alt="" style="width:100%;height:100%;object-fit:cover">';
+      html += '<div class="play-ov"><div class="play-ico">&#9654;</div></div>';
+      html += '</div>';
+      html += '<div class="vid-info">';
+      html += '<div class="vid-title">'+esc(v.t)+'</div>';
+      html += '<div class="vid-src">'+esc(v.s)+'</div>';
+      html += '</div></div>';
+    });
+    setTimeout(function(){
+      var cards = document.getElementById("vidContent").querySelectorAll(".vid-card[data-vid-id]");
+      cards.forEach(function(c){
+        c.onclick = function(){ openVid(this.getAttribute("data-vid-id"), this.getAttribute("data-vid-title")); };
+      });
+    }, 50);
+    // Attach click handlers after innerHTML is set
+    setTimeout(function(){
+      var cards = document.getElementById("vidContent").querySelectorAll(".vid-card[data-vid-id]");
+      cards.forEach(function(c){
+        c.onclick = function(){ openVid(this.getAttribute("data-vid-id"), this.getAttribute("data-vid-title")); };
+      });
+    }, 50);
+    html += '</div>';
+  } else {
+    html += '<div style="color:#555;font-size:13px;padding:20px 0">No curated videos for this lesson yet. Ask LUCI on the Lesson tab.</div>';
+  }
+  if (refs.length) {
+    html += '<div class="vid-section-title">&#128218; REFERENCE</div>';
+    refs.forEach(function(r){ html += '<a class="ref-link" href="'+r.u+'" target="_blank">&#128196; '+esc(r.t)+' &#8594;</a>'; });
+  }
+  document.getElementById("vidContent").innerHTML = html;
+}
+
+function doQuiz(idx) {
+  fetch("/learn/quiz/scenarios").then(function(r){ return r.json(); }).then(function(data){
+    _scenarios = data.scenarios || [];
+    if (!_scenarios.length) {
+      document.getElementById("quizArea").innerHTML = '<div class="scenario-box">No scenarios yet for this lesson. Try asking LUCI on the Lesson tab.</div>';
+      return;
+    }
+    var i = idx < 0 ? Math.floor(Math.random()*_scenarios.length) : Math.min(idx, _scenarios.length-1);
+    _curScenario = _scenarios[i];
+    var html = '<div class="scenario-box"><div style="font-size:10px;color:#D4AF37;text-transform:uppercase;letter-spacing:2px;margin-bottom:10px">Scenario '+(i+1)+' of '+_scenarios.length+'</div>';
+    html += esc(_curScenario).split('\\n').join('<br>')+'</div>';
+    html += '<div id="quizMsgs" class="chat-msgs"></div>';
+    html += '<div class="chat-row"><textarea class="chat-in" id="quizIn" rows="3" placeholder="Type your answer... LUCI will evaluate it."></textarea>';
+    html += '<button class="btn btn-gold" onclick="doAnswer()">Submit</button></div>';
+    document.getElementById("quizArea").innerHTML = html;
+    document.getElementById("quizIn").addEventListener("keydown", function(e){
+      if (e.key==="Enter" && !e.shiftKey) { e.preventDefault(); doAnswer(); }
+    });
+  });
+}
+
+function doAnswer() {
+  var inp = document.getElementById("quizIn");
+  if (!inp) return;
+  var ans = inp.value.trim();
+  if (!ans || !_curScenario) return;
+  inp.value = "";
+  var msgs = document.getElementById("quizMsgs");
+  msgs.innerHTML += '<div class="msg-user">'+esc(ans)+'</div>';
+  msgs.innerHTML += '<div class="msg-luci" id="evalWaiting"><span class="spin"></span> Evaluating...</div>';
+  msgs.scrollTop = msgs.scrollHeight;
+  fetch("/learn/quiz/evaluate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({scenario:_curScenario,answer:ans})})
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var el = document.getElementById("evalWaiting");
+      if (el) { el.removeAttribute("id"); el.innerHTML = md(data.response||""); }
+      msgs.scrollTop = msgs.scrollHeight;
+      renderQuizStats();
+    });
+}
+
+function doExam() {
+  document.getElementById("quizArea").innerHTML = '<div class="scenario-box">&#128221; Preparing phase exam...</div>';
+  fetch("/learn/exam",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"})
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var html = '<div class="scenario-box">Phase Exam &mdash; 3 questions, answer each then submit</div>';
+      html += '<div class="msg-luci">'+md(data.response||"")+'</div>';
+      html += '<div style="margin-top:14px" class="chat-row"><textarea class="chat-in" id="quizIn" rows="3" placeholder="Your answer to question 1..."></textarea><button class="btn btn-gold" onclick="doAnswer()">Submit</button></div>';
+      document.getElementById("quizArea").innerHTML = html;
+    });
+}
+
+function renderQuizStats() {
+  fetch("/learn/quiz/stats").then(function(r){ return r.json(); }).then(function(data){
+    if (!data.total) { document.getElementById("statsOut").textContent = "No quizzes yet. Click Random to start."; return; }
+    var pct = Math.round(data.pass/data.total*100);
+    document.getElementById("statsOut").innerHTML =
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'
+      +'<div class="stat-card"><div class="stat-val">'+data.total+'</div><div class="stat-lbl">Total</div></div>'
+      +'<div class="stat-card"><div class="stat-val" style="color:#00ff88">'+data.pass+'</div><div class="stat-lbl">Pass</div></div>'
+      +'<div class="stat-card"><div class="stat-val" style="color:#ffd700">'+data.partial+'</div><div class="stat-lbl">Partial</div></div>'
+      +'<div class="stat-card"><div class="stat-val" style="color:#ff3333">'+data.needs_review+'</div><div class="stat-lbl">Review</div></div>'
+      +'</div><div style="margin-top:8px;font-size:11px;color:#555">Pass rate: '+pct+'%</div>';
+  });
+}
+
+function doNext() {
+  if (!confirm("Mark this lesson complete and advance?")) return;
+  fetch("/learn/next",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"})
+    .then(function(r){ return r.json(); })
+    .then(function(){ loadCurriculum(); document.getElementById("teachOut").innerHTML='<span class="teach-placeholder">Lesson advanced! Click Start Lesson to begin.</span>'; _chatHist=[]; });
+}
+
+function renderProgress() {
+  fetch("/learn/curriculum").then(function(r){ return r.json(); }).then(function(data){
+    var pct = data.progress_pct||0;
+    document.getElementById("statGrid").innerHTML =
+      '<div class="stat-card"><div class="stat-val">'+data.completed+'</div><div class="stat-lbl">Done</div></div>'
+      +'<div class="stat-card"><div class="stat-val">'+data.total_lessons+'</div><div class="stat-lbl">Total</div></div>'
+      +'<div class="stat-card"><div class="stat-val">'+pct+'%</div><div class="stat-lbl">Complete</div></div>'
+      +'<div class="stat-card"><div class="stat-val">'+(data.phases||[]).length+'</div><div class="stat-lbl">Phases</div></div>';
+    var ph = document.getElementById("allPhases");
+    ph.innerHTML = (data.phases||[]).map(function(p){
+      var cur = data.current_lesson && p.phase===data.current_lesson.phase;
+      return '<div class="phase-row'+(cur?" cur":"")+'">'
+        +'<div class="phase-row-n">'+p.phase+'</div>'
+        +'<div class="phase-row-t">'+esc(p.title)+'</div>'
+        +'<div class="phase-row-s">'+esc(p.duration)+(cur?" \u00b7 IN PROGRESS":"")+'</div>'
+        +'</div>';
+    }).join("");
+  });
+}
+
+
+function gotoPhase(phaseNum) {
+  fetch("/learn/goto", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({phase: phaseNum})
+  }).then(function(r){ return r.json(); }).then(function(data){
+    loadCurriculum();
+    document.getElementById("teachOut").innerHTML = '<span class="teach-placeholder">Click Start Lesson to begin.</span>';
+    _chatHist = [];
+    showTab("lesson");
+  });
+}
+
+function doPrev() {
+  fetch("/learn/prev", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:"{}"
+  }).then(function(r){ return r.json(); }).then(function(){
+    loadCurriculum();
+    document.getElementById("teachOut").innerHTML = '<span class="teach-placeholder">Click Start Lesson to begin.</span>';
+    _chatHist = [];
+  });
+}
+
+loadCurriculum();
+
+// ── Monaco Editor ──────────────────────────────────────────────
+var _editor = null;
+function initMonaco(){
+  if(_editor || !document.getElementById("editor-container")) return;
+  require.config({ paths: { vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs" }});
+  require(["vs/editor/editor.main"], function(){
+    _editor = monaco.editor.create(document.getElementById("editor-container"), {
+      value: "// Write your code here\n",
+      language: "javascript",
+      theme: "vs-dark",
+      fontSize: 13,
+      minimap: { enabled: false },
+      scrollBeyondLastLine: false,
+      automaticLayout: true,
+      lineNumbers: "on",
+      wordWrap: "on",
+      quickSuggestions: false,
+      suggestOnTriggerCharacters: false,
+      acceptSuggestionOnEnter: "off",
+      tabCompletion: "off",
+      wordBasedSuggestions: "off",
+      parameterHints: { enabled: false },
+    });
+
+    window._editor = _editor;
+
+    // Fix autocomplete dropdown visibility
+    var style = document.createElement("style");
+    style.textContent = [
+      ".monaco-editor .suggest-widget { background:#1e1e1e !important; border:1px solid #444 !important; }",
+      ".monaco-editor .suggest-widget .monaco-list-row { color:#d4d4d4 !important; }",
+      ".monaco-editor .suggest-widget .monaco-list-row.focused { background:#094771 !important; color:#fff !important; }",
+      ".monaco-editor .suggest-widget .monaco-list-row:hover { background:#2a2d2e !important; }",
+      ".monaco-editor .suggest-widget .details-label { color:#d4d4d4 !important; }",
+      ".monaco-editor .suggest-widget .type-label { color:#9cdcfe !important; }",
+      ".monaco-editor .suggest-widget .readMore { color:#9cdcfe !important; }",
+      ".monaco-editor .suggest-widget .docs { color:#aaa !important; background:#1e1e1e !important; }",
+      ".monaco-editor .suggest-widget .label-name { color:#d4d4d4 !important; }",
+      ".monaco-editor .suggest-widget .monaco-icon-label { color:#d4d4d4 !important; }",
+      ".monaco-editor .suggest-widget .monaco-icon-label .label-description { color:#aaa !important; }"
+    ].join("\n");
+    document.head.appendChild(style);
+
+    // Live feedback — debounced 3s after typing stops
+    var _liveTimer = null;
+    var _lastReviewed = "";
+    _editor.onDidChangeModelContent(function(){
+      clearTimeout(_liveTimer);
+      var hintText = document.getElementById("live-hint-text");
+      if(hintText){ hintText.textContent = "typing..."; hintText.style.color="#555"; }
+      _liveTimer = setTimeout(function(){
+        var code = _editor.getValue().trim();
+        if(!code || code === "// Write your code here" || code === _lastReviewed) return;
+        if(code.length < 20) return;
+        _lastReviewed = code;
+        var lang = document.getElementById("code-lang").value;
+        if(hintText){ hintText.textContent = "⟳ reviewing..."; hintText.style.color="#D4AF37"; }
+        fetch("/learn/live-hint", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            code: code.slice(0, 2000),
+            language: lang,
+            lesson: _cur ? _cur.lesson_title : ""
+          })
+        }).then(function(r){ return r.json(); })
+          .then(function(d){
+            var hint = d.hint || "looks good so far";
+            var color = hint.startsWith("✓") ? "#44cc88"
+                      : hint.startsWith("❌") ? "#ff6644"
+                      : hint.startsWith("⚠️") ? "#D4AF37"
+                      : "#888";
+            if(hintText){
+              hintText.style.color = color;
+              // Format backtick code inline
+              hintText.innerHTML = hint.replace(/`([^`]+)`/g,
+                '<code style="background:#1a1a1a;padding:1px 5px;border-radius:3px;color:#D4AF37;font-family:monospace">$1</code>');
+            }
+          }).catch(function(){
+            if(hintText){ hintText.textContent = "● LUCI is watching..."; hintText.style.color="#555"; }
+          });
+      }, 3000);
+    });
+  });
+}
+
+document.getElementById("code-lang").addEventListener("change", function(){
+  if(_editor) monaco.editor.setModelLanguage(_editor.getModel(), this.value);
+});
+
+function clearEditor(){
+  if(_editor) _editor.setValue("// Write your code here\n");
+  document.getElementById("codeReviewOut").innerHTML = "<span class=\"teach-placeholder\">Write some code above, then click \"Ask LUCI to Review\".</span>";
+}
+
+var _codeChatHist = [];
+function doCodeChat(){
+  var inp  = document.getElementById("codeChatIn");
+  var msgs = document.getElementById("codeChatMsgs");
+  var text = inp ? inp.value.trim() : "";
+  if(!text) return;
+
+  // Show user message
+  var um = document.createElement("div");
+  um.className = "msg-user";
+  um.textContent = text;
+  msgs.appendChild(um);
+  inp.value = "";
+  msgs.scrollTop = msgs.scrollHeight;
+
+  // Show typing indicator
+  var tm = document.createElement("div");
+  tm.className = "msg-luci";
+  tm.innerHTML = "<span class='spin'></span> thinking...";
+  msgs.appendChild(tm);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  var code = _editor ? _editor.getValue() : "";
+  var lang = document.getElementById("code-lang").value;
+  _codeChatHist.push({role:"user", content:text});
+
+  fetch("/learn/code-chat", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      text:     text,
+      code:     code.slice(0,2000),
+      language: lang,
+      lesson:   _cur ? _cur.lesson_title : "",
+      history:  _codeChatHist.slice(-6)
+    })
+  }).then(function(r){ return r.json(); })
+    .then(function(d){
+      tm.innerHTML = "<div class='teach-text'>" + md(d.reply||d.error||"No response") + "</div>";
+      _codeChatHist.push({role:"assistant", content: d.reply||""});
+      msgs.scrollTop = msgs.scrollHeight;
+    }).catch(function(e){
+      tm.textContent = "Error: " + e.message;
+    });
+}
+// Allow Enter to send code chat
+document.addEventListener("keydown", function(e){
+  if(e.key==="Enter" && !e.shiftKey && document.activeElement &&
+     document.activeElement.id==="codeChatIn"){
+    e.preventDefault();
+    doCodeChat();
+  }
+});
+
+// Resizable divider
+(function(){
+  document.addEventListener("DOMContentLoaded", function(){
+    var resizer    = document.getElementById("code-resizer");
+    var rightPanel = document.getElementById("code-chat-panel");
+    if(!resizer || !rightPanel) return;
+    var startX = 0, startW = 0;
+    resizer.addEventListener("mousedown", function(e){
+      startX = e.clientX;
+      startW = rightPanel.offsetWidth;
+      resizer.classList.add("dragging");
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      function onMove(e){
+        var dx = startX - e.clientX;
+        var newW = Math.min(520, Math.max(160, startW + dx));
+        rightPanel.style.width = newW + "px";
+        if(window._editor) window._editor.layout();
+      }
+      function onUp(){
+        resizer.classList.remove("dragging");
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+      }
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+      e.preventDefault();
+    });
+  });
+})();
+
+function showPushPanel(){
+  var p = document.getElementById("push-panel");
+  if(p){ p.style.display="flex"; }
+  var msg = document.getElementById("commit-msg");
+  var lesson = _cur ? _cur.lesson_title : "update";
+  if(msg && !msg.value) msg.value = "LUCI Learn: practice " + lesson;
+}
+function hidePushPanel(){
+  var p = document.getElementById("push-panel");
+  if(p){ p.style.display="none"; }
+}
+function doPush(){
+  if(!_editor){ alert("Editor not ready."); return; }
+  var code = _editor.getValue();
+  var repo = (document.getElementById("repo-select")||{}).value||"";
+  var file = _loadedFile || "";
+  var msg  = (document.getElementById("commit-msg")||{}).value||"LUCI Learn practice";
+  var st   = document.getElementById("push-status");
+  if(!repo){ alert("Load a repo file first, then push."); return; }
+  if(!file){ alert("Load a file from repo first so we know where to save it."); return; }
+  if(st){ st.textContent = "Pushing..."; st.style.color="#D4AF37"; }
+  fetch("/learn/git-push", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({repo_name:repo, filename:file, content:code, message:msg})
+  }).then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d.error){
+        if(st){ st.textContent = "❌ " + d.error; st.style.color="#ff6644"; }
+      } else {
+        if(st){ st.textContent = "✓ Pushed! commit: " + (d.commit||""); st.style.color="#44cc88"; }
+        if(d.intelligence){
+          var ip = document.getElementById("commit-intel-panel");
+          var io = document.getElementById("commitIntelOut");
+          if(ip && io){
+            io.innerHTML = md(d.intelligence);
+            ip.style.display = "block";
+          }
+        }
+        setTimeout(hidePushPanel, 2000);
+      }
+    }).catch(function(e){
+      if(st){ st.textContent = "❌ " + e.message; st.style.color="#ff6644"; }
+    });
+}
+
+function loadRepoFile(){
+  var repo = (document.getElementById("repo-select")||{}).value||"";
+  if(!repo){ alert("Select a repo first from the Lesson tab."); return; }
+  var st = document.getElementById("code-status");
+  st.textContent = "Loading...";
+  fetch("/learn/repo-file?repo=" + encodeURIComponent(repo))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d.content && _editor){
+        _editor.setValue(d.content);
+        var lang = d.language || "javascript";
+        monaco.editor.setModelLanguage(_editor.getModel(), lang);
+        document.getElementById("code-lang").value = lang;
+        _loadedFile = d.filename || "";
+        st.textContent = "Loaded: " + (d.filename||"file");
+        setTimeout(function(){ st.textContent=""; }, 3000);
+        var pb = document.getElementById("push-btn");
+        if(pb) pb.style.display = "inline-flex";
+      }
+    }).catch(function(e){ st.textContent = "Error: " + e.message; });
+}
+
+function runCodeReview(){
+  if(!_editor){ alert("Editor not ready yet."); return; }
+  var code = _editor.getValue();
+  var lang = document.getElementById("code-lang").value;
+  var repo = (document.getElementById("repo-select")||{}).value||"";
+  var out  = document.getElementById("codeReviewOut");
+  if(!code.trim() || code.trim() === "// Write your code here"){ alert("Write some code first!"); return; }
+  out.innerHTML = "<span class=\"spin\"></span> LUCI is reviewing your code...";
+  document.getElementById("code-review-panel").style.display = "block";
+  fetch("/learn/code-review", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({code: code, language: lang, repo: repo,
+                          lesson: _cur ? _cur.lesson_title : ""})
+  }).then(function(r){ return r.json(); })
+    .then(function(d){
+      out.innerHTML = "<div class=\"teach-text\">" + md(d.reply || d.error || "No response") + "</div>";
+    }).catch(function(e){
+      out.innerHTML = "<span style=\"color:#ff6644\">Error: " + e.message + "</span>";
+    });
+}
+
+// Init Monaco when Code tab is opened
+var _origShowTab = showTab;
+showTab = function(name){
+  _origShowTab(name);
+  if(name === "code"){
+    if(!window._monacoLoaded){
+      window._monacoLoaded = true;
+      var s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js";
+      s.onload = function(){ initMonaco(); };
+      document.head.appendChild(s);
+    } else {
+      initMonaco();
+    }
+    var ct = document.getElementById("codeTag");
+    if(ct && _cur) ct.textContent = "Phase " + _cur.phase + " · " + (_cur.phase_title||"");
+  }
+};
+</script>
+</body>
+</html>
