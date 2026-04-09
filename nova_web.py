@@ -239,20 +239,45 @@ if STATIC_DIR.exists():
 
 @app.post("/tts")
 async def tts_endpoint(request: Request):
-    """TTS endpoint for TalkingHead lip-sync. Returns WAV audio."""
+    """
+    TTS endpoint compatible with TalkingHead (Google Cloud TTS format).
+    TalkingHead sends:
+      {"input": {"ssml": "<speak>...</speak>"}, "voice": {...}, "audioConfig": {...}}
+    We respond with:
+      {"audioContent": "<base64_ogg_or_mp3>", "timepoints": []}
+    """
+    import base64
     body = await request.json()
-    # TalkingHead sends: {"input": "text", "lang": "en-US", "voice": "...", ...}
-    text = body.get("input") or body.get("text") or ""
+
+    # Extract text from SSML or plain input
+    raw_input = body.get("input", {})
+    if isinstance(raw_input, dict):
+        ssml = raw_input.get("ssml", "")
+        # Strip SSML tags to get plain text for Piper
+        text = re.sub(r'<[^>]+>', ' ', ssml)
+        text = re.sub(r'\s+', ' ', text).strip()
+    else:
+        text = str(raw_input or "")
+
     if not text:
         return JSONResponse({"error": "no text"}, 400)
-    wav = piper_synthesize(text)
-    if not wav:
+
+    # Determine audio encoding from request
+    audio_config = body.get("audioConfig", {})
+    encoding = audio_config.get("audioEncoding", "MP3").upper()
+
+    wav_bytes = piper_synthesize(text)
+    if not wav_bytes:
         return JSONResponse({"error": "synthesis failed"}, 500)
-    return StreamingResponse(
-        io.BytesIO(wav),
-        media_type="audio/wav",
-        headers={"Cache-Control": "no-cache", "X-Nova-TTS": "piper-amy"}
-    )
+
+    # TalkingHead expects base64-encoded audio + timepoints array
+    # We return WAV as base64 (TalkingHead will decode it)
+    audio_b64 = base64.b64encode(wav_bytes).decode("utf-8")
+
+    return JSONResponse({
+        "audioContent": audio_b64,
+        "timepoints": []   # No word-level timing from Piper — TalkingHead handles gracefully
+    })
 
 @app.get("/tts/config")
 async def tts_config():
