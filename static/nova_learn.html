@@ -9,6 +9,8 @@
 <meta name="theme-color" content="#7c3aed">
 <link rel="apple-touch-icon" href="/static/nova-icon.png">
 <link rel="manifest" href="/static/nova-manifest.json">
+<link rel="icon" type="image/png" href="/static/nova-icon.png">
+<link rel="shortcut icon" href="/static/nova-icon.png">
 <title>Nova — Your LCSW Study Partner</title>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}
@@ -939,7 +941,7 @@ function sendChat() {
   }).then(function(r){ return r.json(); })
     .then(function(data){
       var reply = data.response || data.reply || data.content || "I'm having trouble right now — try again in a moment.";
-      typing.innerHTML = md(reply); if(window.novaStartSpeaking) novaStartSpeaking(reply.length);
+      typing.innerHTML = md(reply); if(window.novaStartSpeaking && reply) novaStartSpeaking(String(reply));
       chatHistory.push({role:'assistant', content:reply});
       setAvatarState('', 'Ready to study ✨');
       scrollChat();
@@ -1350,6 +1352,8 @@ window.setNovaAvatarState = function(state) {
 
 window.novaStartSpeaking = function(text) {
   if (!head) return;
+  if (typeof text !== 'string') text = String(text || '');
+  if (!head) return;
   // Clean markdown before TTS
   var clean = text
     .replace(/```[\s\S]*?```/g, '')
@@ -1365,12 +1369,19 @@ window.novaStartSpeaking = function(text) {
   } catch(e) { console.log('speakText error:', e.message); }
 };
 
-// ── Greeting on load ─────────────────────────────────────────────
-setTimeout(function() {
-  if (head) {
-    try { head.speakText("Hey Ogechi! I'm Nova, ready to study with you!", { avatarMood: 'happy' }); } catch(e) {}
-  }
-}, 1500);
+// ── Greeting on first user interaction (browser requires gesture for audio) ──
+var _greeted = false;
+function _novaGreet() {
+  if (_greeted || !head) return;
+  _greeted = true;
+  try {
+    head.speakText("Hey Ogechi! I'm Nova, ready to study with you!", { avatarMood: 'happy' });
+  } catch(e) { console.log('greet error:', e.message); }
+  document.removeEventListener('click', _novaGreet);
+  document.removeEventListener('keydown', _novaGreet);
+}
+document.addEventListener('click', _novaGreet);
+document.addEventListener('keydown', _novaGreet);
 
 // ── Cursor proximity tracking ─────────────────────────────────────
 var novaFloat = document.getElementById('novaFloat');
