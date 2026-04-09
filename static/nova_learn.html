@@ -1274,7 +1274,7 @@ let head = null;
 if (container) {
   try {
     head = new TalkingHead(container, {
-      ttsEndpoint: '',
+      ttsEndpoint:        '/tts',
       lipsyncLang: 'en',
       lipsyncModules: ['en'],
       cameraView: 'upper',
@@ -1350,45 +1350,119 @@ window.setNovaAvatarState = function(state) {
 
 window.novaStartSpeaking = function(text) {
   if (!head) return;
-  // No TTS — use visual mouth animation timed to text length
-  window._novaSpeaking = true;
-  try { head.setMood('happy'); } catch(e) {}
-  var duration = Math.max(2000, Math.min(text.length * 40, 12000));
-  setTimeout(function(){
-    window._novaSpeaking = false;
-    try {
-      head.setValue('mouthOpen', 0, 200);
-      head.setMood('neutral');
-    } catch(e) {}
-  }, duration);
+  // Clean markdown before TTS
+  var clean = text
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`[^`]+`/g, '')
+    .replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/\s+/g, ' ').trim();
+  if (!clean) return;
+  try {
+    head.setMood('happy');
+    head.speakText(clean, { avatarMood: 'happy', ttsRate: 1.05 });
+  } catch(e) { console.log('speakText error:', e.message); }
 };
 
-// Click reaction
+// ── Greeting on load ─────────────────────────────────────────────
+setTimeout(function() {
+  if (head) {
+    try { head.speakText("Hey Ogechi! I'm Nova, ready to study with you!", { avatarMood: 'happy' }); } catch(e) {}
+  }
+}, 1500);
+
+// ── Cursor proximity tracking ─────────────────────────────────────
 var novaFloat = document.getElementById('novaFloat');
+document.addEventListener('mousemove', function(e) {
+  if (!head || !novaFloat) return;
+  var rect = novaFloat.getBoundingClientRect();
+  var cx = rect.left + rect.width / 2;
+  var cy = rect.top  + rect.height / 2;
+  var dx = e.clientX - cx;
+  var dy = e.clientY - cy;
+  var dist = Math.sqrt(dx*dx + dy*dy);
+  if (dist < 300) {
+    var nx = Math.max(-0.4, Math.min(0.4, dx / 600));
+    var ny = Math.max(-0.3, Math.min(0.3, dy / 600));
+    try {
+      head.setValue('eyeLookInLeft',  nx > 0 ? nx : 0, 200);
+      head.setValue('eyeLookOutLeft', nx < 0 ? -nx : 0, 200);
+      head.setValue('eyesLookUp',     ny < 0 ? -ny : 0, 200);
+      head.setValue('eyesLookDown',   ny > 0 ? ny  : 0, 200);
+    } catch(ee) {}
+  }
+});
+
+// ── Click to expand ───────────────────────────────────────────────
 if (novaFloat) {
   var expanded = false;
+  novaFloat.addEventListener('mouseenter', function() {
+    novaFloat.style.transform = 'scale(1.04)';
+    try { if (head) head.setMood('happy'); } catch(e) {}
+  });
+  novaFloat.addEventListener('mouseleave', function() {
+    novaFloat.style.transform = 'scale(1)';
+    try { if (head) head.setMood('neutral'); } catch(e) {}
+  });
   novaFloat.addEventListener('click', function(e) {
     e.stopPropagation();
     expanded = !expanded;
+    novaFloat.style.width  = expanded ? '240px' : '180px';
+    novaFloat.style.height = expanded ? '340px' : '240px';
+    setTimeout(function() { if (head) head.onResize(); }, 400);
     if (expanded) {
-      novaFloat.style.width = '260px';
-      novaFloat.style.height = '360px';
-    } else {
-      novaFloat.style.width = '180px';
-      novaFloat.style.height = '240px';
+      try { head.speakText("Hi! Ready to study?", { avatarMood: 'happy' }); } catch(e) {}
     }
-    setTimeout(function() {
-      if (head) head.onResize();
-    }, 500);
   });
   document.addEventListener('click', function() {
     if (expanded) {
       expanded = false;
-      novaFloat.style.width = '180px';
+      novaFloat.style.width  = '180px';
       novaFloat.style.height = '240px';
-      setTimeout(function() { if (head) head.onResize(); }, 500);
+      setTimeout(function() { if (head) head.onResize(); }, 400);
     }
   });
+}
+
+// ── Idle reaction after 30s ───────────────────────────────────────
+var _idleTimer = null;
+function resetIdle() {
+  clearTimeout(_idleTimer);
+  _idleTimer = setTimeout(function() {
+    if (!head) return;
+    var prompts = [
+      "Take your time, I'm here when you're ready.",
+      "Whenever you're ready, I've got more practice questions.",
+      "No rush! Want me to quiz you on something?"
+    ];
+    var msg = prompts[Math.floor(Math.random() * prompts.length)];
+    var statusEl = document.getElementById('avatarStatus');
+    if (statusEl) statusEl.textContent = 'Thinking of you... 💜';
+    try { head.speakText(msg, { avatarMood: 'happy' }); } catch(e) {}
+  }, 30000);
+}
+document.addEventListener('mousemove', resetIdle);
+document.addEventListener('keydown', resetIdle);
+document.addEventListener('click', resetIdle);
+resetIdle();
+
+// ── Mute button ───────────────────────────────────────────────────
+if (novaFloat) {
+  var muteBtn = document.createElement('button');
+  muteBtn.style.cssText = 'position:absolute;top:6px;left:6px;z-index:10;background:rgba(255,255,255,0.9);border:none;border-radius:50%;width:22px;height:22px;font-size:11px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.15)';
+  muteBtn.textContent = '🔊';
+  muteBtn.title = 'Toggle voice';
+  var _muted = false;
+  muteBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    _muted = !_muted;
+    muteBtn.textContent = _muted ? '🔇' : '🔊';
+    if (_muted && head && head.speechQueue) {
+      try { head.speechQueue.length = 0; } catch(ee) {}
+    }
+  });
+  novaFloat.appendChild(muteBtn);
 }
 </script>
 </body>
